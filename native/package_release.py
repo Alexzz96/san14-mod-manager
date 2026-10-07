@@ -27,7 +27,8 @@ package=DIST/f'SAN14ModManager-{version}-windows-x64.zip'
 guide=(HERE.parent/'docs/USER_GUIDE.md').read_bytes()
 config=b'[Rule]\nMode=2\n[Manager]\nEnabled=1\n[Features]\nWallClusterLimit=1\nLimitHint=1\nDiagnostics=0\n'
 manifest={'version':version,'release_status':'prerelease','platform':'windows-x64',
-          'supported_game_sha256':'e6ae68925c266a19b05641913e60bf7d97d5eb4754901c3e82a5362d05ff7372',
+          'target_executable':'SAN14PK_SC.exe','game_version_check':False,
+          'game_sha256_check':False,'runtime_hook_validation':True,
           'manager_exe_sha256':verification['manager_exe_sha256'],
           'embedded_dll_sha256':verification['production_dll_sha256'],
           'manager_in_game_acceptance':'pending'}

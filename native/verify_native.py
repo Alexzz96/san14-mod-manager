@@ -18,10 +18,11 @@ import uuid
 HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE.parent/'reference'))
 from build_limit import Building,evaluate
+from verify_entry import run_entry_tests
 
 sys.stdout.reconfigure(encoding='utf-8')
 parser=argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--game-dir', type=Path, help='Optional local compatible game directory; never uploaded')
+parser.add_argument('--game-dir', type=Path, help='Optional local game directory for static checks; never uploaded')
 args=parser.parse_args()
 GAME=args.game_dir.resolve() if args.game_dir else None
 BUILD=HERE/'build' 
@@ -49,17 +50,12 @@ correlation.argtypes=[C.c_int]*6;correlation.restype=C.c_int
 assert correlation(32665,9,1,32665,9,1)==1
 assert correlation(32665,9,1,32665,9,2)==0
 assert correlation(32665,9,1,32664,9,1)==0
+entry_metrics=run_entry_tests(test)
 verified_prologues=[]
 if GAME:
-    game_hash=test.S14TestHash
-    game_hash.argtypes=[C.c_wchar_p];game_hash.restype=C.c_int
-    assert game_hash(str(GAME/'SAN14PK_SC.exe'))==1
-    assert game_hash(str(BUILD/'test_native.exe'))==0
-    
     # Compare the exact constants compiled into the plugin with the original PE.
     # The two hook targets save different first registers (RBP versus RBX).
     binary=(GAME/'SAN14PK_SC.exe').read_bytes()
-    assert hashlib.sha256(binary).hexdigest()=='e6ae68925c266a19b05641913e60bf7d97d5eb4754901c3e82a5362d05ff7372'
     nt=struct.unpack_from('<I',binary,0x3c)[0]
     sections=struct.unpack_from('<H',binary,nt+6)[0]
     section_table=nt+24+struct.unpack_from('<H',binary,nt+20)[0]
@@ -173,70 +169,69 @@ remove=package.S14TestRemove; remove.argtypes=[C.c_wchar_p,C.c_wchar_p];remove.r
 owned=package.S14TestOwned; owned.argtypes=[C.c_wchar_p];owned.restype=C.c_int
 running=package.S14TestRunning; running.argtypes=[C.c_wchar_p];running.restype=C.c_int
 error=C.create_unicode_buffer(192)
-installer_metrics={'status':'skipped','reason':'--game-dir not supplied'}
-if GAME:
-    actual_root=GAME
-    actual_hash=hashlib.sha256((actual_root/'dinput8.dll').read_bytes()).hexdigest() if (actual_root/'dinput8.dll').exists() else None
-    busy_guard=False
-    if running(str(actual_root)):
-        assert install(str(actual_root),str(BUILD/'SAN14ModManager.exe'),error)==0
-        after_hash=hashlib.sha256((actual_root/'dinput8.dll').read_bytes()).hexdigest() if (actual_root/'dinput8.dll').exists() else None
-        assert after_hash==actual_hash
-        busy_guard=True
-    with tempfile.TemporaryDirectory(prefix='SAN14-manager-测试-') as name:
-        sandbox=Path(name).resolve()
-        # Verify the recursive-cleanup target before exercising this owned sandbox.
-        assert sandbox.parent==Path(tempfile.gettempdir()).resolve() and sandbox!=actual_root.resolve()
-        game=sandbox/'SAN14PK_SC.exe';shutil.copyfile(actual_root/'SAN14PK_SC.exe',game)
-        dll=sandbox/'dinput8.dll';dll.write_bytes(b'other-proxy-must-survive')
+busy_guard=False
+if GAME and running(str(GAME)):
+    actual_hash=hashlib.sha256((GAME/'dinput8.dll').read_bytes()).hexdigest() if (GAME/'dinput8.dll').exists() else None
+    assert install(str(GAME),str(BUILD/'SAN14ModManager.exe'),error)==0
+    after_hash=hashlib.sha256((GAME/'dinput8.dll').read_bytes()).hexdigest() if (GAME/'dinput8.dll').exists() else None
+    assert actual_hash==after_hash
+    busy_guard=True
+game_source=GAME/'SAN14PK_SC.exe' if GAME else BUILD/'test_native.exe'
+input_hash=hashlib.sha256(game_source.read_bytes()).hexdigest()
+with tempfile.TemporaryDirectory(prefix='SAN14-manager-测试-') as name:
+    sandbox=Path(name).resolve()
+    # Verify the recursive-cleanup target before exercising this owned sandbox.
+    assert sandbox.parent==Path(tempfile.gettempdir()).resolve() and (GAME is None or sandbox!=GAME.resolve())
+    game=sandbox/'SAN14PK_SC.exe';shutil.copyfile(game_source,game)
+    dll=sandbox/'dinput8.dll';dll.write_bytes(b'other-proxy-must-survive')
+    assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0
+    assert dll.read_bytes()==b'other-proxy-must-survive'
+    dll.unlink()
+    game.unlink()
+    assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0 and not dll.exists()
+    cli=subprocess.run([str(BUILD/'SAN14ModManager.exe'),'--install',str(sandbox)],capture_output=True,timeout=10,
+                       creationflags=subprocess.CREATE_NO_WINDOW)
+    assert cli.returncode==2 and not dll.exists(),(cli.returncode,cli.stderr)
+    shutil.copyfile(game_source,game)
+    assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==1,error.value
+    assert owned(str(sandbox))==1 and dll.read_bytes()==(BUILD/'dinput8.dll').read_bytes()
+    assert (sandbox/'SAN14ModManager.exe').read_bytes()==(BUILD/'SAN14ModManager.exe').read_bytes()
+    config=sandbox/'SAN14BuildLimit.ini'
+    config.write_text('[Manager]\nEnabled=1\n[Features]\nWallClusterLimit=0\nLimitHint=1\n[Future]\nUnknownFeature=keep-me\n',encoding='ascii')
+    # Hold only a sandbox manager file open to force a commit failure. The
+    # native installer must restore the previous DLL and leave its receipt.
+    old_dll=(BUILD/'dinput8.dll').read_bytes()+b'previous-sandbox-version';dll.write_bytes(old_dll)
+    receipt=sandbox/'SAN14ModManager/installation.ini'
+    metadata=configparser.ConfigParser();metadata.optionxform=str;metadata.read(receipt)
+    metadata.set('Install','DllSHA256',hashlib.sha256(old_dll).hexdigest())
+    with receipt.open('w',encoding='ascii') as output: metadata.write(output)
+    create_file=kernel.CreateFileW
+    create_file.argtypes=[C.c_wchar_p,C.c_uint32,C.c_uint32,C.c_void_p,C.c_uint32,C.c_uint32,C.c_void_p];create_file.restype=C.c_void_p
+    close_handle=kernel.CloseHandle;close_handle.argtypes=[C.c_void_p];close_handle.restype=C.c_int
+    held=create_file(str(sandbox/'SAN14ModManager.exe'),0x80000000,1,None,3,0,None)
+    assert held not in (None,C.c_void_p(-1).value)
+    try:
         assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0
-        assert dll.read_bytes()==b'other-proxy-must-survive'
-        dll.unlink()
-        game.write_bytes(b'unsupported-game')
-        assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0 and not dll.exists()
-        cli=subprocess.run([str(BUILD/'SAN14ModManager.exe'),'--install',str(sandbox)],capture_output=True,timeout=10,
-                           creationflags=subprocess.CREATE_NO_WINDOW)
-        assert cli.returncode==2 and not dll.exists(),(cli.returncode,cli.stderr)
-        shutil.copyfile(actual_root/'SAN14PK_SC.exe',game)
-        assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==1,error.value
-        assert owned(str(sandbox))==1 and dll.read_bytes()==(BUILD/'dinput8.dll').read_bytes()
-        assert (sandbox/'SAN14ModManager.exe').read_bytes()==(BUILD/'SAN14ModManager.exe').read_bytes()
-        config=sandbox/'SAN14BuildLimit.ini'
-        config.write_text('[Manager]\nEnabled=1\n[Features]\nWallClusterLimit=0\nLimitHint=1\n[Future]\nUnknownFeature=keep-me\n',encoding='ascii')
-        # Hold only a sandbox manager file open to force a commit failure. The
-        # native installer must restore the previous DLL and leave its receipt.
-        old_dll=(BUILD/'dinput8.dll').read_bytes()+b'previous-sandbox-version';dll.write_bytes(old_dll)
-        receipt=sandbox/'SAN14ModManager/installation.ini'
-        metadata=configparser.ConfigParser();metadata.optionxform=str;metadata.read(receipt)
-        metadata.set('Install','DllSHA256',hashlib.sha256(old_dll).hexdigest())
-        with receipt.open('w',encoding='ascii') as output: metadata.write(output)
-        create_file=kernel.CreateFileW
-        create_file.argtypes=[C.c_wchar_p,C.c_uint32,C.c_uint32,C.c_void_p,C.c_uint32,C.c_uint32,C.c_void_p];create_file.restype=C.c_void_p
-        close_handle=kernel.CloseHandle;close_handle.argtypes=[C.c_void_p];close_handle.restype=C.c_int
-        held=create_file(str(sandbox/'SAN14ModManager.exe'),0x80000000,1,None,3,0,None)
-        assert held not in (None,C.c_void_p(-1).value)
-        try:
-            assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0
-            assert dll.read_bytes()==old_dll and owned(str(sandbox))==1
-        finally: assert close_handle(held)
-        assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==1,error.value
-        assert 'UnknownFeature=keep-me' in config.read_text() and 'WallClusterLimit=0' in config.read_text()
-        assert (sandbox/'SAN14ModManager/backups/dinput8.previous.dll').read_bytes()==old_dll
-        dll.write_bytes(dll.read_bytes()+b'changed')
-        assert owned(str(sandbox))==0 and install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0
-        assert remove(str(sandbox),error)==0
-        shutil.copyfile(BUILD/'dinput8.dll',dll)
-        assert remove(str(sandbox),error)==1,error.value
-        assert not dll.exists() and config.exists() and (sandbox/'SAN14ModManager.exe').exists()
-        assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==1,error.value
-        assert hashlib.sha256(game.read_bytes()).hexdigest()=='e6ae68925c266a19b05641913e60bf7d97d5eb4754901c3e82a5362d05ff7372'
-    installer_metrics={'install_update_remove_reinstall':'passed','unicode_game_folder':'passed',
-                       'unknown_proxy_preserved':True,'unsupported_game_rejected':True,
-                       'changed_owned_dll_rejected':True,'configuration_preserved':True,
-                       'previous_dll_backup':True,'live_game_update_guard_tested':busy_guard,
-                       'locked_manager_rolls_back_plugin':True,
-                       'game_binary_unchanged':True}
-report={'status':'passed','native_game_hash_check':'passed' if GAME else 'skipped','verified_game_prologues':verified_prologues,
+        assert dll.read_bytes()==old_dll and owned(str(sandbox))==1
+    finally: assert close_handle(held)
+    assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==1,error.value
+    assert 'UnknownFeature=keep-me' in config.read_text() and 'WallClusterLimit=0' in config.read_text()
+    assert (sandbox/'SAN14ModManager/backups/dinput8.previous.dll').read_bytes()==old_dll
+    dll.write_bytes(dll.read_bytes()+b'changed')
+    assert owned(str(sandbox))==0 and install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0
+    assert remove(str(sandbox),error)==0
+    shutil.copyfile(BUILD/'dinput8.dll',dll)
+    assert remove(str(sandbox),error)==1,error.value
+    assert not dll.exists() and config.exists() and (sandbox/'SAN14ModManager.exe').exists()
+    assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==1,error.value
+    assert hashlib.sha256(game.read_bytes()).hexdigest()==input_hash
+installer_metrics={'install_update_remove_reinstall':'passed','unicode_game_folder':'passed',
+                   'unknown_proxy_preserved':True,'missing_game_rejected':True,'unlisted_game_fingerprint_accepted':True,
+                   'changed_owned_dll_rejected':True,'configuration_preserved':True,
+                   'previous_dll_backup':True,'live_game_update_guard_tested':busy_guard,
+                   'locked_manager_rolls_back_plugin':True,
+                   'game_binary_unchanged':True}
+report={'status':'passed','game_version_check':False,'game_sha256_check':False,'hook_entry_validation':entry_metrics,'verified_game_prologues':verified_prologues,
         'territory_adapter_cases':512,'creation_correlation':'passed',
         'random_reference_cases':random_cases,'private_snapshots_required':False,
         'tls_thread_count':8,'tls_calls':8000,'full_queue_dropped':dropped,

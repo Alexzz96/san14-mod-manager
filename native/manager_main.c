@@ -10,13 +10,13 @@
 #include "package.h"
 
 static wchar_t executable[MAX_PATH];
-static void refresh(S14ManagerUI *ui,int check_version) {
-    if (check_version) ui->compatible=s14_game_compatible(ui->root);
+static void refresh(S14ManagerUI *ui,int check_directory) {
+    if (check_directory) ui->game_found=s14_game_available(ui->root);
     ui->installed=s14_owned_install(ui->root); ui->running=s14_game_running(ui->root);
     ui->requested=s14_config_read(ui->ini);
     unsigned int applied=0; int fault=0; ui->attached=s14_read_runtime(ui->root,&applied,&fault); ui->fault=fault;
     ui->effective=s14_effective_flags(ui->requested);
-    if (ui->attached && fault) wcscpy(ui->status,L"游戏已接入，但追加规则已保护性停用，请重启后检查。");
+    if (ui->attached && fault) wcscpy(ui->status,s14_fault_message(fault));
     else if (ui->attached) wcscpy(ui->status,applied==ui->effective?L"游戏已连接 · 当前设置已生效":L"设置已保存 · 等待游戏应用");
     else if (ui->running) wcscpy(ui->status,L"游戏正在运行 · 尚未连接此版本管理器，更新后需要重启");
     else wcscpy(ui->status,L"游戏未运行 · 设置将在下次启动时载入");

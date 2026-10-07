@@ -44,7 +44,7 @@ int main(void) {
     }
     HWND foreground=GetForegroundWindow(); S14ManagerUI ui={0}; ui.action=changed;
     wcscpy(ui.ini,ini); wcscpy(ui.root,root); wcscpy(ui.status,L"游戏已接入 · 开关从下一次检查起生效");
-    ui.compatible=ui.installed=ui.attached=1;
+    ui.game_found=ui.installed=ui.attached=1;
     REQUIRE(s14_manager_create(&ui,GetModuleHandleW(NULL),NULL,1));
     REQUIRE(GetForegroundWindow()==foreground && !IsWindowVisible(ui.window));
     REQUIRE(s14_manager_hit(&ui,(POINT){668,242})==10);

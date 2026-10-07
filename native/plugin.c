@@ -1,6 +1,5 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <bcrypt.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -265,42 +264,42 @@ static void *hooked_create(const int *parameters) {
     return created;
 }
 
-static int hash_matches(const wchar_t *path) {
-    static const unsigned char expected[32]={0xe6,0xae,0x68,0x92,0x5c,0x26,0x6a,0x19,0xb0,0x56,0x41,0x91,0x3e,0x60,0xbf,0x7d,
-        0x97,0xd5,0xeb,0x47,0x54,0x90,0x1c,0x3e,0x82,0xa5,0x36,0x2d,0x05,0xff,0x73,0x72};
-    HANDLE file=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
-    if (file==INVALID_HANDLE_VALUE) return 0;
-    BCRYPT_ALG_HANDLE algorithm=NULL;
-    BCRYPT_HASH_HANDLE hash=NULL;
-    unsigned char digest[32],buffer[65536];
-    DWORD length=0,got=0;
-    int valid=0;
-    if (BCryptOpenAlgorithmProvider(&algorithm,BCRYPT_SHA256_ALGORITHM,NULL,0)<0) goto cleanup;
-    if (BCryptCreateHash(algorithm,&hash,NULL,0,NULL,0,0)<0) goto cleanup;
-    for (;;) {
-        if (!ReadFile(file,buffer,sizeof(buffer),&got,NULL)) goto cleanup;
-        if (!got) break;
-        if (BCryptHashData(hash,buffer,got,0)<0) goto cleanup;
-        length+=got;
+// These checks concern the bytes about to be patched, not a version or
+// executable fingerprint. Refuse unreadable/out-of-image addresses before
+// dereferencing them, including when the host image uses a different layout.
+static int mapped_bytes(uintptr_t address,size_t length,uintptr_t allocation) {
+    if (!length || address>UINTPTR_MAX-length) return 0;
+    uintptr_t end=address+length;
+    while (address<end) {
+        MEMORY_BASIC_INFORMATION region;
+        if (!VirtualQuery((void*)address,&region,sizeof(region)) || region.State!=MEM_COMMIT ||
+            (uintptr_t)region.AllocationBase!=allocation || (region.Protect&(PAGE_NOACCESS|PAGE_GUARD))) return 0;
+        uintptr_t next=(uintptr_t)region.BaseAddress+region.RegionSize;
+        if (next<=address) return 0;
+        address=next<end?next:end;
     }
-    if (length!=28747544 || BCryptFinishHash(hash,digest,sizeof(digest),0)<0) goto cleanup;
-    valid=memcmp(digest,expected,32)==0;
-cleanup:
-    if (hash) BCryptDestroyHash(hash);
-    if (algorithm) BCryptCloseAlgorithmProvider(algorithm,0);
-    CloseHandle(file); return valid;
+    return 1;
 }
-
-static int prepare_game(void) {
-    wchar_t game_path[MAX_PATH];
-    if (!GetModuleFileNameW(NULL,game_path,MAX_PATH)) return 0;
-    wchar_t *name=wcsrchr(game_path,L'\\');
-    if (!name || _wcsicmp(name+1,L"SAN14PK_SC.exe") || !hash_matches(game_path)) return 0;
-    image_base=(uintptr_t)GetModuleHandleW(NULL);
+static int image_span(size_t rva,size_t length) {
+    size_t size=image_end-image_base;
+    return rva<=size && length<=size-rva && mapped_bytes(image_base+rva,length,image_base);
+}
+static int prepare_image(uintptr_t base) {
+    image_base=base; image_end=base; manager_slot=NULL;
+    if (!mapped_bytes(base,sizeof(IMAGE_DOS_HEADER),base)) return 0;
     IMAGE_DOS_HEADER *dos=(IMAGE_DOS_HEADER*)image_base;
+    if (dos->e_magic!=IMAGE_DOS_SIGNATURE || dos->e_lfanew<0 ||
+        (uintptr_t)dos->e_lfanew>UINTPTR_MAX-image_base ||
+        !mapped_bytes(image_base+dos->e_lfanew,sizeof(IMAGE_NT_HEADERS64),base)) return 0;
     IMAGE_NT_HEADERS64 *pe=(IMAGE_NT_HEADERS64*)(image_base+dos->e_lfanew);
-    if (dos->e_magic!=IMAGE_DOS_SIGNATURE || pe->Signature!=IMAGE_NT_SIGNATURE || pe->FileHeader.Machine!=IMAGE_FILE_MACHINE_AMD64) return 0;
+    if (pe->Signature!=IMAGE_NT_SIGNATURE || pe->FileHeader.Machine!=IMAGE_FILE_MACHINE_AMD64 ||
+        pe->OptionalHeader.Magic!=IMAGE_NT_OPTIONAL_HDR64_MAGIC ||
+        pe->OptionalHeader.SizeOfImage>UINTPTR_MAX-image_base) return 0;
     image_end=image_base+pe->OptionalHeader.SizeOfImage;
+    if (!image_span(COMMON_RVA,sizeof(common_signature)) || !image_span(CREATE_RVA,sizeof(create_signature)) ||
+        !image_span(WRAPPER_RVA,sizeof(wrapper_signature)) || !image_span(ENTER_RVA,sizeof(enter_signature)) ||
+        !image_span(EXIT_RVA,sizeof(exit_signature)) || !image_span(CONSTRUCTION_VTABLE_RVA,16*sizeof(uintptr_t)) ||
+        !image_span(0x20cdcd,7) || !image_span(0x1fc91d0,sizeof(void*)) || !image_span(FORCE_ID_RVA,1)) return 0;
     if (memcmp((void*)(image_base+COMMON_RVA),common_signature,15) ||
         memcmp((void*)(image_base+CREATE_RVA),create_signature,15) ||
         memcmp((void*)(image_base+WRAPPER_RVA),wrapper_signature,sizeof(wrapper_signature)) ||
@@ -314,9 +313,19 @@ static int prepare_game(void) {
     int32_t relative=0; memcpy(&relative,instruction+3,4);
     uintptr_t slot=(uintptr_t)(instruction+7)+relative;
     if (slot!=image_base+0x1fc91d0 || !executable_address(image_base+FORCE_ID_RVA)) return 0;
+    static const size_t returns[]={0x6eebe0,0x7089fd,0x70d9bc,0x722571,0x724406,
+        0x733cd,0x7370a,0x74245,0x74605,0x70744c,0x26015d,0x70d9fa,0x37894d};
+    for (size_t i=0;i<sizeof(returns)/sizeof(returns[0]);i++) {
+        if (!image_span(returns[i]-5,5)) return 0;
+        unsigned char *call=(unsigned char*)(image_base+returns[i]-5);
+        int32_t displacement; memcpy(&displacement,call+1,4);
+        size_t target=i<11?WRAPPER_RVA:COMMON_RVA;
+        if (call[0]!=0xe8 || (int64_t)returns[i]+displacement!=(int64_t)target) return 0;
+    }
     manager_slot=(unsigned char**)slot;
     return 1;
 }
+static int prepare_game(void) { return prepare_image((uintptr_t)GetModuleHandleW(NULL)); }
 
 static void write_line(HANDLE file,const char *line) {
     static size_t written_bytes;
@@ -364,7 +373,7 @@ static void apply_configuration(S14ManagerUI *ui) {
     InterlockedExchange(&effective_flags,(LONG)ui->effective);
     InterlockedExchange(&mode,s14_runtime_mode(ui->effective));
     ui->fault=runtime_fault; ui->attached=hooks_ready;
-    wcscpy(ui->status,runtime_fault?L"追加规则已保护性停用 · 设置仅保存，重启后检查":
+    wcscpy(ui->status,runtime_fault?s14_fault_message(runtime_fault):
         (ui->requested&S14_MASTER?L"游戏已接入 · 开关从下一次检查起生效":L"扩展功能已关闭 · F10 管理器仍可使用"));
     s14_manager_refresh(ui);
 }
@@ -397,8 +406,8 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
     if (log==INVALID_HANDLE_VALUE) return 0;
     int prepared=prepare_game();
     if (!prepared) {
-        write_line(log,"{\"event\":\"startup_failed\",\"reason\":\"game_validation\"}\n");
-        runtime_fault=1;
+        write_line(log,"{\"event\":\"startup_failed\",\"reason\":\"hook_entry_unavailable\",\"game_version_check\":false}\n");
+        runtime_fault=S14_FAULT_ENTRY;
     }
     MH_STATUS status=prepared?MH_Initialize():MH_ERROR_NOT_EXECUTABLE;
     if (status==MH_OK) status=MH_CreateHook((void*)(image_base+COMMON_RVA),hooked_check,(void**)&original_check);
@@ -408,13 +417,13 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
     if (status==MH_OK) status=MH_CreateHook((void*)(image_base+EXIT_RVA),hooked_exit,(void**)&original_exit);
     if (status==MH_OK) status=MH_EnableHook(MH_ALL_HOOKS);
     char startup[384];
-    snprintf(startup,sizeof(startup),"{\"event\":\"startup\",\"requested_mode\":%d,\"hook_status\":%d,\"base\":\"0x%llx\",\"wall_owner_source\":\"tile_current_force\",\"interaction_version\":2,\"toast_duration_ms\":5000,\"manager_version\":\"0.2.0\",\"requested_flags\":%u}\n",requested,(int)status,(unsigned long long)image_base,requested_flags);
+    snprintf(startup,sizeof(startup),"{\"event\":\"startup\",\"requested_mode\":%d,\"hook_status\":%d,\"base\":\"0x%llx\",\"wall_owner_source\":\"tile_current_force\",\"interaction_version\":2,\"toast_duration_ms\":5000,\"manager_version\":\"0.2.1\",\"game_version_check\":false,\"requested_flags\":%u}\n",requested,(int)status,(unsigned long long)image_base,requested_flags);
     write_line(log,startup);
-    if (status!=MH_OK) { if (prepared) MH_DisableHook(MH_ALL_HOOKS); runtime_fault=1; }
+    if (status!=MH_OK && prepared) { MH_DisableHook(MH_ALL_HOOKS); runtime_fault=S14_FAULT_HOOK; }
     hooks_ready=status==MH_OK;
     ULONGLONG last_summary=0,last_config=0;
     HWND owner=NULL; S14Toast toast={0};
-    S14ManagerUI ui={0}; ui.action=game_manager_action; ui.compatible=prepared; ui.running=1; ui.installed=1;
+    S14ManagerUI ui={0}; ui.action=game_manager_action; ui.game_found=1; ui.running=1; ui.installed=1;
     wcscpy(ui.root,game_folder); wcscpy(ui.ini,ini_path); apply_configuration(&ui);
     ATOM hotkey_id=GlobalAddAtomW(L"SAN14ModManager.F10.0.2"); int hotkey_registered=0;
     for (;;) {
@@ -433,7 +442,7 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
         if (tick-last_config>=250) {
             last_config=tick;
             if (!runtime_fault && InterlockedCompareExchange64(&decode_errors,0,0)) {
-                runtime_fault=1; hooks_ready=0; InterlockedExchange(&effective_flags,0); InterlockedExchange(&mode,0);
+                runtime_fault=S14_FAULT_MAP; hooks_ready=0; InterlockedExchange(&effective_flags,0); InterlockedExchange(&mode,0);
                 MH_DisableHook(MH_ALL_HOOKS); write_line(log,"{\"event\":\"rules_disabled_until_restart\",\"reason\":\"decode_error\"}\n");
             }
             unsigned int previous_flags=ui.requested; apply_configuration(&ui);
@@ -524,7 +533,11 @@ __declspec(dllexport) int S14TestCorrelation(int tile,int type,int owner,int act
     last_validation=(LastValidation){tile,type,owner,1,GetTickCount64(),owner};
     return matches_validation(actual_tile,actual_type,actual_owner);
 }
-__declspec(dllexport) int S14TestHash(const wchar_t *path) { return hash_matches(path); }
+__declspec(dllexport) int S14TestPrepareImage(void *base) {
+    uintptr_t previous_base=image_base,previous_end=image_end; unsigned char **previous_slot=manager_slot;
+    int result=prepare_image((uintptr_t)base);
+    image_base=previous_base; image_end=previous_end; manager_slot=previous_slot; return result;
+}
 __declspec(dllexport) int S14TestPrologue(int creation,unsigned char *output) {
     memcpy(output,creation?create_signature:common_signature,15);
     return creation?CREATE_RVA:COMMON_RVA;

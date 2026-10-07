@@ -10,7 +10,6 @@
 #ifdef S14_INSTALLER
 #include "payload.h"
 #endif
-static const char expected_game_hash[]="e6ae68925c266a19b05641913e60bf7d97d5eb4754901c3e82a5362d05ff7372";
 int s14_join(wchar_t *out,const wchar_t *root,const wchar_t *name) {
     if (!root[0] || wcslen(root)+wcslen(name)+2>=MAX_PATH) return 0;
     swprintf(out,MAX_PATH,L"%ls\\%ls",root,name); return 1;
@@ -33,8 +32,16 @@ int s14_hash_file(const wchar_t *path,char out[65]) {
 done:
     if (hash) BCryptDestroyHash(hash); if (a) BCryptCloseAlgorithmProvider(a,0); CloseHandle(file); return ok;
 }
-int s14_game_compatible(const wchar_t *root) {
-    wchar_t path[MAX_PATH]; char hash[65]; return s14_join(path,root,L"SAN14PK_SC.exe") && s14_hash_file(path,hash) && !strcmp(hash,expected_game_hash);
+int s14_game_available(const wchar_t *root) {
+    wchar_t path[MAX_PATH]; return s14_join(path,root,L"SAN14PK_SC.exe") && ordinary_file(path);
+}
+const wchar_t *s14_fault_message(int fault) {
+    switch (fault) {
+    case S14_FAULT_ENTRY: return L"建造接入点未匹配 · 扩展功能已停用，管理器仍可使用";
+    case S14_FAULT_HOOK: return L"建造接入失败 · 扩展功能已停用，请查看日志";
+    case S14_FAULT_MAP: return L"地图数据读取异常 · 扩展功能已停用，请重启后检查";
+    default: return L"扩展功能已保护性停用 · 请查看日志";
+    }
 }
 int s14_game_running(const wchar_t *root) {
     HANDLE snapshot=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0); if (snapshot==INVALID_HANDLE_VALUE) return 1;
@@ -76,7 +83,7 @@ int s14_package_install(const wchar_t *root,const wchar_t *manager_source,wchar_
         !s14_join(app,root,L"SAN14ModManager.exe") || !s14_join(app_stage,root,L"SAN14ModManager\\manager.exe.tmp") ||
         !s14_join(receipt_stage,root,L"SAN14ModManager\\receipt.ini.tmp") || !s14_join(app_backup,root,L"SAN14ModManager\\backups\\manager.previous.exe")) return fail(error,L"目录不可用或路径过长，请选择普通游戏目录。");
     if (s14_game_running(root)) return fail(error,L"请先保存存档并完全退出游戏，再安装或更新。");
-    if (!s14_game_compatible(root)) return fail(error,L"游戏版本不匹配，本版本仅支持已经核对的 SAN14PK_SC.exe。");
+    if (!s14_game_available(root)) return fail(error,L"当前目录未找到 SAN14PK_SC.exe，请选择游戏文件所在目录。");
     int exists=GetFileAttributesW(dll)!=INVALID_FILE_ATTRIBUTES;
     if (exists && !s14_owned_install(root)) return fail(error,L"已有其他或来源未知的 dinput8.dll，未覆盖。需要先确认 MOD 兼容方式。");
     if (GetFileAttributesW(receipt)!=INVALID_FILE_ATTRIBUTES && !ordinary_file(receipt)) return fail(error,L"安装凭据路径不是普通文件，未更改。");

@@ -60,18 +60,18 @@ void s14_manager_paint(S14ManagerUI *ui,HDC dc,int width,int height) {
         label(ui,dc,L"游戏目录",box(ui,30,160,140,24),ui->body_font,RGB(234,238,245),DT_SINGLELINE);
         if (ui->in_game) label(ui,dc,ui->root,box(ui,30,193,690,48),ui->small_font,RGB(168,182,200),DT_WORDBREAK);
         else button(ui,dc,L"选择目录",640,186,92,30,1);
-        label(ui,dc,ui->compatible?L"游戏版本：已匹配当前支持的版本":L"游戏版本：尚未匹配，请选择正确的游戏目录",box(ui,30,250,690,28),ui->body_font,ui->compatible?RGB(149,218,175):RGB(230,185,114),DT_SINGLELINE);
+        label(ui,dc,ui->game_found?L"游戏文件：已找到 SAN14PK_SC.exe，不检查版本":L"游戏文件：当前目录未找到 SAN14PK_SC.exe",box(ui,30,250,690,28),ui->body_font,ui->game_found?RGB(149,218,175):RGB(230,185,114),DT_SINGLELINE);
         label(ui,dc,ui->installed?L"插件文件：已安装":L"插件文件：未安装或文件已改变",box(ui,30,290,690,28),ui->body_font,RGB(192,204,221),DT_SINGLELINE);
         label(ui,dc,ui->running?L"游戏正在运行，安装和移除需要先退出游戏。":L"游戏已关闭，可以安装或更新插件。",box(ui,30,330,690,28),ui->small_font,RGB(159,173,193),DT_SINGLELINE);
         if (!ui->in_game) {
-            button(ui,dc,L"安装 / 更新",30,382,210,31,ui->compatible && !ui->running);
+            button(ui,dc,L"安装 / 更新",30,382,210,31,ui->game_found && !ui->running);
             button(ui,dc,L"移除插件",264,382,210,32,ui->installed && !ui->running);
             button(ui,dc,L"打开日志",498,382,234,33,ui->installed);
         } else button(ui,dc,L"打开日志",30,382,210,33,1);
         label(ui,dc,L"功能开关在游戏内生效；新增功能版本需退出后更新。\n移除插件会保留你的设置和备份，方便之后重新安装。",box(ui,30,456,700,72),ui->small_font,RGB(163,178,198),DT_WORDBREAK);
     } else {
         const wchar_t *names[]={L"规则与平衡",L"地图与提示",L"配置与管理"};
-        const wchar_t *descriptions[]={L"可继续加入其他建造限制、势力规则与可调参数。",L"可增加范围显示、施工提醒、领地变化提示等辅助功能。",L"可扩展多套规则配置、导入导出、版本兼容与更新。"};
+        const wchar_t *descriptions[]={L"可继续加入其他建造限制、势力规则与可调参数。",L"可增加范围显示、施工提醒、领地变化提示等辅助功能。",L"可扩展多套规则配置、导入导出与更新。"};
         for (int i=0;i<3;i++) { int y=164+i*119; rounded(dc,box(ui,28,y,704,102),RGB(30,36,44));
             label(ui,dc,names[i],box(ui,46,y+18,650,26),ui->body_font,RGB(236,220,186),DT_SINGLELINE);
             label(ui,dc,descriptions[i],box(ui,46,y+56,650,32),ui->small_font,RGB(168,183,202),DT_WORDBREAK); }
@@ -106,7 +106,7 @@ int s14_manager_activate(S14ManagerUI *ui,int id) {
     if (id>=100 && id<=102) { ui->tab=id-100; ui->focus=id; s14_manager_refresh(ui); return 1; }
     unsigned int flag=id==1?S14_MASTER:(id>=10 && id<10+s14_feature_count?s14_features[id-10].flag:0);
     if (flag) {
-        if (!ui->in_game && !ui->compatible) { wcscpy(ui->notice,L"请先选择受支持的游戏目录，再调整功能开关。"); ui->tab=1; s14_manager_refresh(ui); return 0; }
+        if (!ui->in_game && !ui->game_found) { wcscpy(ui->notice,L"请先选择含 SAN14PK_SC.exe 的目录，再调整功能开关。"); ui->tab=1; s14_manager_refresh(ui); return 0; }
         int enable=!(ui->requested&flag);
         if (!s14_config_set(ui->ini,flag,enable)) { wcscpy(ui->notice,L"设置保存失败，请检查游戏目录的写入权限。" ); s14_manager_refresh(ui); return 0; }
         ui->requested=s14_config_read(ui->ini); ui->effective=s14_effective_flags(ui->requested);
@@ -115,7 +115,7 @@ int s14_manager_activate(S14ManagerUI *ui,int id) {
         s14_manager_refresh(ui); return 1;
     }
     if (ui->action && id>=30 && id<=33) {
-        if (id==31 && (ui->in_game || ui->running || !ui->compatible)) return 0;
+        if (id==31 && (ui->in_game || ui->running || !ui->game_found)) return 0;
         if (id==32 && (ui->in_game || ui->running || !ui->installed)) return 0;
         ui->action(ui,id-30+S14_ACTION_CHOOSE,ui->context); s14_manager_refresh(ui); return 1;
     }
