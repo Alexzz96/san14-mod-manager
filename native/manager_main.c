@@ -13,6 +13,7 @@ static wchar_t executable[MAX_PATH];
 static void refresh(S14ManagerUI *ui,int check_directory) {
     if (check_directory) ui->game_found=s14_game_available(ui->root);
     ui->installed=s14_owned_install(ui->root); ui->running=s14_game_running(ui->root);
+    ui->detected=s14_package_detect(ui->root,executable);
     ui->requested=s14_config_read(ui->ini);
     unsigned int applied=0; int fault=0; ui->attached=s14_read_runtime(ui->root,&applied,&fault); ui->fault=fault;
     ui->effective=s14_effective_flags(ui->requested);
@@ -56,10 +57,18 @@ static void action(S14ManagerUI *ui,int command,void *context) {
         else wcscpy(ui->notice,error);
         refresh(ui,1);
         MessageBoxW(ui->window,ui->notice,installed?L"安装完成":L"安装失败",MB_OK|(installed?MB_ICONINFORMATION:MB_ICONERROR));
+    } else if (command==S14_ACTION_CLEAN) {
+        if (MessageBoxW(ui->window,L"彻底卸载将删除本项目已识别的插件、管理器、设置、日志及备份。\n游戏文件、存档和未知文件会保留。\n\n请从游戏目录外的安装包运行，并关闭目标目录中的管理器。\n确认彻底卸载？",L"彻底卸载",MB_YESNO|MB_ICONWARNING|MB_DEFBUTTON2)!=IDYES) return;
+        S14CleanupReport report={0}; int cleaned=s14_package_clean(ui->root,executable,&report,error); ui->notice_error=!cleaned;
+        if (cleaned) swprintf(ui->notice,192,L"卸载完成：清理 %d 个文件、%d 个空目录。%ls",report.files,report.directories,report.preserved?L"未知文件已保留，未删除其所在目录。":L"游戏与存档已保留。");
+        else swprintf(ui->notice,192,L"未完成（已清理 %d 个文件）：%.150ls",report.files,error);
+        refresh(ui,1);
+        MessageBoxW(ui->window,ui->notice,cleaned?L"卸载完成":L"卸载未完成",MB_OK|(cleaned?MB_ICONINFORMATION:MB_ICONERROR));
     } else if (command==S14_ACTION_REMOVE) {
         int removed=s14_package_remove(ui->root,error); ui->notice_error=!removed;
         if (removed) wcscpy(ui->notice,L"插件已移除。设置、管理器和备份已保留。"); else wcscpy(ui->notice,error);
         refresh(ui,1);
+        MessageBoxW(ui->window,ui->notice,removed?L"插件已移除":L"移除失败",MB_OK|(removed?MB_ICONINFORMATION:MB_ICONERROR));
     } else if (command==S14_ACTION_LOGS) {
         wchar_t logs[MAX_PATH]; if (s14_join(logs,ui->root,L"SAN14ModManager\\logs")) ShellExecuteW(ui->window,L"open",logs,NULL,NULL,SW_SHOWNORMAL);
     }
@@ -68,11 +77,14 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE previous,LPWSTR command,int sho
     (void)previous; (void)command; (void)show;
     GetModuleFileNameW(NULL,executable,MAX_PATH);
     int count=0; wchar_t **args=CommandLineToArgvW(GetCommandLineW(),&count);
-    if (count==3 && (!wcscmp(args[1],L"--install") || !wcscmp(args[1],L"--remove"))) {
+    if (count==3 && (!wcscmp(args[1],L"--install") || !wcscmp(args[1],L"--remove") || !wcscmp(args[1],L"--uninstall"))) {
         wchar_t target[MAX_PATH],error[192]={0}; DWORD length=GetFullPathNameW(args[2],MAX_PATH,target,NULL);
         if (!length || length>=MAX_PATH) { LocalFree(args); return 2; }
         size_t n=wcslen(target); while (n>3 && (target[n-1]==L'\\' || target[n-1]==L'/')) target[--n]=0;
-        int ok=!wcscmp(args[1],L"--install")?s14_package_install(target,executable,error):s14_package_remove(target,error);
+        S14CleanupReport report={0};
+        int ok=!wcscmp(args[1],L"--install")?s14_package_install(target,executable,error):
+            !wcscmp(args[1],L"--remove")?s14_package_remove(target,error):s14_package_clean(target,executable,&report,error);
+        if (ok && !wcscmp(args[1],L"--uninstall")) printf("{\"files\":%d,\"directories\":%d,\"preserved\":%d}\n",report.files,report.directories,report.preserved);
         if (!ok) { char utf8[768]; if (WideCharToMultiByte(CP_UTF8,0,error,-1,utf8,sizeof(utf8),NULL,NULL)) fprintf(stderr,"%s\n",utf8); }
         LocalFree(args); return ok?0:2;
     }

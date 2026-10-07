@@ -58,32 +58,74 @@ int s14_game_running(const wchar_t *root) {
     CloseHandle(snapshot); return running;
 }
 static int receipt_path(wchar_t *path,const wchar_t *root) { return s14_join(path,root,L"SAN14ModManager\\installation.ini"); }
-int s14_owned_install(const wchar_t *root) {
-    wchar_t dll[MAX_PATH],receipt[MAX_PATH],expected[80]; char actual[65];
-    if (!s14_join(dll,root,L"dinput8.dll") || !receipt_path(receipt,root) || !s14_hash_file(dll,actual)) return 0;
-    // Migrate only exact, previously verified builds of this mod.
-    if (!ordinary_file(receipt)) return !strcmp(actual,"d22049371c7fb8eaa036101b526e0a6135ec61a017556e2de32926d9bb47e2fe") ||
-        !strcmp(actual,"aa9145a8590e1bd8d94fc852ccefaf14d1ecf7075f250ac462910d8396cd2571");
-    GetPrivateProfileStringW(L"Install",L"DllSHA256",L"",expected,80,receipt);
-    char expected_utf8[80]; if (!WideCharToMultiByte(CP_UTF8,0,expected,-1,expected_utf8,80,NULL,NULL)) return 0;
-    return !strcmp(actual,expected_utf8);
-}
 static int directory(const wchar_t *root,const wchar_t *name) {
     wchar_t path[MAX_PATH]; if (!s14_join(path,root,name)) return 0;
     return CreateDirectoryW(path,NULL) || (GetLastError()==ERROR_ALREADY_EXISTS && ordinary_directory(path));
 }
 static int fail(wchar_t error[192],const wchar_t *text) { wcsncpy(error,text,191); error[191]=0; return 0; }
 
-#ifdef S14_INSTALLER
 static int known_previous_manager(const char *hash) {
     static const char *known[]={
         "1d32fff1c27f155b46494cd1f762474ed32eec6a613a1b88614691b7ff749030", // public 0.2.0
         "7be3eb8f46556e4603702dbf9aedf2443ff84f56c5cfc794aedc793e8824c692", // source 0.2.0
-        "570c30fd02bc3ddc647889770c6bece79280fd6ed65a145b84e4c920721a0829"  // public 0.2.1
+        "570c30fd02bc3ddc647889770c6bece79280fd6ed65a145b84e4c920721a0829", // public 0.2.1
+        "2b565bb0ac8b2fbd42b4c3c0e29a06b48ba654704efaed7dad1549bedfef4cab"  // public 0.2.2
     };
     for (size_t i=0;i<sizeof(known)/sizeof(known[0]);i++) if (!strcmp(hash,known[i])) return 1;
     return 0;
 }
+static int known_previous_dll(const char *hash) {
+    static const char *known[]={
+        "d22049371c7fb8eaa036101b526e0a6135ec61a017556e2de32926d9bb47e2fe",
+        "aa9145a8590e1bd8d94fc852ccefaf14d1ecf7075f250ac462910d8396cd2571",
+        "2b6996215274d3d465bc1cc08478c9df16ab80717c556b5822ef807e9b0a028a",
+        "f97fe520092b64976480b858cfe5a97a8368a51b7768130d4ca7a00f915dfd84",
+        "25043bbaef4cda54eaaf47fe9a63ef47ca81ca224db1c6e8fd01be1915620a77",
+        "5cfceeb8457829240c9e06740784046b5d4d47170868cd0a6469f58c0260634d"
+    };
+    for (size_t i=0;i<sizeof(known)/sizeof(known[0]);i++) if (!strcmp(hash,known[i])) return 1;
+    return 0;
+}
+int s14_owned_artifact(const wchar_t *root,const wchar_t *path,const wchar_t *source,int manager) {
+    char hash[65],expected_ascii[80]={0}; wchar_t receipt[MAX_PATH],expected[80];
+    if (!s14_hash_file(path,hash)) return 0;
+    if (manager?known_previous_manager(hash):known_previous_dll(hash)) return 1;
+    if (manager && source) { char current[65]; if (s14_hash_file(source,current) && !strcmp(hash,current)) return 1; }
+#ifdef S14_INSTALLER
+    if (!manager && !strcmp(hash,s14_payload_hash)) return 1;
+#endif
+    if (!receipt_path(receipt,root) || !ordinary_file(receipt)) return 0;
+    GetPrivateProfileStringW(L"Install",manager?L"ManagerSHA256":L"DllSHA256",L"",expected,80,receipt);
+    WideCharToMultiByte(CP_UTF8,0,expected,-1,expected_ascii,80,NULL,NULL);
+    return !strcmp(hash,expected_ascii);
+}
+int s14_owned_install(const wchar_t *root) {
+    wchar_t dll[MAX_PATH]; return s14_join(dll,root,L"dinput8.dll") && s14_owned_artifact(root,dll,NULL,0);
+}
+unsigned int s14_package_detect(const wchar_t *root,const wchar_t *source) {
+    wchar_t path[MAX_PATH]; unsigned int found=0;
+    if (!ordinary_directory(root)) return 0;
+    if (s14_join(path,root,L"dinput8.dll") && GetFileAttributesW(path)!=INVALID_FILE_ATTRIBUTES)
+        found|=s14_owned_artifact(root,path,source,0)?S14_FOUND_DLL:S14_FOUND_UNKNOWN;
+    if (s14_join(path,root,L"SAN14ModManager.exe") && GetFileAttributesW(path)!=INVALID_FILE_ATTRIBUTES)
+        found|=s14_owned_artifact(root,path,source,1)?S14_FOUND_MANAGER:S14_FOUND_UNKNOWN;
+    if (s14_join(path,root,L"SAN14ModManager\\installation.ini") && ordinary_file(path)) {
+        wchar_t dll[80],app[80],version[32];
+        GetPrivateProfileStringW(L"Install",L"DllSHA256",L"",dll,80,path);
+        GetPrivateProfileStringW(L"Install",L"ManagerSHA256",L"",app,80,path);
+        GetPrivateProfileStringW(L"Install",L"Version",L"",version,32,path);
+        if (version[0] && wcslen(dll)==64 && wcslen(app)==64 && wcsspn(dll,L"0123456789abcdef")==64 && wcsspn(app,L"0123456789abcdef")==64) found|=S14_FOUND_DATA;
+    }
+    if (found&(S14_FOUND_DLL|S14_FOUND_MANAGER)) found|=S14_FOUND_DATA;
+    if (s14_join(path,root,L"SAN14BuildLimit.ini") && ordinary_file(path)) {
+        wchar_t enabled[16],mode[16];
+        GetPrivateProfileStringW(L"Manager",L"Enabled",L"",enabled,16,path);
+        GetPrivateProfileStringW(L"Rule",L"Mode",L"",mode,16,path);
+        if ((!wcscmp(enabled,L"0") || !wcscmp(enabled,L"1")) && (!wcscmp(mode,L"0") || !wcscmp(mode,L"1") || !wcscmp(mode,L"2"))) found|=S14_FOUND_DATA;
+    }
+    return found;
+}
+#ifdef S14_INSTALLER
 int s14_package_install(const wchar_t *root,const wchar_t *manager_source,wchar_t error[192]) {
     wchar_t dll[MAX_PATH],config[MAX_PATH],receipt[MAX_PATH],stage[MAX_PATH],backup[MAX_PATH],app[MAX_PATH],app_stage[MAX_PATH],receipt_stage[MAX_PATH],app_backup[MAX_PATH];
     if (!ordinary_directory(root) || !s14_join(dll,root,L"dinput8.dll") || !s14_join(config,root,L"SAN14BuildLimit.ini") ||

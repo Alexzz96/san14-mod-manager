@@ -1,22 +1,24 @@
 #define WIN32_LEAN_AND_MEAN
 #include "toast.h"
+#include "theme.h"
 
 static const wchar_t toast_class[]=L"S14BuildLimit.Toast.v1";
 static int px(const S14Toast *toast,int value) { return MulDiv(value,toast->scale,96); }
 
 void s14_toast_paint(S14Toast *toast,HDC dc) {
     RECT bounds={0,0,toast->width,toast->height};
-    HBRUSH background=CreateSolidBrush(RGB(27,31,38));
+    HBRUSH background=CreateSolidBrush(S14_PAPER);
     FillRect(dc,&bounds,background); DeleteObject(background);
-    HBRUSH accent=CreateSolidBrush(RGB(221,177,93));
+    HBRUSH border=CreateSolidBrush(S14_BORDER); FrameRect(dc,&bounds,border); DeleteObject(border);
+    HBRUSH accent=CreateSolidBrush(S14_ACCENT);
     RECT bar={0,0,px(toast,4),toast->height};
     FillRect(dc,&bar,accent); DeleteObject(accent);
     SetBkMode(dc,TRANSPARENT);
     HGDIOBJ previous=SelectObject(dc,toast->title_font);
     RECT title={px(toast,20),px(toast,14),toast->width-px(toast,16),px(toast,42)};
-    SetTextColor(dc,RGB(244,209,141));
+    SetTextColor(dc,S14_ACCENT);
     DrawTextW(dc,L"超过连接数量上限",-1,&title,DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
-    SelectObject(dc,toast->body_font); SetTextColor(dc,RGB(242,244,247));
+    SelectObject(dc,toast->body_font); SetTextColor(dc,S14_INK);
     RECT text={px(toast,20),px(toast,48),toast->width-px(toast,16),toast->height-px(toast,12)};
     DrawTextW(dc,L"同一势力领地内，相连土垒和石墙最多 5 个。",-1,&text,DT_WORDBREAK|DT_NOPREFIX);
     SelectObject(dc,previous);

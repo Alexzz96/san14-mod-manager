@@ -19,6 +19,7 @@ HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE.parent/'reference'))
 from build_limit import Building,evaluate
 from verify_entry import run_entry_tests
+from verify_cleanup import run_cleanup_tests
 
 sys.stdout.reconfigure(encoding='utf-8')
 parser=argparse.ArgumentParser(description=__doc__)
@@ -270,6 +271,7 @@ installer_metrics={'install_update_remove_reinstall':'passed','unicode_game_fold
                    'previous_dll_backup':True,'live_game_update_guard_tested':busy_guard,
                    'locked_manager_rolls_back_plugin':True,
                    'game_binary_unchanged':True}
+cleanup_metrics=run_cleanup_tests(package,BUILD,args.legacy_manager)
 report={'status':'passed','game_version_check':False,'game_sha256_check':False,'hook_entry_validation':entry_metrics,'verified_game_prologues':verified_prologues,
         'territory_adapter_cases':512,'creation_correlation':'passed',
         'random_reference_cases':random_cases,'private_snapshots_required':False,
@@ -277,7 +279,7 @@ report={'status':'passed','game_version_check':False,'game_sha256_check':False,'
         'queue_test_ms':round(elapsed*1000,3),'directinput_proxy_hresult':hr,
         'synthetic_hook_and_rule':metrics,
         'interaction':ui_metrics,'verified_phase_call_sites':len(wrapper_returns)+2 if GAME else 0,
-        'manager':manager_metrics,'installer':installer_metrics,
+        'manager':manager_metrics,'installer':installer_metrics,'cleanup':cleanup_metrics,
         'private_actual_check_off_on':list(switch_results),
         'manager_exe_sha256':hashlib.sha256((BUILD/'SAN14ModManager.exe').read_bytes()).hexdigest(),
         'production_dll_sha256':hashlib.sha256((BUILD/'dinput8.dll').read_bytes()).hexdigest(),

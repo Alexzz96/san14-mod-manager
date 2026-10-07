@@ -23,7 +23,8 @@ static DWORD WINAPI stress(LPVOID unused) {
 }
 #define REQUIRE(expr) do { if (!(expr)) { fprintf(stderr,"FAILED line %d: %s\n",__LINE__,#expr); exit(1); } } while (0)
 
-int main(void) {
+int main(int argc,char **argv) {
+    if (argc==2 && !strcmp(argv[1],"--hold")) { puts("ready"); fflush(stdout); Sleep(30000); return 0; }
     // Same complete 15-byte entry sequence as both inspected game functions.
     const unsigned char code[]={0x48,0x89,0x6c,0x24,0x10,0x48,0x89,0x74,0x24,0x18,
         0x48,0x89,0x7c,0x24,0x20,0x48,0x8d,0x04,0x11,0x4c,0x01,0xc0,0x4c,0x01,0xc8,0xc3};

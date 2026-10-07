@@ -417,7 +417,7 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
     if (status==MH_OK) status=MH_CreateHook((void*)(image_base+EXIT_RVA),hooked_exit,(void**)&original_exit);
     if (status==MH_OK) status=MH_EnableHook(MH_ALL_HOOKS);
     char startup[384];
-    snprintf(startup,sizeof(startup),"{\"event\":\"startup\",\"requested_mode\":%d,\"hook_status\":%d,\"base\":\"0x%llx\",\"wall_owner_source\":\"tile_current_force\",\"interaction_version\":2,\"toast_duration_ms\":5000,\"manager_version\":\"0.2.2\",\"game_version_check\":false,\"requested_flags\":%u}\n",requested,(int)status,(unsigned long long)image_base,requested_flags);
+    snprintf(startup,sizeof(startup),"{\"event\":\"startup\",\"requested_mode\":%d,\"hook_status\":%d,\"base\":\"0x%llx\",\"wall_owner_source\":\"tile_current_force\",\"interaction_version\":2,\"toast_duration_ms\":5000,\"manager_version\":\"0.3.0\",\"game_version_check\":false,\"requested_flags\":%u}\n",requested,(int)status,(unsigned long long)image_base,requested_flags);
     write_line(log,startup);
     if (status!=MH_OK && prepared) { MH_DisableHook(MH_ALL_HOOKS); runtime_fault=S14_FAULT_HOOK; }
     hooks_ready=status==MH_OK;

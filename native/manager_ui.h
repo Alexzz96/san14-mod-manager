@@ -4,13 +4,15 @@
 #include "features.h"
 typedef struct S14ManagerUI S14ManagerUI;
 typedef void (*S14ManagerAction)(S14ManagerUI*,int,void*);
-enum { S14_ACTION_CONFIG=1,S14_ACTION_CHOOSE,S14_ACTION_INSTALL,S14_ACTION_REMOVE,S14_ACTION_LOGS };
+enum { S14_ACTION_CONFIG=1,S14_ACTION_CHOOSE,S14_ACTION_INSTALL,S14_ACTION_REMOVE,S14_ACTION_LOGS,S14_ACTION_CLEAN };
 struct S14ManagerUI {
     HWND window,owner,directory_edit;
     HINSTANCE instance;
     HFONT title_font,body_font,small_font;
+    HBRUSH edit_brush;
     wchar_t root[MAX_PATH],ini[MAX_PATH],status[192],notice[192];
     unsigned int requested,effective;
+    unsigned int detected;
     int in_game,attached,fault,installed,game_found,running,tab,focus,pressed,scale,scroll,notice_error;
     S14ManagerAction action; void *context;
 };

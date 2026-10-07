@@ -1,7 +1,7 @@
 #ifndef S14_FEATURES_H
 #define S14_FEATURES_H
 #include <windows.h>
-#define S14_MANAGER_VERSION L"0.2.2"
+#define S14_MANAGER_VERSION L"0.3.0"
 #define S14_MASTER 1u
 #define S14_WALL_LIMIT 2u
 #define S14_LIMIT_HINT 4u

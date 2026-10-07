@@ -32,6 +32,8 @@ manifest={'version':version,'release_status':'prerelease','platform':'windows-x6
           'manager_exe_sha256':verification['manager_exe_sha256'],
           'embedded_dll_sha256':verification['production_dll_sha256'],
           'manager_in_game_acceptance':'pending'}
+manifest.update({'ui_theme':'warm-paper-terracotta','complete_uninstall':True,
+                 'uninstall_from_external_manager':True,'unknown_files_preserved':True})
 files={'SAN14ModManager.exe':payloads['SAN14ModManager.exe'],
        '使用说明.md':guide,'MinHook-LICENSE.txt':license_data,'默认配置示例.ini':config,
        'release.json':(json.dumps(manifest,indent=2)+'\n').encode()}
