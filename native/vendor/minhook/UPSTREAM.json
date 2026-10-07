@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/TsudaKageyu/minhook",
+  "version": "v1.3.4",
+  "commit": "c3fcafdc10146beb5919319d0683e44e3c30d537",
+  "included": [
+    "include/",
+    "src/",
+    "LICENSE.txt",
+    "AUTHORS.txt"
+  ],
+  "local_modifications": false
+}

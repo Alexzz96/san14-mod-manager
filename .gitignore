@@ -1,0 +1,25 @@
+# Build and release products
+/native/build/
+/native/dist/
+/.tools/
+__pycache__/
+*.py[cod]
+# Game/runtime/private analysis material must never enter source control
+*.exe
+*.dll
+*.sav
+*.dmp
+*.bin
+*.log
+SAN14BuildLimit.ini
+installation.ini
+runtime.ini
+install-state.json
+captures/
+backups/
+output/
+.mod-analysis/
+.env
+.env.*
+*.pem
+*.key

@@ -1,0 +1,40 @@
+name: Windows build and independent verification
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publication boundary
+        shell: pwsh
+        run: python tools/audit_public.py
+      - name: Download verified Zig 0.15.2
+        shell: pwsh
+        run: python tools/get_zig.py
+      - name: Build native code
+        shell: pwsh
+        run: python native/build.py --zig .tools/zig/zig.exe
+      - name: Independent Python geometry and rules
+        shell: pwsh
+        run: python -m unittest discover -s tests -v
+      - name: Native verification without game files
+        shell: pwsh
+        run: python native/verify_native.py
+      - name: Candidate installer
+        shell: pwsh
+        run: python native/package_release.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: san14-mod-manager-candidate
+          path: |
+            native/dist/*
+            native/build/verification.json
+          if-no-files-found: error
