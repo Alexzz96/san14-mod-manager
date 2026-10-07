@@ -75,6 +75,15 @@ static int directory(const wchar_t *root,const wchar_t *name) {
 static int fail(wchar_t error[192],const wchar_t *text) { wcsncpy(error,text,191); error[191]=0; return 0; }
 
 #ifdef S14_INSTALLER
+static int known_previous_manager(const char *hash) {
+    static const char *known[]={
+        "1d32fff1c27f155b46494cd1f762474ed32eec6a613a1b88614691b7ff749030", // public 0.2.0
+        "7be3eb8f46556e4603702dbf9aedf2443ff84f56c5cfc794aedc793e8824c692", // source 0.2.0
+        "570c30fd02bc3ddc647889770c6bece79280fd6ed65a145b84e4c920721a0829"  // public 0.2.1
+    };
+    for (size_t i=0;i<sizeof(known)/sizeof(known[0]);i++) if (!strcmp(hash,known[i])) return 1;
+    return 0;
+}
 int s14_package_install(const wchar_t *root,const wchar_t *manager_source,wchar_t error[192]) {
     wchar_t dll[MAX_PATH],config[MAX_PATH],receipt[MAX_PATH],stage[MAX_PATH],backup[MAX_PATH],app[MAX_PATH],app_stage[MAX_PATH],receipt_stage[MAX_PATH],app_backup[MAX_PATH];
     if (!ordinary_directory(root) || !s14_join(dll,root,L"dinput8.dll") || !s14_join(config,root,L"SAN14BuildLimit.ini") ||
@@ -88,6 +97,23 @@ int s14_package_install(const wchar_t *root,const wchar_t *manager_source,wchar_
     if (exists && !s14_owned_install(root)) return fail(error,L"已有其他或来源未知的 dinput8.dll，未覆盖。需要先确认 MOD 兼容方式。");
     if (GetFileAttributesW(receipt)!=INVALID_FILE_ATTRIBUTES && !ordinary_file(receipt)) return fail(error,L"安装凭据路径不是普通文件，未更改。");
     if (GetFileAttributesW(config)!=INVALID_FILE_ATTRIBUTES && !ordinary_file(config)) return fail(error,L"配置路径不是普通文件，未更改。");
+    char source_hash[65],existing_hash[65];
+    if (!s14_hash_file(manager_source,source_hash)) return fail(error,L"无法读取当前安装器文件，请重新解压安装包。");
+    int existing_manager=GetFileAttributesW(app)!=INVALID_FILE_ATTRIBUTES;
+    int copy_manager=1;
+    if (existing_manager) {
+        if (!s14_hash_file(app,existing_hash)) return fail(error,L"同名管理器文件无法读取或不是普通文件，未覆盖。");
+        // A manually copied installer needs no receipt yet. Identical bytes
+        // also cover alternate path spellings and a running destination EXE.
+        copy_manager=strcmp(existing_hash,source_hash)!=0;
+        if (copy_manager) {
+            wchar_t expected[80]; char expected_ascii[80]={0};
+            GetPrivateProfileStringW(L"Install",L"ManagerSHA256",L"",expected,80,receipt);
+            WideCharToMultiByte(CP_UTF8,0,expected,-1,expected_ascii,80,NULL,NULL);
+            if (strcmp(existing_hash,expected_ascii) && !known_previous_manager(existing_hash))
+                return fail(error,L"同名管理器不是本项目已识别文件，未覆盖。请检查或移动该文件后重试。");
+        }
+    }
     if (!directory(root,L"SAN14ModManager") || !directory(root,L"SAN14ModManager\\backups") || !directory(root,L"SAN14ModManager\\logs")) return fail(error,L"无法创建管理器目录，请检查写入权限。");
     if (GetFileAttributesW(stage)!=INVALID_FILE_ATTRIBUTES || GetFileAttributesW(app_stage)!=INVALID_FILE_ATTRIBUTES || GetFileAttributesW(receipt_stage)!=INVALID_FILE_ATTRIBUTES) return fail(error,L"上次安装的暂存文件仍存在，请先检查后再重试。");
     if (GetFileAttributesW(backup)!=INVALID_FILE_ATTRIBUTES && !ordinary_file(backup)) return fail(error,L"备份路径不是普通文件，未更改。");
@@ -97,14 +123,7 @@ int s14_package_install(const wchar_t *root,const wchar_t *manager_source,wchar_
     DWORD written=0; int valid=WriteFile(file,s14_payload,(DWORD)sizeof(s14_payload),&written,NULL) && written==sizeof(s14_payload) && FlushFileBuffers(file);
     CloseHandle(file); char hash[65]; valid=valid && s14_hash_file(stage,hash) && !strcmp(hash,s14_payload_hash);
     if (!valid) { DeleteFileW(stage); return fail(error,L"插件写入或哈希校验失败，未替换现有插件。"); }
-    // The manager may run from the destination on subsequent reinstalls.
-    int copy_manager=_wcsicmp(manager_source,app)!=0;
-    int existing_manager=GetFileAttributesW(app)!=INVALID_FILE_ATTRIBUTES;
     if (copy_manager && existing_manager) {
-        wchar_t app_expected[80]; char app_hash[65],expected_ascii[80];
-        GetPrivateProfileStringW(L"Install",L"ManagerSHA256",L"",app_expected,80,receipt);
-        WideCharToMultiByte(CP_UTF8,0,app_expected,-1,expected_ascii,80,NULL,NULL);
-        if (!s14_hash_file(app,app_hash) || strcmp(app_hash,expected_ascii)) { DeleteFileW(stage); return fail(error,L"同名管理器文件来源未知，未覆盖。"); }
         if ((GetFileAttributesW(app_backup)!=INVALID_FILE_ATTRIBUTES && !ordinary_file(app_backup)) || !CopyFileW(app,app_backup,FALSE)) { DeleteFileW(stage); return fail(error,L"旧管理器备份失败，未替换。"); }
     }
     if (copy_manager && !CopyFileW(manager_source,app_stage,TRUE)) {
@@ -118,7 +137,7 @@ int s14_package_install(const wchar_t *root,const wchar_t *manager_source,wchar_
     wchar_t hash_wide[65]; MultiByteToWideChar(CP_UTF8,0,s14_payload_hash,-1,hash_wide,65);
     int receipt_ok=WritePrivateProfileStringW(L"Install",L"DllSHA256",hash_wide,receipt_stage) && WritePrivateProfileStringW(L"Install",L"Version",S14_MANAGER_VERSION,receipt_stage);
     char manager_hash[65];
-    if (!s14_hash_file(copy_manager?app_stage:app,manager_hash)) receipt_ok=0;
+    if (!s14_hash_file(copy_manager?app_stage:app,manager_hash) || strcmp(manager_hash,source_hash)) receipt_ok=0;
     else { MultiByteToWideChar(CP_UTF8,0,manager_hash,-1,hash_wide,65); receipt_ok=receipt_ok && WritePrivateProfileStringW(L"Install",L"ManagerSHA256",hash_wide,receipt_stage); }
     WritePrivateProfileStringW(NULL,NULL,NULL,receipt_stage);
     if (!receipt_ok) { DeleteFileW(stage); DeleteFileW(receipt_stage); if (copy_manager) DeleteFileW(app_stage); return fail(error,L"安装凭据保存失败，未替换插件。"); }

@@ -11,7 +11,7 @@ struct S14ManagerUI {
     HFONT title_font,body_font,small_font;
     wchar_t root[MAX_PATH],ini[MAX_PATH],status[192],notice[192];
     unsigned int requested,effective;
-    int in_game,attached,fault,installed,game_found,running,tab,focus,pressed,scale,scroll;
+    int in_game,attached,fault,installed,game_found,running,tab,focus,pressed,scale,scroll,notice_error;
     S14ManagerAction action; void *context;
 };
 int s14_manager_create(S14ManagerUI *ui,HINSTANCE instance,HWND owner,int in_game);

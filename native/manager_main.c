@@ -26,7 +26,8 @@ static void set_root(S14ManagerUI *ui,const wchar_t *root) {
     wchar_t full[MAX_PATH]; DWORD length=GetFullPathNameW(root,MAX_PATH,full,NULL); if (!length || length>=MAX_PATH) return;
     size_t n=wcslen(full); while (n>3 && (full[n-1]==L'\\' || full[n-1]==L'/')) full[--n]=0;
     if (!s14_join(ui->ini,full,L"SAN14BuildLimit.ini")) return;
-    wcscpy(ui->root,full); if (ui->directory_edit) SetWindowTextW(ui->directory_edit,full);
+    wcscpy(ui->root,full); ui->notice[0]=0; ui->notice_error=0;
+    if (ui->directory_edit) SetWindowTextW(ui->directory_edit,full);
     refresh(ui,1);
 }
 static void choose(S14ManagerUI *ui) {
@@ -49,11 +50,15 @@ static void action(S14ManagerUI *ui,int command,void *context) {
     if (command==S14_ACTION_CONFIG) refresh(ui,0);
     else if (command==S14_ACTION_CHOOSE) choose(ui);
     else if (command==S14_ACTION_INSTALL) {
-        if (s14_package_install(ui->root,executable,error)) wcscpy(ui->notice,L"安装完成。现在可启动游戏，用 F10 打开管理器。");
+        int installed=s14_package_install(ui->root,executable,error);
+        ui->notice_error=!installed;
+        if (installed) wcscpy(ui->notice,L"安装完成。现在可启动游戏，用 F10 打开管理器。");
         else wcscpy(ui->notice,error);
         refresh(ui,1);
+        MessageBoxW(ui->window,ui->notice,installed?L"安装完成":L"安装失败",MB_OK|(installed?MB_ICONINFORMATION:MB_ICONERROR));
     } else if (command==S14_ACTION_REMOVE) {
-        if (s14_package_remove(ui->root,error)) wcscpy(ui->notice,L"插件已移除。设置、管理器和备份已保留。"); else wcscpy(ui->notice,error);
+        int removed=s14_package_remove(ui->root,error); ui->notice_error=!removed;
+        if (removed) wcscpy(ui->notice,L"插件已移除。设置、管理器和备份已保留。"); else wcscpy(ui->notice,error);
         refresh(ui,1);
     } else if (command==S14_ACTION_LOGS) {
         wchar_t logs[MAX_PATH]; if (s14_join(logs,ui->root,L"SAN14ModManager\\logs")) ShellExecuteW(ui->window,L"open",logs,NULL,NULL,SW_SHOWNORMAL);

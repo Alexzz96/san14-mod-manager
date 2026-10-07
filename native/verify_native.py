@@ -23,6 +23,7 @@ from verify_entry import run_entry_tests
 sys.stdout.reconfigure(encoding='utf-8')
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--game-dir', type=Path, help='Optional local game directory for static checks; never uploaded')
+parser.add_argument('--legacy-manager', type=Path, help='Optional verified previous release installer to exercise migration')
 args=parser.parse_args()
 GAME=args.game_dir.resolve() if args.game_dir else None
 BUILD=HERE/'build' 
@@ -187,12 +188,19 @@ with tempfile.TemporaryDirectory(prefix='SAN14-manager-测试-') as name:
     assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0
     assert dll.read_bytes()==b'other-proxy-must-survive'
     dll.unlink()
+    app=sandbox/'SAN14ModManager.exe'
+    app.write_bytes(b'other-program-must-survive')
+    assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0 and not dll.exists()
+    assert app.read_bytes()==b'other-program-must-survive'
+    app.unlink()
     game.unlink()
     assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0 and not dll.exists()
     cli=subprocess.run([str(BUILD/'SAN14ModManager.exe'),'--install',str(sandbox)],capture_output=True,timeout=10,
                        creationflags=subprocess.CREATE_NO_WINDOW)
     assert cli.returncode==2 and not dll.exists(),(cli.returncode,cli.stderr)
     shutil.copyfile(game_source,game)
+    # Manual copying is valid even before an installation receipt exists.
+    shutil.copyfile(BUILD/'SAN14ModManager.exe',app)
     assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==1,error.value
     assert owned(str(sandbox))==1 and dll.read_bytes()==(BUILD/'dinput8.dll').read_bytes()
     assert (sandbox/'SAN14ModManager.exe').read_bytes()==(BUILD/'SAN14ModManager.exe').read_bytes()
@@ -201,9 +209,11 @@ with tempfile.TemporaryDirectory(prefix='SAN14-manager-测试-') as name:
     # Hold only a sandbox manager file open to force a commit failure. The
     # native installer must restore the previous DLL and leave its receipt.
     old_dll=(BUILD/'dinput8.dll').read_bytes()+b'previous-sandbox-version';dll.write_bytes(old_dll)
+    old_manager=app.read_bytes()+b'previous-sandbox-manager';app.write_bytes(old_manager)
     receipt=sandbox/'SAN14ModManager/installation.ini'
     metadata=configparser.ConfigParser();metadata.optionxform=str;metadata.read(receipt)
     metadata.set('Install','DllSHA256',hashlib.sha256(old_dll).hexdigest())
+    metadata.set('Install','ManagerSHA256',hashlib.sha256(old_manager).hexdigest())
     with receipt.open('w',encoding='ascii') as output: metadata.write(output)
     create_file=kernel.CreateFileW
     create_file.argtypes=[C.c_wchar_p,C.c_uint32,C.c_uint32,C.c_void_p,C.c_uint32,C.c_uint32,C.c_void_p];create_file.restype=C.c_void_p
@@ -224,9 +234,38 @@ with tempfile.TemporaryDirectory(prefix='SAN14-manager-测试-') as name:
     assert remove(str(sandbox),error)==1,error.value
     assert not dll.exists() and config.exists() and (sandbox/'SAN14ModManager.exe').exists()
     assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==1,error.value
+    # An identical target EXE may be running/locked: it must not be replaced.
+    held=create_file(str(app),0x80000000,1,None,3,0,None)
+    assert held not in (None,C.c_void_p(-1).value)
+    try:
+        assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==1,error.value
+    finally: assert close_handle(held)
+    cli=subprocess.run([str(app),'--install',str(sandbox)],capture_output=True,timeout=10,
+                       creationflags=subprocess.CREATE_NO_WINDOW)
+    assert cli.returncode==0,(cli.returncode,cli.stderr)
     assert hashlib.sha256(game.read_bytes()).hexdigest()==input_hash
+legacy_tested=False
+if args.legacy_manager:
+    previous=args.legacy_manager.resolve().read_bytes()
+    assert hashlib.sha256(previous).hexdigest() in {
+        '1d32fff1c27f155b46494cd1f762474ed32eec6a613a1b88614691b7ff749030',
+        '7be3eb8f46556e4603702dbf9aedf2443ff84f56c5cfc794aedc793e8824c692',
+        '570c30fd02bc3ddc647889770c6bece79280fd6ed65a145b84e4c920721a0829'}
+    with tempfile.TemporaryDirectory(prefix='SAN14-manager-migration-') as name:
+        sandbox=Path(name).resolve()
+        assert sandbox.parent==Path(tempfile.gettempdir()).resolve()
+        shutil.copyfile(game_source,sandbox/'SAN14PK_SC.exe')
+        (sandbox/'SAN14ModManager.exe').write_bytes(previous)
+        assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==1,error.value
+        assert (sandbox/'SAN14ModManager/backups/manager.previous.exe').read_bytes()==previous
+        assert owned(str(sandbox))==1
+        assert (sandbox/'SAN14ModManager.exe').read_bytes()==(BUILD/'SAN14ModManager.exe').read_bytes()
+        legacy_tested=True
 installer_metrics={'install_update_remove_reinstall':'passed','unicode_game_folder':'passed',
                    'unknown_proxy_preserved':True,'missing_game_rejected':True,'unlisted_game_fingerprint_accepted':True,
+                   'unknown_manager_preserved':True,'copied_current_manager_adopted':True,
+                   'locked_identical_manager_reinstall':True,'cli_install_from_game_directory':True,
+                   'previous_release_without_receipt_migrated':legacy_tested,
                    'changed_owned_dll_rejected':True,'configuration_preserved':True,
                    'previous_dll_backup':True,'live_game_update_guard_tested':busy_guard,
                    'locked_manager_rolls_back_plugin':True,

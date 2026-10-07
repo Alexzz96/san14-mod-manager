@@ -79,7 +79,7 @@ void s14_manager_paint(S14ManagerUI *ui,HDC dc,int width,int height) {
     }
     fill(dc,box(ui,28,578,704,1),RGB(51,60,73));
     label(ui,dc,ui->status,box(ui,30,590,700,26),ui->small_font,ui->fault?RGB(248,169,139):RGB(164,216,182),DT_SINGLELINE|DT_END_ELLIPSIS);
-    label(ui,dc,ui->notice[0]?ui->notice:L"设置自动保存。规则开关从下一次检查起生效，已建墙体会保留。",box(ui,30,620,704,26),ui->small_font,RGB(158,173,194),DT_SINGLELINE|DT_END_ELLIPSIS);
+    label(ui,dc,ui->notice[0]?ui->notice:L"设置自动保存。规则开关从下一次检查起生效，已建墙体会保留。",box(ui,30,617,704,42),ui->small_font,ui->notice_error?RGB(255,158,140):RGB(158,173,194),DT_WORDBREAK);
 }
 
 int s14_manager_hit(S14ManagerUI *ui,POINT point) {
@@ -106,11 +106,11 @@ int s14_manager_activate(S14ManagerUI *ui,int id) {
     if (id>=100 && id<=102) { ui->tab=id-100; ui->focus=id; s14_manager_refresh(ui); return 1; }
     unsigned int flag=id==1?S14_MASTER:(id>=10 && id<10+s14_feature_count?s14_features[id-10].flag:0);
     if (flag) {
-        if (!ui->in_game && !ui->game_found) { wcscpy(ui->notice,L"请先选择含 SAN14PK_SC.exe 的目录，再调整功能开关。"); ui->tab=1; s14_manager_refresh(ui); return 0; }
+        if (!ui->in_game && !ui->game_found) { ui->notice_error=1; wcscpy(ui->notice,L"请先选择含 SAN14PK_SC.exe 的目录，再调整功能开关。"); ui->tab=1; s14_manager_refresh(ui); return 0; }
         int enable=!(ui->requested&flag);
-        if (!s14_config_set(ui->ini,flag,enable)) { wcscpy(ui->notice,L"设置保存失败，请检查游戏目录的写入权限。" ); s14_manager_refresh(ui); return 0; }
+        if (!s14_config_set(ui->ini,flag,enable)) { ui->notice_error=1; wcscpy(ui->notice,L"设置保存失败，请检查游戏目录的写入权限。" ); s14_manager_refresh(ui); return 0; }
         ui->requested=s14_config_read(ui->ini); ui->effective=s14_effective_flags(ui->requested);
-        wcscpy(ui->notice,L"设置已保存。" );
+        ui->notice_error=0; wcscpy(ui->notice,L"设置已保存。" );
         if (ui->action) ui->action(ui,S14_ACTION_CONFIG,ui->context);
         s14_manager_refresh(ui); return 1;
     }

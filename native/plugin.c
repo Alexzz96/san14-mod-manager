@@ -417,7 +417,7 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
     if (status==MH_OK) status=MH_CreateHook((void*)(image_base+EXIT_RVA),hooked_exit,(void**)&original_exit);
     if (status==MH_OK) status=MH_EnableHook(MH_ALL_HOOKS);
     char startup[384];
-    snprintf(startup,sizeof(startup),"{\"event\":\"startup\",\"requested_mode\":%d,\"hook_status\":%d,\"base\":\"0x%llx\",\"wall_owner_source\":\"tile_current_force\",\"interaction_version\":2,\"toast_duration_ms\":5000,\"manager_version\":\"0.2.1\",\"game_version_check\":false,\"requested_flags\":%u}\n",requested,(int)status,(unsigned long long)image_base,requested_flags);
+    snprintf(startup,sizeof(startup),"{\"event\":\"startup\",\"requested_mode\":%d,\"hook_status\":%d,\"base\":\"0x%llx\",\"wall_owner_source\":\"tile_current_force\",\"interaction_version\":2,\"toast_duration_ms\":5000,\"manager_version\":\"0.2.2\",\"game_version_check\":false,\"requested_flags\":%u}\n",requested,(int)status,(unsigned long long)image_base,requested_flags);
     write_line(log,startup);
     if (status!=MH_OK && prepared) { MH_DisableHook(MH_ALL_HOOKS); runtime_fault=S14_FAULT_HOOK; }
     hooks_ready=status==MH_OK;
@@ -426,15 +426,35 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
     S14ManagerUI ui={0}; ui.action=game_manager_action; ui.game_found=1; ui.running=1; ui.installed=1;
     wcscpy(ui.root,game_folder); wcscpy(ui.ini,ini_path); apply_configuration(&ui);
     ATOM hotkey_id=GlobalAddAtomW(L"SAN14ModManager.F10.0.2"); int hotkey_registered=0;
+    int last_window=-1,last_panel=-1,last_foreground=-1,last_hotkey=-1;
+    DWORD hotkey_error=0,last_hotkey_error=(DWORD)-1; ULONGLONG last_hotkey_attempt=0;
     for (;;) {
         if (!owner || !IsWindow(owner)) EnumWindows(find_game_window,(LPARAM)&owner);
         if (owner && !ui.window) { s14_manager_create(&ui,own_module,owner,1); apply_configuration(&ui); }
         int foreground=owner && foreground_is(owner);
-        if (foreground && !hotkey_registered && hotkey_id) hotkey_registered=RegisterHotKey(NULL,hotkey_id,MOD_NOREPEAT,VK_F10);
+        ULONGLONG input_tick=GetTickCount64();
+        if (foreground && !hotkey_registered && hotkey_id && input_tick-last_hotkey_attempt>=500) {
+            last_hotkey_attempt=input_tick;
+            hotkey_registered=RegisterHotKey(NULL,hotkey_id,MOD_NOREPEAT,VK_F10);
+            hotkey_error=hotkey_registered?0:GetLastError();
+        }
         if (!foreground && hotkey_registered) { UnregisterHotKey(NULL,hotkey_id); hotkey_registered=0; }
+        int has_window=owner && IsWindow(owner),has_panel=ui.window && IsWindow(ui.window);
+        if (has_window!=last_window || has_panel!=last_panel || foreground!=last_foreground ||
+            hotkey_registered!=last_hotkey || hotkey_error!=last_hotkey_error) {
+            char line[256];
+            snprintf(line,sizeof(line),"{\"event\":\"manager_input\",\"window_found\":%d,\"panel_ready\":%d,\"foreground\":%d,\"hotkey_registered\":%d,\"hotkey_error\":%lu}\n",
+                has_window,has_panel,foreground,hotkey_registered,(unsigned long)hotkey_error);
+            write_line(log,line); last_window=has_window; last_panel=has_panel;
+            last_foreground=foreground; last_hotkey=hotkey_registered; last_hotkey_error=hotkey_error;
+        }
         if (!foreground && ui.window && IsWindowVisible(ui.window)) ShowWindow(ui.window,SW_HIDE);
         MSG message; while (PeekMessageW(&message,NULL,0,0,PM_REMOVE)) {
-            if (message.message==WM_HOTKEY && message.wParam==hotkey_id && foreground_is(owner)) s14_manager_toggle(&ui);
+            if (message.message==WM_HOTKEY && message.wParam==hotkey_id && foreground_is(owner)) {
+                s14_manager_toggle(&ui); char line[96];
+                snprintf(line,sizeof(line),"{\"event\":\"manager_toggle\",\"visible\":%d}\n",ui.window && IsWindowVisible(ui.window));
+                write_line(log,line);
+            }
             else { TranslateMessage(&message); DispatchMessageW(&message); }
         }
         drain_events(log,&toast,owner);
