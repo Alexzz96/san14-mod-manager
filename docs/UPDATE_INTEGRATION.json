@@ -1,0 +1,13 @@
+{
+  "version": "0.7.2",
+  "date": "2026-10-08",
+  "public_github_release_query": "passed",
+  "native_https_download_and_github_sha256": "passed",
+  "incorrect_digest_rejected_and_file_removed": true,
+  "downloaded_installer_migrates_0_7_1_in_private_sandbox": "passed",
+  "existing_configuration_and_career_files_preserved": true,
+  "old_installer_and_plugin_backed_up": true,
+  "real_game_installation_modified_by_these_tests": false,
+  "release_build_ci": "https://github.com/Alexzz96/san14-mod-manager/actions/runs/37740275012",
+  "remaining_check": "Full UI handoff between two released update-capable manager versions"
+}

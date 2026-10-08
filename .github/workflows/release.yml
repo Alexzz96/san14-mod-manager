@@ -1,0 +1,44 @@
+name: Publish verified version tag
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Match tag and source version
+        shell: pwsh
+        run: |
+          python -c "import os,pathlib; v=pathlib.Path('VERSION').read_text().strip(); assert os.environ['GITHUB_REF']=='refs/tags/v'+v, 'Tag does not match VERSION'"
+      - name: Publication audit
+        shell: pwsh
+        run: python tools/audit_public.py
+      - name: Download pinned compiler
+        shell: pwsh
+        run: python tools/get_zig.py
+      - name: Build installer
+        shell: pwsh
+        run: python native/build.py --zig .tools/zig/zig.exe
+      - name: Independent rules
+        shell: pwsh
+        run: python -m unittest discover -s tests -v
+      - name: Independent native verification
+        shell: pwsh
+        run: python native/verify_native.py
+      - name: Package verified assets
+        shell: pwsh
+        run: python native/package_release.py
+      - name: Publish complete verified release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python tools/publish_release.py
