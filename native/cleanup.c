@@ -5,6 +5,7 @@
 #include <string.h>
 #include <wchar.h>
 #include "package.h"
+#include "battle_stats.h"
 
 // Only the fixed application paths are visited; no recursive directory delete.
 #define CLEAN_MAX 2048
@@ -30,10 +31,13 @@ static int metadata(const wchar_t *path,const wchar_t *section,const wchar_t *ke
 }
 static int own_log(const wchar_t *path,const wchar_t *name) {
     size_t length=wcslen(name);
-    if (wcsncmp(name,L"plugin-",7) || length<30 || wcscmp(name+length-6,L".jsonl")) return 0;
+    int battle=!wcsncmp(name,L"battle-",7);
+    if ((!battle && wcsncmp(name,L"plugin-",7)) || length<30 || wcscmp(name+length-6,L".jsonl")) return 0;
     HANDLE file=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_FLAG_OPEN_REPARSE_POINT,NULL);
     if (file==INVALID_HANDLE_VALUE) return 0;
     char text[2049]; DWORD got=0; int ok=ReadFile(file,text,2048,&got,NULL); CloseHandle(file); text[got]=0;
+    if(battle) return ok && !strncmp(text,"{\"event\":\"battle_probe_startup\",",sizeof("{\"event\":\"battle_probe_startup\",")-1) &&
+        strstr(text,"\"gameplay_modified_by_probe\":false") && (strstr(text,"\"career_statistics\":false") || strstr(text,"\"career_statistics\":true"));
     return ok && (strstr(text,"\"event\":\"startup\"") || strstr(text,"\"event\":\"startup_failed\"")) &&
         (strstr(text,"\"wall_owner_source\"") || strstr(text,"\"hook_entry_unavailable\""));
 }
@@ -49,6 +53,9 @@ static int add(CleanPlan *p,const wchar_t *name,int kind) {
     else if (kind==4) own=metadata(path,L"Install",L"DllSHA256") && metadata(path,L"Install",L"Version");
     else if (kind==5) own=metadata(path,L"Runtime",L"Pid") && metadata(path,L"Runtime",L"Version");
     else if (kind==6) { const wchar_t *leaf=wcsrchr(path,L'\\'); own=own_log(path,leaf?leaf+1:path); }
+    else if (kind==7) own=metadata(path,L"SearchReport",L"Version") && metadata(path,L"SearchReport",L"Summary");
+    else if (kind==8) own=metadata(path,L"BattleObservation",L"Version") && metadata(path,L"BattleObservation",L"Enabled");
+    else if (kind==9) own=s14_stats_checkpoint_owned(path);
     if (!own) { p->report->preserved++; return 1; }
     if (p->count>=CLEAN_MAX) return failure(p,L"待清理文件过多，请先整理日志；未删除文件。");
     if (!plain_path(path) || (a&FILE_ATTRIBUTE_READONLY)) return failure(p,L"待清理文件是只读文件或链接路径，未删除文件。");
@@ -75,7 +82,8 @@ static int scan(CleanPlan *p,const wchar_t *folder,int logs) {
         if (!wcscmp(data.cFileName,L".") || !wcscmp(data.cFileName,L"..")) continue;
         if (data.dwFileAttributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT)) { p->report->preserved++; continue; }
         int kind=0;
-        if (logs) kind=6;
+        if (logs==2) kind=9;
+        else if (logs) kind=6;
         else if (!_wcsicmp(data.cFileName,L"dinput8.previous.dll")) kind=1;
         else if (!_wcsicmp(data.cFileName,L"manager.previous.exe")) kind=2;
         if (!kind) { p->report->preserved++; continue; }
@@ -100,15 +108,15 @@ int s14_package_clean(const wchar_t *root,const wchar_t *source,S14CleanupReport
     wchar_t dir[MAX_PATH]; s14_join(dir,p.root,L"SAN14ModManager"); DWORD a=GetFileAttributesW(dir);
     if (ok && a!=INVALID_FILE_ATTRIBUTES && (a&FILE_ATTRIBUTE_DIRECTORY) && !(a&FILE_ATTRIBUTE_REPARSE_POINT)) {
         if (!plain_path(dir)) ok=failure(&p,L"管理器目录包含链接，未删除文件。");
-        else ok=add(&p,L"SAN14ModManager\\runtime.ini",5) &&
+        else ok=add(&p,L"SAN14ModManager\\runtime.ini",5) && add(&p,L"SAN14ModManager\\search-results.ini",7) && add(&p,L"SAN14ModManager\\battle-observation-status.ini",8) &&
             add(&p,L"SAN14ModManager\\install.dll.tmp",1) && add(&p,L"SAN14ModManager\\manager.exe.tmp",2) && add(&p,L"SAN14ModManager\\receipt.ini.tmp",4) &&
-            scan(&p,L"SAN14ModManager\\logs",1) && scan(&p,L"SAN14ModManager\\backups",0) && add(&p,L"SAN14ModManager\\installation.ini",4);
+            scan(&p,L"SAN14ModManager\\logs",1) && scan(&p,L"SAN14ModManager\\backups",0) && scan(&p,L"SAN14ModManager\\career\\checkpoints",2) && add(&p,L"SAN14ModManager\\installation.ini",4);
         // Unknown entries in the application directory are preserved, too.
         wchar_t pattern[MAX_PATH]; s14_join(pattern,dir,L"*"); WIN32_FIND_DATAW data; HANDLE search=FindFirstFileW(pattern,&data);
         if (search!=INVALID_HANDLE_VALUE) { do {
             if (!wcscmp(data.cFileName,L".") || !wcscmp(data.cFileName,L"..")) continue;
-            const wchar_t *known[]={L"runtime.ini",L"installation.ini",L"install.dll.tmp",L"manager.exe.tmp",L"receipt.ini.tmp",L"logs",L"backups"}; int recognized=0;
-            for (int i=0;i<7;i++) if (!_wcsicmp(data.cFileName,known[i])) recognized=1;
+            const wchar_t *known[]={L"runtime.ini",L"installation.ini",L"install.dll.tmp",L"manager.exe.tmp",L"receipt.ini.tmp",L"logs",L"backups",L"search-results.ini",L"battle-observation-status.ini",L"career"}; int recognized=0;
+            for (int i=0;i<10;i++) if (!_wcsicmp(data.cFileName,known[i])) recognized=1;
             if (!recognized) report->preserved++;
         } while (FindNextFileW(search,&data)); FindClose(search); }
         else if (ok) ok=failure(&p,L"无法检查管理器目录，未删除文件。");
@@ -132,8 +140,8 @@ int s14_package_clean(const wchar_t *root,const wchar_t *source,S14CleanupReport
     if (ok) report->files=p.count;
     free(p.files);
     if (ok) {
-        const wchar_t *folders[]={L"SAN14ModManager\\logs",L"SAN14ModManager\\backups",L"SAN14ModManager"};
-        for (int i=0;i<3;i++) if (s14_join(dir,p.root,folders[i]) && plain_path(dir)) {
+        const wchar_t *folders[]={L"SAN14ModManager\\career\\checkpoints",L"SAN14ModManager\\career",L"SAN14ModManager\\logs",L"SAN14ModManager\\backups",L"SAN14ModManager"};
+        for (int i=0;i<5;i++) if (s14_join(dir,p.root,folders[i]) && plain_path(dir)) {
             if (RemoveDirectoryW(dir)) report->directories++;
             else if (GetLastError()!=ERROR_DIR_NOT_EMPTY) ok=failure(&p,L"本项目文件已清理，但空目录无法删除，请检查权限后重试。");
         }

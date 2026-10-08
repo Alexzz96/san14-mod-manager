@@ -6,6 +6,7 @@
 #include <wchar.h>
 #include <string.h>
 #include "package.h"
+#include "battle_stats.h"
 #include "features.h"
 #ifdef S14_INSTALLER
 #include "payload.h"
@@ -48,9 +49,19 @@ int s14_game_running(const wchar_t *root) {
     PROCESSENTRY32W process={0}; process.dwSize=sizeof(process); int running=0;
     if (Process32FirstW(snapshot,&process)) do {
         if (_wcsicmp(process.szExeFile,L"SAN14PK_SC.exe")) continue;
-        if (!root) { running=1; break; }
+        // Crash-report clones and terminated processes may remain enumerable
+        // with no threads; they cannot execute. File replacement still checks
+        // sharing and rolls back if an existing file remains locked.
+        if (!process.cntThreads) continue;
         HANDLE handle=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,process.th32ProcessID);
-        if (!handle) { running=1; break; }
+        if (!handle) {
+            // A process may disappear between the snapshot and this lookup.
+            if (GetLastError()==ERROR_INVALID_PARAMETER) continue;
+            running=1; break;
+        }
+        DWORD exit_code;
+        if (GetExitCodeProcess(handle,&exit_code) && exit_code!=STILL_ACTIVE) { CloseHandle(handle); continue; }
+        if (!root) { CloseHandle(handle); running=1; break; }
         wchar_t path[MAX_PATH],expected[MAX_PATH]; DWORD size=MAX_PATH;
         int known=QueryFullProcessImageNameW(handle,0,path,&size); CloseHandle(handle);
         if (!known || !s14_join(expected,root,L"SAN14PK_SC.exe") || !_wcsicmp(path,expected)) { running=1; break; }
@@ -66,16 +77,38 @@ static int fail(wchar_t error[192],const wchar_t *text) { wcsncpy(error,text,191
 
 static int known_previous_manager(const char *hash) {
     static const char *known[]={
+        "a12bde5634abcb4f3841d76852da523968f48fef73beab782c744a382c67764a", // local 0.5.2
+        "4063432b33717b6d9ce4cfecd1d23e096926ab607e1187a7af43baa3e7bdf0ba", // local 0.5.1
+        "deab45bf5bbb0538f5a4ed9492e50ad0676347189b7bbb674dcd8f6cb472f8f2", // local 0.5.0
         "1d32fff1c27f155b46494cd1f762474ed32eec6a613a1b88614691b7ff749030", // public 0.2.0
         "7be3eb8f46556e4603702dbf9aedf2443ff84f56c5cfc794aedc793e8824c692", // source 0.2.0
         "570c30fd02bc3ddc647889770c6bece79280fd6ed65a145b84e4c920721a0829", // public 0.2.1
-        "2b565bb0ac8b2fbd42b4c3c0e29a06b48ba654704efaed7dad1549bedfef4cab"  // public 0.2.2
+        "2b565bb0ac8b2fbd42b4c3c0e29a06b48ba654704efaed7dad1549bedfef4cab", // public 0.2.2
+        "ec2dbdaac23d42578a229877146787259afc7a72c1248bc22aa14f9f46097dad", // local 0.3.0
+        "1bacedb4ec1632d6ded1cc2ec2016fd416d53435290043d004f79de4108bf26d", // local 0.4.0
+        "4d94a1e3c7a18e4a08ff139d2bba4975630214a23e6a7c4574cbb3d29a2eb6f0", // local 0.4.1
+        "1c3af86e9bcc940642f3f322ae865581355c936709bc8b6d17e41f8354df787f", // local 0.4.2
+        "23f4186fad6c651640e9fbc208a387e8d00051ad24813fd62659fa81cd218de4", // local 0.5.3
+        "4c962ddce7353a51f23e5d207763b163ec78105d5c631f489dfd00d7ff5f0df0", // local 0.6.0
+        "958518645460caa9735a60c96c9de8508c6bed8f005f7dd577cb6f2647712a88", // local 0.6.1
+        "c1d2dae333edfbe222908519085c43573756cb16f412db857bd74e5920bc98f9", // local 0.6.2
+        "522230d684952cdbfb2db0864796363d94c690b8d042d417bcc0e42bae3f0f1f", // local 0.6.3
+        "d1cdb01676e600797701917daca041817c1ac0fc16bf3ef2afb92859cd80c4ad", // local 0.7.0
+        "0c9b5bddfec9f59e32ee04e8f6bec14bc3092d4a58f16a3c96ac7c1fd9371451" // accepted local 0.7.1
     };
     for (size_t i=0;i<sizeof(known)/sizeof(known[0]);i++) if (!strcmp(hash,known[i])) return 1;
     return 0;
 }
 static int known_previous_dll(const char *hash) {
     static const char *known[]={
+        "6d6964e52255be65aa3b86859dd10221f9a6ec4d1e8ecdd6dbe4cfe16e14df30", // accepted local 0.7.1
+        "3383059ff8e8a90550bf958ff48b5015d05613cb06e5b7152fb120f6072b848c", // local 0.5.2
+        "8763d16be17adfbc06a8815fe8d0f9e4c1890dd92dddaf712abd0c9c0b221033", // local 0.5.1
+        "31c5d9e20a069de6b29ce6e1a967d7a2577d544a9b0d2143424d2e72eef1b1cf", // local 0.5.0
+        "343b59054103ca7a7024afb47a9b13f38905140f4183dce0b9ce1e6609ad5208", // local 0.4.2
+        "6edc9c72178d0bd0e8b95d092fb0f843a392158b3f00319c51ad7935d76cde44", // local 0.4.1
+        "25aa90932a53dafe93ede7f7c470a4ae276d4f782e76983405cf170ecbba1624", // local 0.4.0
+        "22b1afec1a454f0a323bd84242f54b9034d294fc14dc2bf0ec1c27afdb09f899", // local 0.3.0
         "d22049371c7fb8eaa036101b526e0a6135ec61a017556e2de32926d9bb47e2fe",
         "aa9145a8590e1bd8d94fc852ccefaf14d1ecf7075f250ac462910d8396cd2571",
         "2b6996215274d3d465bc1cc08478c9df16ab80717c556b5822ef807e9b0a028a",
@@ -122,6 +155,23 @@ unsigned int s14_package_detect(const wchar_t *root,const wchar_t *source) {
         GetPrivateProfileStringW(L"Manager",L"Enabled",L"",enabled,16,path);
         GetPrivateProfileStringW(L"Rule",L"Mode",L"",mode,16,path);
         if ((!wcscmp(enabled,L"0") || !wcscmp(enabled,L"1")) && (!wcscmp(mode,L"0") || !wcscmp(mode,L"1") || !wcscmp(mode,L"2"))) found|=S14_FOUND_DATA;
+    }
+    if (s14_join(path,root,L"SAN14ModManager\\search-results.ini") && ordinary_file(path)) {
+        wchar_t version[16],summary[32];
+        GetPrivateProfileStringW(L"SearchReport",L"Version",L"",version,16,path);
+        GetPrivateProfileStringW(L"SearchReport",L"Summary",L"",summary,32,path);
+        if (!wcscmp(version,L"1") && summary[0]) found|=S14_FOUND_DATA;
+    }
+    if (s14_join(path,root,L"SAN14ModManager\\battle-observation-status.ini") && ordinary_file(path)) {
+        wchar_t version[32],enabled[16];
+        GetPrivateProfileStringW(L"BattleObservation",L"Version",L"",version,32,path);
+        GetPrivateProfileStringW(L"BattleObservation",L"Enabled",L"",enabled,16,path);
+        if(version[0] && (!wcscmp(enabled,L"0") || !wcscmp(enabled,L"1"))) found|=S14_FOUND_DATA;
+    }
+    wchar_t folder[MAX_PATH],pattern[MAX_PATH];
+    if(s14_join(folder,root,L"SAN14ModManager\\career\\checkpoints") && ordinary_directory(folder) && s14_join(pattern,folder,L"*.s14career")) {
+        WIN32_FIND_DATAW data;HANDLE find=FindFirstFileW(pattern,&data);int examined=0;
+        if(find!=INVALID_HANDLE_VALUE) {do {if(++examined>2048) break;if(s14_join(path,folder,data.cFileName) && s14_stats_checkpoint_owned(path)) {found|=S14_FOUND_DATA;break;}} while(FindNextFileW(find,&data));FindClose(find);}
     }
     return found;
 }

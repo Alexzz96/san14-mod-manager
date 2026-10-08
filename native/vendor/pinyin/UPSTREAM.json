@@ -1,0 +1,8 @@
+{
+  "project": "pypinyin",
+  "version": "0.55.0",
+  "url": "https://github.com/mozillazg/python-pinyin",
+  "license": "MIT",
+  "data": "BMP CJK codepoints from PINYIN_DICT; Style.NORMAL heteronyms; \u00fc normalized to v",
+  "readings_sha256": "ce9eb91ddd18241a951672561a43f300d47c346d9f3f02d8b56cdc969811afa8"
+}

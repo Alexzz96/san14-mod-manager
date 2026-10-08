@@ -88,7 +88,24 @@ if GAME:
         assert hook_bytes(code,64)==1,f'MinHook rejected private copy of {rva:#x}'
         verified_prologues.append({'rva':hex(rva),'bytes':bytes(signature)[:length.value].hex(),
                                    'private_trampoline':'passed'})
+    search_prologue=test.S14TestSearchPrologue
+    search_prologue.argtypes=[C.c_int,C.POINTER(C.c_ubyte),C.POINTER(C.c_int)];search_prologue.restype=C.c_int
+    for index in range(8):
+        signature=(C.c_ubyte*32)();length=C.c_int()
+        rva=search_prologue(index,signature,C.byref(length))
+        assert bytes(signature)[:length.value]==rva_bytes(rva,length.value)
+        code=(C.c_ubyte*64).from_buffer_copy(rva_bytes(rva,64))
+        assert hook_bytes(code,64)==1,f'MinHook rejected private search copy of {rva:#x}'
+        verified_prologues.append({'rva':hex(rva),'bytes':bytes(signature)[:length.value].hex(),'private_trampoline':'passed','feature':'auto_search'})
     vtable=struct.unpack('<16Q',rva_bytes(0x133f170,128))
+    battle_prologue=test.S14TestBattlePrologue
+    battle_prologue.argtypes=[C.c_int,C.POINTER(C.c_ubyte)];battle_prologue.restype=C.c_int
+    for index in range(14):
+        signature=(C.c_ubyte*16)();rva=battle_prologue(index,signature)
+        assert bytes(signature)==rva_bytes(rva,16),(hex(rva),'battle entry mismatch')
+        code=(C.c_ubyte*64).from_buffer_copy(rva_bytes(rva,64))
+        assert hook_bytes(code,64)==1,f'MinHook rejected private battle copy of {rva:#x}'
+        verified_prologues.append({'rva':hex(rva),'bytes':bytes(signature).hex(),'private_trampoline':'passed','feature':'battle_observation'})
     assert (vtable[1],vtable[2],vtable[5],vtable[15])==tuple(0x140000000+r for r in (0x702ed0,0x701f00,0x707050,0x722490))
     # Each phase key must be an actual call to the appropriate original checker.
     wrapper_returns=(0x6eebe0,0x7089fd,0x70d9bc,0x722571,0x724406,
@@ -165,6 +182,37 @@ ui_metrics=json.loads(ui_test.stdout)
 manager_test=subprocess.run([str(BUILD/'test_manager.exe')],cwd=BUILD,capture_output=True,text=True,check=True,
                             timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 manager_metrics=json.loads(manager_test.stdout)
+update_test=subprocess.run([str(BUILD/'test_update.exe')],capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+update_metrics=json.loads(update_test.stdout);assert update_metrics['update_model']=='passed'
+officer_test=subprocess.run([str(BUILD/'test_officers.exe')],cwd=BUILD,capture_output=True,text=True,check=True,
+                            timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+officer_metrics=json.loads(officer_test.stdout)
+search_metrics={}
+for name in ('test_search','test_search_bridge'):
+    result=subprocess.run([str(BUILD/(name+'.exe'))],cwd=BUILD,capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+    search_metrics[name]=json.loads(result.stdout)
+if GAME:
+    # Execute the complete city constructor and predicate plus the unchanged
+    # target-table store from this PE
+    # inside the isolated fixture. Their relative globals stay in its synthetic
+    # image; no game is loaded and no running process is accessed.
+    assert struct.unpack('<Q',rva_bytes(0x129fb48,8))[0]==0x1402f6130
+    constructor=rva_bytes(0x2034e0,147)
+    predicate=rva_bytes(0x2f6130,55)
+    target_store=rva_bytes(0x65dcc1,19)
+    with tempfile.TemporaryDirectory(prefix='SAN14-city-ABI-') as name:
+        fixture=Path(name)/'city-iterator.bin'
+        fixture.write_bytes(struct.pack('<III',len(constructor),len(predicate),len(target_store))+constructor+predicate+target_store)
+        result=subprocess.run([str(BUILD/'test_search_bridge.exe'),str(fixture)],cwd=BUILD,capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+        search_metrics['private_native_city_iterator']=json.loads(result.stdout)
+        assert search_metrics['private_native_city_iterator']['private_native_iterator_fixture']
+        assert search_metrics['private_native_city_iterator']['private_native_target_store']
+        legacy=subprocess.run([str(BUILD/'test_search_bridge.exe'),str(fixture),'--reproduce-040'],cwd=BUILD,capture_output=True,text=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+        assert legacy.returncode==71,('Expected the recorded null RDX access violation',legacy.returncode,legacy.stdout,legacy.stderr)
+        search_metrics['legacy_040_null_rdx_reproduced']=True
+        legacy=subprocess.run([str(BUILD/'test_search_bridge.exe'),str(fixture),'--reproduce-041'],cwd=BUILD,capture_output=True,text=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+        assert legacy.returncode==74,('Expected the recorded null target-table write at person 393',legacy.returncode,legacy.stdout,legacy.stderr)
+        search_metrics['legacy_041_null_target_table_reproduced']=True
 package=C.CDLL(str(BUILD/'package_test.dll'))
 install=package.S14TestInstall; install.argtypes=[C.c_wchar_p,C.c_wchar_p,C.c_wchar_p];install.restype=C.c_int
 remove=package.S14TestRemove; remove.argtypes=[C.c_wchar_p,C.c_wchar_p];remove.restype=C.c_int
@@ -184,6 +232,21 @@ with tempfile.TemporaryDirectory(prefix='SAN14-manager-测试-') as name:
     sandbox=Path(name).resolve()
     # Verify the recursive-cleanup target before exercising this owned sandbox.
     assert sandbox.parent==Path(tempfile.gettempdir()).resolve() and (GAME is None or sandbox!=GAME.resolve())
+    # This is our independent native test binary under the process name checked
+    # by the installer, never the real game. Keep its handle after termination
+    # to exercise an exited process lingering in a Windows process snapshot.
+    fixture_root=sandbox/'process-fixture';fixture_root.mkdir()
+    fixture_app=fixture_root/'SAN14PK_SC.exe'
+    shutil.copyfile(BUILD/'test_native.exe',fixture_app)
+    fixture_process=subprocess.Popen([str(fixture_app)],creationflags=0x00000004|subprocess.CREATE_NO_WINDOW) # Win32 CREATE_SUSPENDED
+    try:
+        assert running(str(fixture_root))==1,'A live fixture must block installation'
+        fixture_process.terminate();fixture_process.wait(timeout=5)
+        assert running(str(fixture_root))==0,'An exited process must not block installation'
+    finally:
+        if fixture_process.poll() is None:fixture_process.terminate();fixture_process.wait(timeout=5)
+        fixture_process._handle.Close()
+    search_metrics['installer_live_vs_exited_process']=True
     game=sandbox/'SAN14PK_SC.exe';shutil.copyfile(game_source,game)
     dll=sandbox/'dinput8.dll';dll.write_bytes(b'other-proxy-must-survive')
     assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0
@@ -249,9 +312,21 @@ legacy_tested=False
 if args.legacy_manager:
     previous=args.legacy_manager.resolve().read_bytes()
     assert hashlib.sha256(previous).hexdigest() in {
+        'a12bde5634abcb4f3841d76852da523968f48fef73beab782c744a382c67764a',
+        '4063432b33717b6d9ce4cfecd1d23e096926ab607e1187a7af43baa3e7bdf0ba',
+        'deab45bf5bbb0538f5a4ed9492e50ad0676347189b7bbb674dcd8f6cb472f8f2',
         '1d32fff1c27f155b46494cd1f762474ed32eec6a613a1b88614691b7ff749030',
         '7be3eb8f46556e4603702dbf9aedf2443ff84f56c5cfc794aedc793e8824c692',
-        '570c30fd02bc3ddc647889770c6bece79280fd6ed65a145b84e4c920721a0829'}
+        '570c30fd02bc3ddc647889770c6bece79280fd6ed65a145b84e4c920721a0829',
+        '4d94a1e3c7a18e4a08ff139d2bba4975630214a23e6a7c4574cbb3d29a2eb6f0',
+        '1c3af86e9bcc940642f3f322ae865581355c936709bc8b6d17e41f8354df787f',
+        '23f4186fad6c651640e9fbc208a387e8d00051ad24813fd62659fa81cd218de4',
+        '4c962ddce7353a51f23e5d207763b163ec78105d5c631f489dfd00d7ff5f0df0',
+        '958518645460caa9735a60c96c9de8508c6bed8f005f7dd577cb6f2647712a88',
+        'c1d2dae333edfbe222908519085c43573756cb16f412db857bd74e5920bc98f9',
+        '522230d684952cdbfb2db0864796363d94c690b8d042d417bcc0e42bae3f0f1f',
+        'd1cdb01676e600797701917daca041817c1ac0fc16bf3ef2afb92859cd80c4ad',
+        '0c9b5bddfec9f59e32ee04e8f6bec14bc3092d4a58f16a3c96ac7c1fd9371451'}
     with tempfile.TemporaryDirectory(prefix='SAN14-manager-migration-') as name:
         sandbox=Path(name).resolve()
         assert sandbox.parent==Path(tempfile.gettempdir()).resolve()
@@ -272,6 +347,49 @@ installer_metrics={'install_update_remove_reinstall':'passed','unicode_game_fold
                    'locked_manager_rolls_back_plugin':True,
                    'game_binary_unchanged':True}
 cleanup_metrics=run_cleanup_tests(package,BUILD,args.legacy_manager)
+battle_metrics={}
+for name in ('test_battle_probe','test_battle_skills','test_battle_details','test_battle_save'):
+    with tempfile.TemporaryDirectory(prefix='S14-battle-verify-') as root:
+        result=subprocess.run([str(BUILD/(name+'.exe')),root],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+        battle_fixture_metrics=json.loads(result.stdout);assert battle_fixture_metrics['status']=='passed'
+        lines=[json.loads(l) for p in Path(root).rglob('*.jsonl') for l in p.read_text(encoding='utf-8').splitlines()]
+        records=[e for e in lines if e['event']=='battle_observation']
+        assert len(records)==battle_fixture_metrics['written_events']
+        assert all(len(bytes.fromhex(o['raw_hex']))==o['raw_size'] for e in records for o in (e[k] for k in ('source','target','target_after','source_after','other')))
+        if name=='test_battle_skills':
+            effects=[e for e in records if e['kind']=='skill_effect_dispatch' and e['tactic_id']==5]
+            assert effects and all(e['tactic_name']=='火矢' and e['effect_categories']==[17,0] and e['tactic_parameters']==[3,40,10,130,130,163,160,40,40,8] for e in effects)
+        if name=='test_battle_details':
+            ratios=[e for e in records if e['kind']=='wounded_generation_ratio']
+            assert len(ratios)==7 and all(e['schema_version']==7 for e in records)
+            assert {e['wound_rate_float_bits'] for e in ratios}>={'0x80000000','0x7fc12345','0x7f800000','0xff800000'}
+            abnormal=[e for e in records if e['kind']=='army_abnormal_application']
+            assert len(abnormal)==4 and abnormal[0]['target']['id']==2 and abnormal[0]['source']['id']==1
+            assert abnormal[0]['abnormal_before']==0 and abnormal[0]['abnormal_after']==15
+            troops=[e for e in records if e['kind']=='troop_change']
+            assert all(e['player_force_id']==1 and e['source_force_id']==1 and e['target_force_id']==2 and e['target']['raw_force']==0 for e in troops)
+        battle_metrics[name]=battle_fixture_metrics
+analysis_test=subprocess.run([sys.executable,str(HERE.parent/'tools/test_summarize_battle.py')],capture_output=True,text=True,check=True,timeout=20)
+battle_metrics['analysis_tests']=analysis_test.stderr.strip()
+round_result=subprocess.run([str(BUILD/'test_battle_report.exe')],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+battle_metrics['turn_report']=json.loads(round_result.stdout)
+assert battle_metrics['turn_report']['status']=='passed'
+with tempfile.TemporaryDirectory(prefix='S14-stats-') as folder:
+    stats_result=subprocess.run([str(BUILD/'test_battle_stats.exe'),folder],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    battle_metrics['persistent_stats']=json.loads(stats_result.stdout)
+    reopen=subprocess.run([str(BUILD/'test_battle_stats.exe'),folder,'--reopen'],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    assert json.loads(reopen.stdout)['cross_process_restore']
+    battle_metrics['persistent_stats']['cross_process_restore']=True
+battle_metrics['in_game_acceptance']='pending'
+detail_result=subprocess.run([str(BUILD/'test_native_detail.exe')],capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+detail_metrics=json.loads(detail_result.stdout);assert detail_metrics['status']=='passed'
+detail_ui_result=subprocess.run([str(BUILD/'test_detail_ui.exe')],capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+detail_metrics['ui']=json.loads(detail_ui_result.stdout);assert detail_metrics['ui']['status']=='passed'
+detail_metrics['game_process_touched']=False;detail_metrics['in_game_acceptance']='pending'
+if GAME:
+    for rva,hexcode in ((0x58bae9,'488b87e002000048899840010000'),(0x80a264,'48899168010000'),(0xf4d4,'488d05b56e9d01')):
+        assert rva_bytes(rva,len(bytes.fromhex(hexcode)))==bytes.fromhex(hexcode)
+    detail_metrics['static_adapter_anchors_verified']=3
 report={'status':'passed','game_version_check':False,'game_sha256_check':False,'hook_entry_validation':entry_metrics,'verified_game_prologues':verified_prologues,
         'territory_adapter_cases':512,'creation_correlation':'passed',
         'random_reference_cases':random_cases,'private_snapshots_required':False,
@@ -279,7 +397,7 @@ report={'status':'passed','game_version_check':False,'game_sha256_check':False,'
         'queue_test_ms':round(elapsed*1000,3),'directinput_proxy_hresult':hr,
         'synthetic_hook_and_rule':metrics,
         'interaction':ui_metrics,'verified_phase_call_sites':len(wrapper_returns)+2 if GAME else 0,
-        'manager':manager_metrics,'installer':installer_metrics,'cleanup':cleanup_metrics,
+        'manager':manager_metrics,'github_update':update_metrics,'officers':officer_metrics,'native_officer_detail':detail_metrics,'auto_search':search_metrics,'battle_observation':battle_metrics,'installer':installer_metrics,'cleanup':cleanup_metrics,
         'private_actual_check_off_on':list(switch_results),
         'manager_exe_sha256':hashlib.sha256((BUILD/'SAN14ModManager.exe').read_bytes()).hexdigest(),
         'production_dll_sha256':hashlib.sha256((BUILD/'dinput8.dll').read_bytes()).hexdigest(),

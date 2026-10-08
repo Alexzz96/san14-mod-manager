@@ -1,0 +1,22 @@
+{
+  "release": "0.7.2",
+  "validation_date": "2026-10-08",
+  "evidence": "User-confirmed behavior of earlier local builds; independent verification for the release build is required by packaging.",
+  "accepted_prior_builds": {
+    "exploration_results_and_manual_dismiss": "0.4.3",
+    "officer_search_and_on_open_refresh": "0.5.3",
+    "end_of_turn_battle_report": "local 0.6 series",
+    "officer_career_stats": "0.7.0",
+    "native_officer_detail_stats": "0.7.1"
+  },
+  "pending_in_game_checks": [
+    "Nonzero career totals after process restart and rollback to an older game save",
+    "Online update between two released manager versions"
+  ],
+  "limitations": [
+    "Only validated native adapters and attributable battle events are counted",
+    "Enemy troop loss includes wounded soldiers and is not a confirmed death count",
+    "Runtime hook validation remains necessary; game version and EXE hash are not installation gates"
+  ],
+  "publication_contains_game_files_or_saves": false
+}

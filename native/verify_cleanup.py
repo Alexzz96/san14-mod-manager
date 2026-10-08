@@ -75,6 +75,32 @@ def run_cleanup_tests(package, build, legacy=None):
         assert report.files==8 and report.directories==3 and report.preserved==0
         assert set(p.name for p in root.iterdir())=={'SAN14PK_SC.exe','save.sav'}
 
+        root=folder();state=root/'SAN14ModManager';state.mkdir()
+        (state/'search-results.ini').write_text('[SearchReport]\nVersion=1\nSummary=search report\nCount=0\n',encoding='utf-16')
+        assert detect(str(root),source)&4
+        report=cleanup(root);assert report.files==1 and not state.exists()
+
+        root=installed();state=root/'SAN14ModManager'
+        (state/'search-results.ini').write_text('[SearchReport]\nVersion=1\nSummary=search report\nCount=0\n',encoding='utf-16')
+        report=cleanup(root);assert not state.exists() and report.preserved==0
+
+        root=installed();state=root/'SAN14ModManager'
+        (state/'battle-observation-status.ini').write_text('[BattleObservation]\nVersion=0.6.0\nEnabled=1\n',encoding='ascii')
+        (state/'logs/battle-20261008-120000-42.jsonl').write_text('{"event":"battle_probe_startup","schema_version":3,"gameplay_modified_by_probe":false,"career_statistics":false}\n',encoding='ascii')
+        report=cleanup(root);assert not state.exists() and report.preserved==0
+
+        root=folder();state=root/'SAN14ModManager';state.mkdir()
+        (state/'battle-observation-status.ini').write_text('[BattleObservation]\nVersion=0.6.0\nEnabled=0\n',encoding='ascii')
+        assert detect(str(root),source)&4
+        report=cleanup(root);assert report.files==1 and not state.exists()
+
+        root=installed();state=root/'SAN14ModManager'
+        (state/'logs/battle-20261008-120000-42.jsonl').write_bytes(b'foreign-battle-log')
+        (state/'battle-observation-status.ini').write_bytes(b'foreign-status')
+        report=cleanup(root);assert report.preserved>=2
+        assert (state/'logs/battle-20261008-120000-42.jsonl').read_bytes()==b'foreign-battle-log'
+        assert (state/'battle-observation-status.ini').read_bytes()==b'foreign-status'
+
         root=installed();(root/'SAN14ModManager/installation.ini').unlink()
         assert detect(str(root),source)&7==7
         cleanup(root);assert not (root/'dinput8.dll').exists() and not (root/'SAN14ModManager').exists()
@@ -165,6 +191,18 @@ def run_cleanup_tests(package, build, legacy=None):
             root=folder();(root/'SAN14ModManager.exe').write_bytes(legacy.resolve().read_bytes())
             assert detect(str(root),source)&2
             cleanup(root);assert not (root/'SAN14ModManager.exe').exists()
+        # Persistent checkpoints are recognized even without the installer
+        # receipt; CRC corruption and arbitrary neighboring files survive.
+        stats_save=package.S14TestStatsSave;stats_save.argtypes=[C.c_wchar_p];stats_save.restype=C.c_int
+        root=installed();assert stats_save(str(root))==1
+        checkpoint=next((root/'SAN14ModManager/career/checkpoints').glob('*.s14career'))
+        cleanup(root);assert not checkpoint.exists() and not (root/'SAN14ModManager').exists()
+        root=folder();(root/'SAN14ModManager').mkdir();assert stats_save(str(root))==1
+        assert detect(str(root),source)&4;cleanup(root);assert not (root/'SAN14ModManager').exists()
+        root=installed();assert stats_save(str(root))==1
+        checkpoint=next((root/'SAN14ModManager/career/checkpoints').glob('*.s14career'));data=bytearray(checkpoint.read_bytes());data[-1]^=1;checkpoint.write_bytes(data)
+        unknown=root/'SAN14ModManager/career/keep.txt';unknown.write_bytes(b'keep-my-data')
+        cleanup(root);assert checkpoint.read_bytes()==data and unknown.read_bytes()==b'keep-my-data'
 
     return {'temporary_folder_cases':cases,'complete_uninstall':True,'missing_receipt':True,'orphan_receipt_and_config':True,
             'same_name_copy_detected':True,'legacy_copy_removed':bool(legacy),'unknown_files_preserved':True,

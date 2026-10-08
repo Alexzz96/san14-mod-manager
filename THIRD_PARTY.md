@@ -7,3 +7,5 @@ MinHook v1.3.4，原项目：https://github.com/TsudaKageyu/minhook
 MinHook 及其 HDE 部分的完整许可和版权声明保存在 [LICENSE.txt](native/vendor/minhook/LICENSE.txt)，安装包也附带原始许可证。构建工具 Zig 和 Python 不随玩家安装包分发。
 
 本项目原创代码的许可证尚待作者确定，当前不额外授予开源再分发许可。
+
+拼音字典来自 [pypinyin 0.55.0](https://github.com/mozillazg/python-pinyin)，MIT 许可；使用其基本多音字词表生成 `native/vendor/pinyin/readings.h`。原始许可与来源、版本和数据哈希见 [拼音词表目录](native/vendor/pinyin/UPSTREAM.json) 及 [LICENSE.txt](native/vendor/pinyin/LICENSE.txt)。安装包附带 `Pinyin-MIT-LICENSE.txt`；玩家无需安装 pypinyin。可选的 `native/generate_pinyin.py` 用于维护时重新生成词表。

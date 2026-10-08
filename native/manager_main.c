@@ -8,13 +8,55 @@
 #include "features.h"
 #include "manager_ui.h"
 #include "package.h"
+#include "search_model.h"
+#include "update.h"
 
 static wchar_t executable[MAX_PATH];
+#define UPDATE_DONE (WM_APP+140)
+// Worker owns network state; the window thread reads it only after worker exit.
+static struct {HANDLE thread;HWND window;int download,ok;S14Release release;wchar_t path[MAX_PATH],root[MAX_PATH],error[192];} updater;
+static DWORD WINAPI update_worker(void *unused){
+    (void)unused;updater.ok=updater.download?s14_update_download(&updater.release,updater.path,updater.error):s14_update_check(&updater.release,updater.error);
+    PostMessageW(updater.window,UPDATE_DONE,0,0);return 0;
+}
+static void start_update(S14ManagerUI *ui,int download){
+    if(ui->update_busy)return;
+    if(updater.thread){if(WaitForSingleObject(updater.thread,0)!=WAIT_OBJECT_0)return;CloseHandle(updater.thread);updater.thread=NULL;}
+    ui->update_busy=1;updater.window=ui->window;updater.download=download;updater.error[0]=0;updater.path[0]=0;
+    wcscpy(updater.root,ui->root);
+    if(!download)ui->update_ready=0;
+    wcscpy(ui->update_status,download?L"正在下载并校验安装器…":L"正在检查 GitHub 发布版本…");
+    updater.thread=CreateThread(NULL,0,update_worker,NULL,0,NULL);
+    if(!updater.thread){ui->update_busy=0;wcscpy(ui->update_status,L"无法开始更新检查，请重试。");}
+}
+static void finish_update(S14ManagerUI *ui){
+    if(!updater.thread || WaitForSingleObject(updater.thread,0)!=WAIT_OBJECT_0)return;
+    CloseHandle(updater.thread);updater.thread=NULL;ui->update_busy=0;ui->notice_error=!updater.ok;
+    if(!updater.ok){wcscpy(ui->update_status,L"操作失败，详情见下方。");wcscpy(ui->notice,updater.error);}
+    else if(!updater.download){
+        ui->update_ready=updater.release.newer;wchar_t version[32];MultiByteToWideChar(CP_UTF8,0,updater.release.version,-1,version,32);
+        swprintf(ui->update_status,192,updater.release.newer?L"发现 v%ls，可下载更新。":L"当前已是最新版本（v%ls）。",version);
+        wcscpy(ui->notice,L"发布源：Alexzz96/san14-mod-manager，包含已发布的预发布版本。");
+    }else if(_wcsicmp(updater.root,ui->root)){
+        wcscpy(ui->update_status,L"目录已改变，未安装。");wcscpy(ui->notice,L"请选择要更新的游戏目录后重新更新。");
+    }else if(s14_game_running(ui->root)){
+        wcscpy(ui->update_status,L"已下载；游戏仍在运行。");wcscpy(ui->notice,L"请保存并退出游戏后再次更新，暂未替换任何游戏文件。");
+    }else{
+        wchar_t args[MAX_PATH+64];swprintf(args,MAX_PATH+64,L"--apply-update \"%ls\"",ui->root);
+        if((INT_PTR)ShellExecuteW(ui->window,L"open",updater.path,args,NULL,SW_SHOWNORMAL)>32){DestroyWindow(ui->window);return;}
+        wcscpy(ui->notice,L"无法打开下载的安装器，请重新尝试。");ui->notice_error=1;
+    }
+    s14_manager_refresh(ui);
+}
 static void refresh(S14ManagerUI *ui,int check_directory) {
     if (check_directory) ui->game_found=s14_game_available(ui->root);
     ui->installed=s14_owned_install(ui->root); ui->running=s14_game_running(ui->root);
     ui->detected=s14_package_detect(ui->root,executable);
     ui->requested=s14_config_read(ui->ini);
+    ui->search_settings=s14_search_settings_read(ui->ini);
+    ui->officers_enabled=GetPrivateProfileIntW(L"Views",L"Officers",1,ui->ini)!=0;
+    ui->native_stats_enabled=GetPrivateProfileIntW(L"Views",L"NativeOfficerStats",1,ui->ini)!=0;
+    s14_search_report_read(ui->root,ui->search_summary,ui->search_details);
     unsigned int applied=0; int fault=0; ui->attached=s14_read_runtime(ui->root,&applied,&fault); ui->fault=fault;
     ui->effective=s14_effective_flags(ui->requested);
     if (ui->attached && fault) wcscpy(ui->status,s14_fault_message(fault));
@@ -49,11 +91,13 @@ static void choose(S14ManagerUI *ui) {
 static void action(S14ManagerUI *ui,int command,void *context) {
     (void)context; wchar_t error[192]={0};
     if (command==S14_ACTION_CONFIG) refresh(ui,0);
+    else if(command==S14_ACTION_CHECK_UPDATE)start_update(ui,0);
+    else if(command==S14_ACTION_DOWNLOAD_UPDATE)start_update(ui,1);
     else if (command==S14_ACTION_CHOOSE) choose(ui);
     else if (command==S14_ACTION_INSTALL) {
         int installed=s14_package_install(ui->root,executable,error);
         ui->notice_error=!installed;
-        if (installed) wcscpy(ui->notice,L"安装完成。现在可启动游戏，用 F10 打开管理器。");
+        if (installed) wcscpy(ui->notice,L"安装完成。启动游戏后，F 查看武将，F10 打开管理器。");
         else wcscpy(ui->notice,error);
         refresh(ui,1);
         MessageBoxW(ui->window,ui->notice,installed?L"安装完成":L"安装失败",MB_OK|(installed?MB_ICONINFORMATION:MB_ICONERROR));
@@ -77,6 +121,11 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE previous,LPWSTR command,int sho
     (void)previous; (void)command; (void)show;
     GetModuleFileNameW(NULL,executable,MAX_PATH);
     int count=0; wchar_t **args=CommandLineToArgvW(GetCommandLineW(),&count);
+    if(count==2 && !wcscmp(args[1],L"--check-updates")){
+        S14Release release;wchar_t error[192]={0};int ok=s14_update_check(&release,error);
+        if(ok)printf("{\"version\":\"%s\",\"newer\":%s,\"sha256\":\"%s\"}\n",release.version,release.newer?"true":"false",release.sha256);
+        else{char text[768];WideCharToMultiByte(CP_UTF8,0,error,-1,text,sizeof(text),NULL,NULL);fprintf(stderr,"%s\n",text);}LocalFree(args);return ok?0:2;
+    }
     if (count==3 && (!wcscmp(args[1],L"--install") || !wcscmp(args[1],L"--remove") || !wcscmp(args[1],L"--uninstall"))) {
         wchar_t target[MAX_PATH],error[192]={0}; DWORD length=GetFullPathNameW(args[2],MAX_PATH,target,NULL);
         if (!length || length>=MAX_PATH) { LocalFree(args); return 2; }
@@ -90,8 +139,9 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE previous,LPWSTR command,int sho
     }
     CoInitializeEx(NULL,COINIT_APARTMENTTHREADED);
     S14ManagerUI ui={0}; ui.action=action;
+    int updates=count==3 && !wcscmp(args[1],L"--updates"),apply_update=count==3 && !wcscmp(args[1],L"--apply-update");
     wchar_t root[MAX_PATH]; wcscpy(root,executable); wchar_t *slash=wcsrchr(root,L'\\'); if (slash) *slash=0;
-    if (count==3 && !wcscmp(args[1],L"--game-dir") && wcslen(args[2])<MAX_PATH) wcscpy(root,args[2]);
+    if (count==3 && (!wcscmp(args[1],L"--game-dir") || updates || apply_update) && wcslen(args[2])<MAX_PATH) wcscpy(root,args[2]);
     else { wchar_t initial[MAX_PATH]; wcscpy(initial,root); int found=0;
         for (int i=0;i<4;i++) { wchar_t candidate[MAX_PATH];
             if (s14_join(candidate,root,L"SAN14PK_SC.exe") && GetFileAttributesW(candidate)!=INVALID_FILE_ATTRIBUTES) { found=1; break; }
@@ -102,9 +152,13 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE previous,LPWSTR command,int sho
     LocalFree(args); set_root(&ui,root);
     if (!s14_manager_create(&ui,instance,NULL,0)) { CoUninitialize(); return 1; }
     refresh(&ui,1); s14_manager_toggle(&ui);
+    if(updates || apply_update){ui.tab=1;s14_manager_refresh(&ui);}
+    if(updates)start_update(&ui,0);
+    if(apply_update){Sleep(600);action(&ui,S14_ACTION_INSTALL,NULL);}
     ULONGLONG last_refresh=0; MSG message;
     while (IsWindow(ui.window)) {
-        while (PeekMessageW(&message,NULL,0,0,PM_REMOVE)) { TranslateMessage(&message); DispatchMessageW(&message); }
+        while (PeekMessageW(&message,NULL,0,0,PM_REMOVE)) { if(message.message==UPDATE_DONE)continue;TranslateMessage(&message); DispatchMessageW(&message); }
+        if(ui.update_busy && updater.thread && WaitForSingleObject(updater.thread,0)==WAIT_OBJECT_0)finish_update(&ui);
         ULONGLONG now=GetTickCount64(); if (now-last_refresh>=1000) { last_refresh=now; refresh(&ui,0); }
         MsgWaitForMultipleObjects(0,NULL,FALSE,50,QS_ALLINPUT);
     }
