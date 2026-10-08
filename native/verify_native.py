@@ -269,7 +269,7 @@ with tempfile.TemporaryDirectory(prefix='SAN14-manager-测试-') as name:
     assert owned(str(sandbox))==1 and dll.read_bytes()==(BUILD/'dinput8.dll').read_bytes()
     assert (sandbox/'SAN14ModManager.exe').read_bytes()==(BUILD/'SAN14ModManager.exe').read_bytes()
     config=sandbox/'SAN14BuildLimit.ini'
-    config.write_text('[Manager]\nEnabled=1\n[Features]\nWallClusterLimit=0\nLimitHint=1\n[Future]\nUnknownFeature=keep-me\n',encoding='ascii')
+    config.write_text('[Manager]\nEnabled=1\n[Features]\nWallClusterLimit=0\nLimitHint=1\nAutoSearch=0\n[AutoSearch]\nExecutors=0\n[Observation]\nBattleEvents=0\n[Future]\nUnknownFeature=keep-me\n',encoding='ascii')
     # Hold only a sandbox manager file open to force a commit failure. The
     # native installer must restore the previous DLL and leave its receipt.
     old_dll=(BUILD/'dinput8.dll').read_bytes()+b'previous-sandbox-version';dll.write_bytes(old_dll)
@@ -289,7 +289,7 @@ with tempfile.TemporaryDirectory(prefix='SAN14-manager-测试-') as name:
         assert dll.read_bytes()==old_dll and owned(str(sandbox))==1
     finally: assert close_handle(held)
     assert install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==1,error.value
-    assert 'UnknownFeature=keep-me' in config.read_text() and 'WallClusterLimit=0' in config.read_text()
+    assert all(setting in config.read_text() for setting in ('UnknownFeature=keep-me','WallClusterLimit=0','AutoSearch=0','Executors=0','BattleEvents=0'))
     assert (sandbox/'SAN14ModManager/backups/dinput8.previous.dll').read_bytes()==old_dll
     dll.write_bytes(dll.read_bytes()+b'changed')
     assert owned(str(sandbox))==0 and install(str(sandbox),str(BUILD/'SAN14ModManager.exe'),error)==0
@@ -326,7 +326,8 @@ if args.legacy_manager:
         'c1d2dae333edfbe222908519085c43573756cb16f412db857bd74e5920bc98f9',
         '522230d684952cdbfb2db0864796363d94c690b8d042d417bcc0e42bae3f0f1f',
         'd1cdb01676e600797701917daca041817c1ac0fc16bf3ef2afb92859cd80c4ad',
-        '0c9b5bddfec9f59e32ee04e8f6bec14bc3092d4a58f16a3c96ac7c1fd9371451'}
+        '0c9b5bddfec9f59e32ee04e8f6bec14bc3092d4a58f16a3c96ac7c1fd9371451',
+        '68f2cfbffe0fc5233d5b210b5d2929332498c37c73c3ea36887d901feded7991'}
     with tempfile.TemporaryDirectory(prefix='SAN14-manager-migration-') as name:
         sandbox=Path(name).resolve()
         assert sandbox.parent==Path(tempfile.gettempdir()).resolve()

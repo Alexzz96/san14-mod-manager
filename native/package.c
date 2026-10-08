@@ -94,13 +94,15 @@ static int known_previous_manager(const char *hash) {
         "c1d2dae333edfbe222908519085c43573756cb16f412db857bd74e5920bc98f9", // local 0.6.2
         "522230d684952cdbfb2db0864796363d94c690b8d042d417bcc0e42bae3f0f1f", // local 0.6.3
         "d1cdb01676e600797701917daca041817c1ac0fc16bf3ef2afb92859cd80c4ad", // local 0.7.0
-        "0c9b5bddfec9f59e32ee04e8f6bec14bc3092d4a58f16a3c96ac7c1fd9371451" // accepted local 0.7.1
+        "0c9b5bddfec9f59e32ee04e8f6bec14bc3092d4a58f16a3c96ac7c1fd9371451", // accepted local 0.7.1
+        "68f2cfbffe0fc5233d5b210b5d2929332498c37c73c3ea36887d901feded7991" // public 0.7.2
     };
     for (size_t i=0;i<sizeof(known)/sizeof(known[0]);i++) if (!strcmp(hash,known[i])) return 1;
     return 0;
 }
 static int known_previous_dll(const char *hash) {
     static const char *known[]={
+        "456289dad3e746e1a5731846858151fc79297a8606e5da724acb33fbf681e346", // public 0.7.2
         "6d6964e52255be65aa3b86859dd10221f9a6ec4d1e8ecdd6dbe4cfe16e14df30", // accepted local 0.7.1
         "3383059ff8e8a90550bf958ff48b5015d05613cb06e5b7152fb120f6072b848c", // local 0.5.2
         "8763d16be17adfbc06a8815fe8d0f9e4c1890dd92dddaf712abd0c9c0b221033", // local 0.5.1

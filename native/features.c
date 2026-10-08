@@ -19,7 +19,7 @@ unsigned int s14_config_read(const wchar_t *path) {
     if (boolean(path,L"Features",L"WallClusterLimit",legacy==2)) flags|=S14_WALL_LIMIT;
     if (boolean(path,L"Features",L"LimitHint",1)) flags|=S14_LIMIT_HINT;
     if (boolean(path,L"Features",L"Diagnostics",legacy==1)) flags|=S14_DIAGNOSTICS;
-    if (boolean(path,L"Features",L"AutoSearch",0)) flags|=S14_AUTO_SEARCH;
+    if (boolean(path,L"Features",L"AutoSearch",1)) flags|=S14_AUTO_SEARCH;
     return flags;
 }
 int s14_config_set(const wchar_t *path,unsigned int flag,int enabled) {
@@ -45,14 +45,18 @@ int s14_runtime_mode(unsigned int flags) {
     return flags&S14_WALL_LIMIT?2:(flags&S14_DIAGNOSTICS?1:0);
 }
 static const wchar_t *search_keys[]={L"Executors",L"ReturnDays",L"Priority"};
+static const unsigned int search_defaults[]={1,0,0};
 unsigned int s14_search_settings_read(const wchar_t *path) {
     unsigned int packed=0;
     for (int i=0;i<3;i++) {
-        unsigned int value=GetPrivateProfileIntW(L"AutoSearch",search_keys[i],0,path);
-        if (value>(unsigned int)(i==0?3:i==1?2:1)) value=0;
+        unsigned int value=GetPrivateProfileIntW(L"AutoSearch",search_keys[i],search_defaults[i],path);
+        if (value>(unsigned int)(i==0?3:i==1?2:1)) value=search_defaults[i];
         packed|=value<<(i*4);
     }
     return packed;
+}
+int s14_battle_setting_read(const wchar_t *path) {
+    return boolean(path,L"Observation",L"BattleEvents",1);
 }
 int s14_search_setting_set(const wchar_t *path,int group,int value) {
     if (group<0 || group>2 || value<0 || value>(group==0?3:group==1?2:1)) return 0;

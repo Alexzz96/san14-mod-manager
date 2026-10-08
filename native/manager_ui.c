@@ -105,7 +105,7 @@ void s14_manager_paint(S14ManagerUI *ui,HDC dc,int width,int height) {
         if(ui->in_game) {rounded(dc,box(ui,44,559,230,30),S14_ACCENT_SOFT);label(ui,dc,L"查看上一回合报告",box(ui,44,559,230,30),ui->small_font,S14_ACCENT,DT_CENTER|DT_VCENTER|DT_SINGLELINE);}
     } else {
         const wchar_t *names[]={L"武将一览 · F 快捷键",L"战斗数据记录与战绩",L"原生武将详情 · 战绩条"};
-        const wchar_t *descriptions[]={L"中文、拼音及首字母搜索；能力、内心信息和累计战绩排序。",L"采集全势力战斗事件；关闭期间不累计，会标注采集缺口。",L"在游戏武将详情上方显示累计战绩，跟随当前武将；鼠标可穿透。"};
+        const wchar_t *descriptions[]={L"中文、拼音及首字母搜索；能力、内心信息和累计战绩排序。",L"供 F 清单和详情条累计战绩；采集全势力，关闭期间不累计。",L"在游戏武将详情上方显示累计战绩，跟随当前武将；鼠标可穿透。"};
         for (int i=0;i<3;i++) { int y=164+i*119; rounded(dc,box(ui,28,y,704,102),S14_CARD);
             label(ui,dc,names[i],box(ui,46,y+18,650,26),ui->body_font,S14_INK,DT_SINGLELINE);
             label(ui,dc,descriptions[i],box(ui,46,y+56,550,32),ui->small_font,S14_MUTED,DT_WORDBREAK); }
@@ -278,7 +278,7 @@ int s14_manager_create(S14ManagerUI *ui,HINSTANCE instance,HWND owner,int in_gam
     ui->requested=s14_config_read(ui->ini); ui->effective=s14_effective_flags(ui->requested); ui->search_settings=s14_search_settings_read(ui->ini);
     ui->officers_enabled=GetPrivateProfileIntW(L"Views",L"Officers",1,ui->ini)!=0;
     ui->native_stats_enabled=GetPrivateProfileIntW(L"Views",L"NativeOfficerStats",1,ui->ini)!=0;
-    ui->battle_enabled=GetPrivateProfileIntW(L"Observation",L"BattleEvents",0,ui->ini)!=0;return 1;
+    ui->battle_enabled=s14_battle_setting_read(ui->ini);return 1;
 }
 void s14_manager_toggle(S14ManagerUI *ui) {
     if (!ui->window) return;

@@ -1,5 +1,5 @@
 {
-  "release": "0.7.2",
+  "release": "0.7.3",
   "validation_date": "2026-10-08",
   "evidence": "User-confirmed behavior of earlier local builds; independent verification for the release build is required by packaging.",
   "accepted_prior_builds": {
@@ -18,5 +18,12 @@
     "Enemy troop loss includes wounded soldiers and is not a confirmed death count",
     "Runtime hook validation remains necessary; game version and EXE hash are not installation gates"
   ],
-  "publication_contains_game_files_or_saves": false
+  "publication_contains_game_files_or_saves": false,
+  "default_settings": {
+    "wall_cluster_limit": false,
+    "auto_search": true,
+    "search_executors": "各官员以外",
+    "battle_events": true
+  },
+  "existing_explicit_settings_preserved": true
 }

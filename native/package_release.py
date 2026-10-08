@@ -25,9 +25,9 @@ for name,key in [('SAN14ModManager.exe','manager_exe_sha256'),('dinput8.dll','pr
 license_data=(HERE/'vendor/minhook/LICENSE.txt').read_bytes()
 package=DIST/f'SAN14ModManager-{version}-windows-x64.zip'
 guide=(HERE.parent/'docs/USER_GUIDE.md').read_bytes()
-config=b'[Rule]\nMode=0\n[Manager]\nEnabled=1\n[Features]\nWallClusterLimit=0\nLimitHint=1\nDiagnostics=0\nAutoSearch=0\n[AutoSearch]\nExecutors=0\nReturnDays=0\nPriority=0\n'
+config=b'[Rule]\nMode=0\n[Manager]\nEnabled=1\n[Features]\nWallClusterLimit=0\nLimitHint=1\nDiagnostics=0\nAutoSearch=1\n[AutoSearch]\nExecutors=1\nReturnDays=0\nPriority=0\n'
 config+=b'[Views]\nOfficers=1\nNativeOfficerStats=1\n'
-config+=b'[Observation]\nBattleEvents=0\n'
+config+=b'[Observation]\nBattleEvents=1\n'
 manifest={'version':version,'release_status':'prerelease','platform':'windows-x64',
           'target_executable':'SAN14PK_SC.exe','game_version_check':False,
           'game_sha256_check':False,'runtime_hook_validation':True,
@@ -49,7 +49,7 @@ manifest.update({'officer_view':True,'officer_view_hotkey':'F','officer_view_rea
                  'officer_view_search':['name','courtesy','personality'],
                  'officer_view_ability_basis':'base','officer_view_career_provider_version':1,
                  'officer_view_in_game_acceptance':'pending','battle_observer_included':True,
-                 'battle_observer_schema_version':7,'battle_observer_default_enabled':False,
+                 'battle_observer_schema_version':7,'battle_observer_default_enabled':True,
                  'battle_observer_in_game_acceptance':'pending','battle_career_totals_verified':False})
 manifest.update({'end_of_turn_report':True,'end_of_turn_report_tabs':['exploration','battle'],
                  'battle_report_scope':'player_force','battle_report_in_game_acceptance':'pending',
@@ -79,6 +79,7 @@ files={'SAN14ModManager.exe':payloads['SAN14ModManager.exe'],
        'release.json':(json.dumps(manifest,indent=2)+'\n').encode()}
 assert verification['github_update']['update_model']=='passed'
 manifest.update({'wall_cluster_limit_default_enabled':False,'existing_settings_preserved':True,
+                 'auto_search_default_enabled':True,'auto_search_default_executors':1,
                  'github_update':True,'github_update_repository':'Alexzz96/san14-mod-manager',
                  'github_update_trigger':'manual_check','github_update_prereleases':True,
                  'github_update_integrity':'GitHub asset SHA256 digest',

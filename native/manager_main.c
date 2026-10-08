@@ -56,6 +56,7 @@ static void refresh(S14ManagerUI *ui,int check_directory) {
     ui->search_settings=s14_search_settings_read(ui->ini);
     ui->officers_enabled=GetPrivateProfileIntW(L"Views",L"Officers",1,ui->ini)!=0;
     ui->native_stats_enabled=GetPrivateProfileIntW(L"Views",L"NativeOfficerStats",1,ui->ini)!=0;
+    ui->battle_enabled=s14_battle_setting_read(ui->ini);
     s14_search_report_read(ui->root,ui->search_summary,ui->search_details);
     unsigned int applied=0; int fault=0; ui->attached=s14_read_runtime(ui->root,&applied,&fault); ui->fault=fault;
     ui->effective=s14_effective_flags(ui->requested);

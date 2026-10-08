@@ -50,7 +50,7 @@ F10 → 更多拓展 → 战斗数据记录。也可在游戏目录的 `SAN14Bui
 BattleEvents=1
 ```
 
-受扩展总开关控制；通用安装包默认关闭，开发测试时显式开启。日志位于 `SAN14ModManager/logs/battle-日期-时间-PID.jsonl`，状态位于 `SAN14ModManager/battle-observation-status.ini`。`Enabled=1`、`HooksReady=1`、`Fault=0`、`Dropped=0` 才表示采集正常。不是安装器的版本白名单检查。
+受扩展总开关控制；0.7.3 起新安装默认开启；已有配置仍保留用户选择。该开关控制 F 清单与原生详情条的新战绩累计，关闭期间不采集，也不能补算历史。日志位于 `SAN14ModManager/logs/battle-日期-时间-PID.jsonl`，状态位于 `SAN14ModManager/battle-observation-status.ini`。`Enabled=1`、`HooksReady=1`、`Fault=0`、`Dropped=0` 才表示采集正常。不是安装器的版本白名单检查。
 
 事件在游戏线程复制进固定队列，后台写盘。队列容量 2048，单进程日志限额 256 MiB；溢出、文件错误或达到限额会停止本次采集并报告故障，继续正常调用游戏，不能把该日志当作完整一回合。重启后才恢复故障停用。每秒刷盘，突然结束进程可能丢失尚未落盘的尾部。关闭开关以后停止产生新事件，已有队列仍会排空。
 

@@ -379,7 +379,7 @@ static void apply_configuration(S14ManagerUI *ui) {
     ui->search_settings=s14_search_settings_read(ini_path);
     ui->officers_enabled=GetPrivateProfileIntW(L"Views",L"Officers",1,ini_path)!=0;
     ui->native_stats_enabled=GetPrivateProfileIntW(L"Views",L"NativeOfficerStats",1,ini_path)!=0;
-    ui->battle_enabled=GetPrivateProfileIntW(L"Observation",L"BattleEvents",0,ini_path)!=0;
+    ui->battle_enabled=s14_battle_setting_read(ini_path);
     s14_battle_configure(ui->effective,ui->battle_enabled);
     s14_search_configure(ui->effective,ui->search_settings);
     InterlockedExchange(&effective_flags,(LONG)ui->effective);
