@@ -21,6 +21,7 @@ typedef struct {
     int active,day,force,dispatched,completed,people,items,books,money,empty,pending,lines,truncated;
     int capacity;
     wchar_t (*details)[S14_SEARCH_LINE];
+    unsigned char types[S14_SEARCH_ITEMS];
 } S14SearchReport;
 int s14_search_claim(S14SearchGuard *guard,uintptr_t world,int day,int force,int enabled,int confirmed);
 int s14_search_budget(int orders,int cost,int candidates);

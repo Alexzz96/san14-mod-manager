@@ -196,9 +196,37 @@ int s14_officer_matches(const S14Officer *p,int player_force,const S14OfficerFil
     return 1;
 }
 static int number(uint64_t a,uint64_t b) { return (a>b)-(a<b); }
+unsigned int s14_officer_special_flag(int key){return key<=S14_SORT_DUEL_LOSSES?S14_SPECIAL_DUEL:S14_SPECIAL_CAPTURE;}
+uint64_t s14_officer_special_value(const S14Officer *p,int key){
+    switch(key){case S14_SORT_DUELS:return p->special.duels;case S14_SORT_DUEL_WINS:return p->special.wins;
+    case S14_SORT_DUEL_LOSSES:return p->special.losses;case S14_SORT_CAPTURES:return p->special.captures;
+    case S14_SORT_CAPTURED:return p->special.captured;case S14_SORT_UNIQUE_CAPTIVES:return p->special.unique_captives;default:return 0;}
+}
+int s14_officer_count_key(int key){return key==S14_SORT_KILLS || key==S14_SORT_ROUTS || (key>=S14_SORT_ENEMY_LOSS && key<=S14_SORT_UNIQUE_CAPTIVES);}
+uint64_t s14_officer_count_value(const S14Officer *p,int key){
+    if(key>=S14_SORT_DUELS && key<=S14_SORT_UNIQUE_CAPTIVES)return p->special.valid_mask&s14_officer_special_flag(key)?s14_officer_special_value(p,key):0;
+    if(key==S14_SORT_KILLS)return p->career.valid_mask&S14_CAREER_KILLS?p->career.officer_kills:0;
+    if(key==S14_SORT_ROUTS){if(p->battle.valid_mask&S14_STATS_ROUTS)return p->battle.units_routed;return p->career.valid_mask&S14_CAREER_ROUTS?p->career.units_routed:0;}
+    unsigned int flag=key==S14_SORT_ENEMY_LOSS?S14_STATS_DAMAGE:key==S14_SORT_DEFEATS?S14_STATS_DEFEATS:key==S14_SORT_OWN_LOSS?S14_STATS_LOSSES:key==S14_SORT_INJURIES?S14_STATS_INJURIES:0;
+    if(!(p->battle.valid_mask&flag))return 0;
+    return key==S14_SORT_ENEMY_LOSS?p->battle.enemy_loss:key==S14_SORT_DEFEATS?p->battle.units_defeated:key==S14_SORT_OWN_LOSS?p->battle.own_loss:p->battle.officers_injured;
+}
+void s14_officer_kda_text(const S14Officer *p,wchar_t *out,size_t size){
+    uint64_t kills=s14_officer_count_value(p,S14_SORT_ENEMY_LOSS),loss=s14_officer_count_value(p,S14_SORT_OWN_LOSS);
+    if(!loss)swprintf(out,size,kills?L"∞":L"0.00");else swprintf(out,size,L"%.2f",(double)kills/(double)loss);
+}
+static int compare_kda(const S14Officer *a,const S14Officer *b){
+    uint64_t x=s14_officer_count_value(a,S14_SORT_ENEMY_LOSS),y=s14_officer_count_value(b,S14_SORT_ENEMY_LOSS);
+    uint64_t dx=s14_officer_count_value(a,S14_SORT_OWN_LOSS),dy=s14_officer_count_value(b,S14_SORT_OWN_LOSS);
+    int ix=x && !dx,iy=y && !dy;if(ix || iy)return ix-iy;if(!dx)dx=1;if(!dy)dy=1;
+    // Cross products fit 128 bits even for a complete uint64 counter.
+    unsigned __int128 left=(unsigned __int128)x*dy,right=(unsigned __int128)y*dx;return (left>right)-(left<right);
+}
 int s14_officer_compare(const S14Officer *a,const S14Officer *b,int key,int descending) {
     int diff=0;
-    if (key>=S14_SORT_LEADERSHIP && key<=S14_SORT_CHARM) diff=number(a->ability[key-S14_SORT_LEADERSHIP],b->ability[key-S14_SORT_LEADERSHIP]);
+    if(key==S14_SORT_KDA)diff=compare_kda(a,b);
+    else if(s14_officer_count_key(key))diff=number(s14_officer_count_value(a,key),s14_officer_count_value(b,key));
+    else if (key>=S14_SORT_LEADERSHIP && key<=S14_SORT_CHARM) diff=number(a->ability[key-S14_SORT_LEADERSHIP],b->ability[key-S14_SORT_LEADERSHIP]);
     else if (key==S14_SORT_TOTAL) diff=number(a->total,b->total);
     else if (key==S14_SORT_NAME) diff=wcscmp(a->name,b->name);
     else if (key==S14_SORT_FORCE) diff=wcscmp(a->force_name,b->force_name);
@@ -213,18 +241,6 @@ int s14_officer_compare(const S14Officer *a,const S14Officer *b,int key,int desc
         int y=key==S14_SORT_AMBITION?b->ambition:key==S14_SORT_BOND?b->bond:b->loyalty;
         if ((x<0)!=(y<0)) return x<0?1:-1;
         diff=(x>y)-(x<y);
-    } else if(key==S14_SORT_ENEMY_LOSS || key==S14_SORT_DEFEATS || key==S14_SORT_OWN_LOSS || key==S14_SORT_INJURIES || (key==S14_SORT_ROUTS && ((a->battle.valid_mask|b->battle.valid_mask)&S14_STATS_ROUTS))) {
-        unsigned int flag=key==S14_SORT_ENEMY_LOSS?S14_STATS_DAMAGE:key==S14_SORT_DEFEATS?S14_STATS_DEFEATS:key==S14_SORT_OWN_LOSS?S14_STATS_LOSSES:key==S14_SORT_INJURIES?S14_STATS_INJURIES:S14_STATS_ROUTS;
-        int has_a=(a->battle.valid_mask&flag)!=0,has_b=(b->battle.valid_mask&flag)!=0;if(has_a!=has_b) return has_a?-1:1;
-        uint64_t x=key==S14_SORT_ENEMY_LOSS?a->battle.enemy_loss:key==S14_SORT_DEFEATS?a->battle.units_defeated:key==S14_SORT_OWN_LOSS?a->battle.own_loss:key==S14_SORT_INJURIES?a->battle.officers_injured:a->battle.units_routed;
-        uint64_t y=key==S14_SORT_ENEMY_LOSS?b->battle.enemy_loss:key==S14_SORT_DEFEATS?b->battle.units_defeated:key==S14_SORT_OWN_LOSS?b->battle.own_loss:key==S14_SORT_INJURIES?b->battle.officers_injured:b->battle.units_routed;
-        if(has_a) diff=number(x,y);
-    } else if (key==S14_SORT_KILLS || key==S14_SORT_ROUTS) {
-        unsigned int flag=key==S14_SORT_KILLS?S14_CAREER_KILLS:S14_CAREER_ROUTS;
-        int has_a=(a->career.valid_mask&flag)!=0,has_b=(b->career.valid_mask&flag)!=0;
-        if (has_a!=has_b) return has_a?-1:1;
-        if (has_a) diff=number(key==S14_SORT_KILLS?a->career.officer_kills:a->career.units_routed,
-                             key==S14_SORT_KILLS?b->career.officer_kills:b->career.units_routed);
     }
     if (diff) return descending?-(diff>0?1:-1):(diff>0?1:-1);
     return (a->id>b->id)-(a->id<b->id);

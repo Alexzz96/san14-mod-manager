@@ -57,13 +57,14 @@ int main(int argc,char **argv) {
         a[0x10]=1; a[0x11]=(unsigned char)(i+1); word(a+0x12,i?10:20); word(a+0x16,i?1500:2000); word(a+0x2a,100+i);
     }
     // All signatures must validate before any hook is created.
-    for(int i=0;i<BATTLE_ENTRY_COUNT;i++) memcpy(mock_image+battle_entries[i].rva,battle_entries[i].bytes,16);
+    for(int i=0;i<BATTLE_BASE_ENTRY_COUNT;i++) memcpy(mock_image+battle_entries[i].rva,battle_entries[i].bytes,16);
     assert(MH_Initialize()==MH_OK);
     mock_image[battle_entries[2].rva]^=1;
     assert(!s14_battle_install(battle_base,battle_end,&mock_g) && !battle_ready);
     mock_image[battle_entries[2].rva]^=1;
     assert(s14_battle_install(battle_base,battle_end,&mock_g));
-    for(int i=0;i<BATTLE_ENTRY_COUNT;i++) assert(MH_RemoveHook(mock_image+battle_entries[i].rva)==MH_OK);
+    assert(special_hooks==0); // Missing optional probes must leave base hooks working.
+    for(int i=0;i<BATTLE_BASE_ENTRY_COUNT;i++) assert(MH_RemoveHook(mock_image+battle_entries[i].rva)==MH_OK);
     assert(MH_Uninitialize()==MH_OK);
     original_troops=mock_troops; original_remove=mock_remove; original_injury=mock_injury; original_status=mock_status;
     s14_battle_configure(S14_MASTER,0); SetLastError(1234);

@@ -10,6 +10,8 @@ __pycache__/
 *.sav
 *.s14
 *.s14career
+*.s14special
+*.s14timeline
 *.jsonl
 *.zip
 *.bmp

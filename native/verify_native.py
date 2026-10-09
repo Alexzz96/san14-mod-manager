@@ -100,13 +100,23 @@ if GAME:
     vtable=struct.unpack('<16Q',rva_bytes(0x133f170,128))
     battle_prologue=test.S14TestBattlePrologue
     battle_prologue.argtypes=[C.c_int,C.POINTER(C.c_ubyte)];battle_prologue.restype=C.c_int
-    for index in range(14):
+    for index in range(16):
         signature=(C.c_ubyte*16)();rva=battle_prologue(index,signature)
         assert bytes(signature)==rva_bytes(rva,16),(hex(rva),'battle entry mismatch')
         code=(C.c_ubyte*64).from_buffer_copy(rva_bytes(rva,64))
         assert hook_bytes(code,64)==1,f'MinHook rejected private battle copy of {rva:#x}'
         verified_prologues.append({'rva':hex(rva),'bytes':bytes(signature).hex(),'private_trampoline':'passed','feature':'battle_observation'})
+    duel_anchor=test.S14TestDuelAnchor;duel_anchor.argtypes=[C.c_int,C.POINTER(C.c_ubyte),C.POINTER(C.c_int)];duel_anchor.restype=C.c_int
+    for index in range(3):
+        signature=(C.c_ubyte*32)();length=C.c_int();rva=duel_anchor(index,signature,C.byref(length))
+        assert bytes(signature)[:length.value]==rva_bytes(rva,length.value)
+        verified_prologues.append({'rva':hex(rva),'bytes':bytes(signature)[:length.value].hex(),'feature':'ordinary_duel_result_mapping'})
     assert (vtable[1],vtable[2],vtable[5],vtable[15])==tuple(0x140000000+r for r in (0x702ed0,0x701f00,0x707050,0x722490))
+    capture_anchor=test.S14TestCaptureAnchor;capture_anchor.argtypes=[C.c_int,C.POINTER(C.c_ubyte),C.POINTER(C.c_int)];capture_anchor.restype=C.c_int
+    for index in range(3):
+        signature=(C.c_ubyte*32)();length=C.c_int();rva=capture_anchor(index,signature,C.byref(length))
+        assert bytes(signature)[:length.value]==rva_bytes(rva,length.value)
+        verified_prologues.append({'rva':hex(rva),'bytes':bytes(signature)[:length.value].hex(),'feature':'capture_report_actor_mapping'})
     # Each phase key must be an actual call to the appropriate original checker.
     wrapper_returns=(0x6eebe0,0x7089fd,0x70d9bc,0x722571,0x724406,
                      0x733cd,0x7370a,0x74245,0x74605,0x70744c,0x26015d)
@@ -312,6 +322,14 @@ legacy_tested=False
 if args.legacy_manager:
     previous=args.legacy_manager.resolve().read_bytes()
     assert hashlib.sha256(previous).hexdigest() in {
+        '4b46d2d923a65f70af7a514c4757a3dbfdea957aee433a4f9a78a5c5f8aedb94',
+        '7447aac1a8b218ba0c1aa54d6a945c0140dc603ff943264c9b41bbf7fce9c5e8',
+        'c96de53337ba48b1fc749857564bba0aa67431663121ee572f56c72e7e742387',
+        'f9eb8e46c8fe40da83b41b38da92b911c5f4e065840f2703ffce057e568da113',
+        '3d9497be3e12c93c7b3b71ba2203acbbab1288518120a37a85537ee9d5796418',
+        'c38c1e8edd187928e9eebb59ba0ad9ca0bb346c78828630e602ac07d4231f58a',
+        '4e7199ce2cbdb86492225327b6c54eec9ba6e96778c26c2e438ad8e324e59a82',
+        '900a6ab7c55f54393e8c1cbffa3d8916a17181469fe37b8d7d1397a82810d7bd',
         'a12bde5634abcb4f3841d76852da523968f48fef73beab782c744a382c67764a',
         '4063432b33717b6d9ce4cfecd1d23e096926ab607e1187a7af43baa3e7bdf0ba',
         'deab45bf5bbb0538f5a4ed9492e50ad0676347189b7bbb674dcd8f6cb472f8f2',
@@ -349,7 +367,7 @@ installer_metrics={'install_update_remove_reinstall':'passed','unicode_game_fold
                    'game_binary_unchanged':True}
 cleanup_metrics=run_cleanup_tests(package,BUILD,args.legacy_manager)
 battle_metrics={}
-for name in ('test_battle_probe','test_battle_skills','test_battle_details','test_battle_save'):
+for name in ('test_battle_probe','test_battle_skills','test_battle_details','test_battle_save','test_battle_special'):
     with tempfile.TemporaryDirectory(prefix='S14-battle-verify-') as root:
         result=subprocess.run([str(BUILD/(name+'.exe')),root],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
         battle_fixture_metrics=json.loads(result.stdout);assert battle_fixture_metrics['status']=='passed'
@@ -375,6 +393,16 @@ battle_metrics['analysis_tests']=analysis_test.stderr.strip()
 round_result=subprocess.run([str(BUILD/'test_battle_report.exe')],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
 battle_metrics['turn_report']=json.loads(round_result.stdout)
 assert battle_metrics['turn_report']['status']=='passed'
+report_ui_command=[str(BUILD/'test_report_ui.exe')]+([str(GAME)] if GAME else [])
+result=subprocess.run(report_ui_command,cwd=BUILD,capture_output=True,text=True,check=True,
+                      timeout=45,creationflags=subprocess.CREATE_NO_WINDOW)
+battle_metrics['turn_report_ui']=json.loads(result.stdout)
+assert battle_metrics['turn_report_ui']['status']=='passed'
+portrait_command=[str(BUILD/'test_portrait.exe')]+([str(GAME),str(BUILD)] if GAME else [])
+result=subprocess.run(portrait_command,cwd=BUILD,capture_output=True,text=True,check=True,
+                      timeout=60,creationflags=subprocess.CREATE_NO_WINDOW)
+battle_metrics['portraits']=json.loads(result.stdout)
+assert battle_metrics['portraits']['status']=='passed'
 with tempfile.TemporaryDirectory(prefix='S14-stats-') as folder:
     stats_result=subprocess.run([str(BUILD/'test_battle_stats.exe'),folder],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
     battle_metrics['persistent_stats']=json.loads(stats_result.stdout)
@@ -382,6 +410,19 @@ with tempfile.TemporaryDirectory(prefix='S14-stats-') as folder:
     assert json.loads(reopen.stdout)['cross_process_restore']
     battle_metrics['persistent_stats']['cross_process_restore']=True
 battle_metrics['in_game_acceptance']='pending'
+with tempfile.TemporaryDirectory(prefix='S14-timeline-') as folder:
+    result=subprocess.run([str(BUILD/'test_timeline.exe'),folder],capture_output=True,text=True,check=True,timeout=25,creationflags=subprocess.CREATE_NO_WINDOW)
+    battle_metrics['timeline']=json.loads(result.stdout)
+    reopen=subprocess.run([str(BUILD/'test_timeline.exe'),folder,'--reopen'],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    assert json.loads(reopen.stdout)['cross_process_restore']
+    battle_metrics['timeline']['cross_process_restore']=True
+with tempfile.TemporaryDirectory(prefix='S14-special-') as folder:
+    result=subprocess.run([str(BUILD/'test_special_stats.exe'),folder],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    battle_metrics['special_stats']=json.loads(result.stdout)
+    reopen=subprocess.run([str(BUILD/'test_special_stats.exe'),folder,'--reopen'],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    assert json.loads(reopen.stdout)['cross_process_restore']
+    battle_metrics['special_stats']['cross_process_restore']=True
+    battle_metrics['special_stats']['in_game_semantics']='pending'
 detail_result=subprocess.run([str(BUILD/'test_native_detail.exe')],capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 detail_metrics=json.loads(detail_result.stdout);assert detail_metrics['status']=='passed'
 detail_ui_result=subprocess.run([str(BUILD/'test_detail_ui.exe')],capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)

@@ -464,7 +464,16 @@ void s14_search_worker(S14ManagerUI *ui,S14Toast *toast,HINSTANCE instance,HWND 
             report.pending=e->pending; s14_search_format(&report,ui->search_summary,ui->search_details);
             s14_search_report_save(ui->root,&report); ui->search_scroll=0; changed=1;
             wchar_t *message=s14_search_popup_text(&report);
-            if (message) { s14_turn_report_search(report.day,e->day,message); HeapFree(GetProcessHeap(),0,message); }
+            if (message) {
+                s14_turn_report_search(report.day,e->day,message);HeapFree(GetProcessHeap(),0,message);
+                S14ReportSearch view={.start=report.day,.end=e->day,.force=report.force,.available=1,.completed=report.completed,
+                    .empty=report.empty,.people=report.people,.items=report.items,.books=report.books,.money=report.money,
+                    .pending=report.pending,.truncated=report.truncated,.line_count=report.lines};
+                if(!report.lines || (view.lines=calloc((size_t)report.lines,sizeof(*view.lines)))){
+                    for(int n=0;n<report.lines;n++){view.lines[n].type=report.types[n];memcpy(view.lines[n].text,report.details[n],sizeof(view.lines[n].text));}
+                    s14_turn_report_search_data(&view);s14_report_search_free(&view);
+                }
+            }
         } else {
             s14_search_reduce(&report,e);
             if (e->kind==S14_SEARCH_RESET) { s14_turn_report_reset();ui->search_summary[0]=ui->search_details[0]=0; ui->search_scroll=0; changed=1; }

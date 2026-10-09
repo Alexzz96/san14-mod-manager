@@ -16,11 +16,14 @@
 #include <stdlib.h>
 #include <bcrypt.h>
 #include "battle_stats.h"
+#include "special_stats.h"
+#include "battle_place.h"
+#include "battle_timeline.h"
 
 #define BATTLE_QSIZE 2048
 #define BATTLE_JSON_SIZE 16384
 #define BATTLE_LOG_LIMIT (256ull*1024*1024)
-enum { B_TROOPS=1,B_REMOVE,B_INJURY,B_STATUS,B_LOG,B_PLANNING,B_PROGRESS,B_ACTION,B_EFFECT,B_FIRE,B_ARMY_SNAPSHOT,B_CATEGORY,B_WOUND_RATE,B_ABNORMAL,B_SAVE,B_LOAD_BEGIN,B_LOAD_END,B_NEW_GAME };
+enum { B_TROOPS=1,B_REMOVE,B_INJURY,B_STATUS,B_LOG,B_PLANNING,B_PROGRESS,B_ACTION,B_EFFECT,B_FIRE,B_ARMY_SNAPSHOT,B_CATEGORY,B_WOUND_RATE,B_ABNORMAL,B_SAVE,B_LOAD_BEGIN,B_LOAD_END,B_NEW_GAME,B_DUEL,B_CAPTURE };
 typedef struct {
     uintptr_t address,vtable;
     int kind,id,leader,raw_force,raw_status,health,troops,field18,tile,active,force_id;
@@ -43,6 +46,7 @@ typedef struct {
     int wound_rate_count,attrition_read,attrition_percent,abnormal_mode,abnormal_requested,abnormal_before,abnormal_after;
     unsigned int wound_rate_bits,attrition_divisor_bits;
     int save_hash_valid;unsigned char save_hash[32];
+    int capture_report_matches,capture_status_matches;S14BattlePlace place;
 } BattleEvent;
 static int same_object(const BattleObject *a,const BattleObject *b);
 typedef struct { volatile LONG state; BattleEvent e; } BattleSlot;
@@ -54,6 +58,7 @@ static volatile LONG64 battle_serial,battle_dropped,battle_events,battle_read_er
 static volatile LONG battle_queue_cursor;
 static _Thread_local LONG64 battle_parent;
 static _Thread_local BattleEvent *battle_action,*battle_effect,*battle_damage;
+static _Thread_local BattleEvent *battle_capture;
 static _Thread_local int battle_category=-1,battle_category_slot=-1;
 static volatile LONG64 planning_world;
 static volatile LONG battle_snapshot_pending;
@@ -61,6 +66,13 @@ static HANDLE battle_file=INVALID_HANDLE_VALUE;
 static ULONGLONG battle_file_bytes,battle_last_status;
 static wchar_t battle_file_path[MAX_PATH];
 static volatile LONG battle_loading;
+static int special_hooks;
+static int duel_semantics_ready;
+static int capture_semantics_ready;
+typedef uintptr_t (*DuelCall)(void*,void*,int,int);
+typedef uintptr_t (*CaptureCall)(void*,void*,int,int,void*);
+static DuelCall original_duel;
+static CaptureCall original_capture;
 typedef uintptr_t (*TroopCall)(int,int,int,int,int);
 typedef uintptr_t (*RemoveCall)(void*,void*,void*,int,int);
 typedef uintptr_t (*InjuryCall)(void*,int,void*,int);
@@ -153,6 +165,17 @@ static int battle_hex_id(uintptr_t world,const void *pointer) {
 }
 static int battle_fire_value(const void *hex) {
     unsigned short value;if (!hex || !battle_read((const unsigned char*)hex+0x16,&value,2)) return -1;return value;
+}
+static int place_read(void *context,uintptr_t at,void *out,size_t size){(void)context;return battle_read((void*)at,out,size);}
+static int object_tile(uintptr_t world,const BattleObject *o){
+    if(o->kind==2 && o->active)return o->tile;
+    if(o->kind==1 && o->raw_size>=0x11e){int current=battle_word(o->raw+0x11c);
+        if(current>=62 && current<=561){BattleObject army=battle_object(world,battle_army_at(world,current-61));if(army.kind==2 && army.active)return army.tile;}}
+    return -1;
+}
+static void event_place(BattleEvent *e){
+    int tile=object_tile(e->world,&e->target),basis=1;if(tile<0){tile=object_tile(e->world,&e->source);basis=2;}
+    s14_place_capture(place_read,NULL,battle_base,e->world,tile,&e->place);e->place.basis=tile>=0?basis:0;
 }
 static void battle_skill(BattleEvent *e,const void *definition) {
     e->tactic_id=-1;unsigned char raw[136];
@@ -348,6 +371,7 @@ static uintptr_t hooked_battle_remove(void *target,void *source,void *other,int 
     e.args[0]=(uintptr_t)target; e.args[1]=(uintptr_t)source; e.args[2]=(uintptr_t)other;
     e.args[3]=(uintptr_t)(intptr_t)reason; e.args[4]=(uintptr_t)(intptr_t)option;
     e.target=battle_object(e.world,target); e.source=battle_object(e.world,source); e.other=battle_object(e.world,other);
+    event_place(&e);
     LONG64 previous=battle_parent; battle_parent=e.id; SetLastError(error);
     uintptr_t result=original_remove(target,source,other,reason,option); error=GetLastError(); battle_parent=previous;
     e.native_return=result; e.target_after=battle_object(e.world,target); e.source_after=battle_object(e.world,source);
@@ -359,6 +383,7 @@ static uintptr_t hooked_battle_injury(void *target,int mode,void *source,int opt
     DWORD error=GetLastError(); BattleEvent e=battle_begin(B_INJURY,(uintptr_t)__builtin_return_address(0)-battle_base);
     e.args[0]=(uintptr_t)target; e.args[1]=(uintptr_t)(intptr_t)mode; e.args[2]=(uintptr_t)source; e.args[3]=(uintptr_t)(intptr_t)option;
     e.target=battle_object(e.world,target); e.source=battle_object(e.world,source);
+    event_place(&e);
     LONG64 previous=battle_parent; battle_parent=e.id; SetLastError(error);
     uintptr_t result=original_injury(target,mode,source,option); error=GetLastError(); battle_parent=previous;
     e.native_return=result; e.target_after=battle_object(e.world,target); e.post_identity_matches=same_object(&e.target,&e.target_after);
@@ -372,8 +397,34 @@ static uintptr_t hooked_battle_status(void *person,int status) {
     e.args[0]=(uintptr_t)person; e.args[1]=(uintptr_t)(intptr_t)status; e.target=battle_object(e.world,person);
     SetLastError(error); uintptr_t result=original_status(person,status); error=GetLastError();
     e.native_return=result; e.target_after=battle_object(e.world,person); e.post_identity_matches=same_object(&e.target,&e.target_after);
+    if(battle_capture && e.parent==battle_capture->id && e.target.address==battle_capture->target.address && e.post_identity_matches && e.target.raw_status!=6 && e.target_after.raw_status==6)battle_capture->capture_status_matches=1;
     if (e.target.raw_status!=e.target_after.raw_status) battle_enqueue(&e);
     SetLastError(error); return result;
+}
+static uintptr_t hooked_duel_settlement(void *first,void *second,int consequence,int report_context) {
+    if(!s14_battle_enabled())return original_duel(first,second,consequence,report_context);
+    DWORD error=GetLastError();BattleEvent e=battle_begin(B_DUEL,(uintptr_t)__builtin_return_address(0)-battle_base);
+    e.args[0]=(uintptr_t)first;e.args[1]=(uintptr_t)second;e.args[2]=(uintptr_t)(intptr_t)consequence;e.args[3]=(uintptr_t)(intptr_t)report_context;
+    e.source=battle_object(e.world,first);e.target=battle_object(e.world,second);
+    event_place(&e);
+    LONG64 previous=battle_parent;battle_parent=e.id;SetLastError(error);
+    uintptr_t value=original_duel(first,second,consequence,report_context);error=GetLastError();battle_parent=previous;
+    e.native_return=value;e.source_after=battle_object(e.world,first);e.target_after=battle_object(e.world,second);
+    e.post_identity_matches=same_object(&e.source,&e.source_after)&&same_object(&e.target,&e.target_after);
+    e.elapsed=GetTickCount64()-e.tick;battle_enqueue(&e);SetLastError(error);return value;
+}
+static uintptr_t hooked_capture_settlement(void *person,void *army,int flag,int option,void *force) {
+    if(!s14_battle_enabled())return original_capture(person,army,flag,option,force);
+    DWORD error=GetLastError();BattleEvent e=battle_begin(B_CAPTURE,(uintptr_t)__builtin_return_address(0)-battle_base);
+    e.args[0]=(uintptr_t)person;e.args[1]=(uintptr_t)army;e.args[2]=(uintptr_t)(intptr_t)flag;e.args[3]=(uintptr_t)(intptr_t)option;e.args[4]=(uintptr_t)force;
+    e.target=battle_object(e.world,person);e.source=battle_object(e.world,army);e.other=battle_object(e.world,force);
+    event_place(&e);
+    BattleEvent *previous_capture=battle_capture;battle_capture=&e;
+    LONG64 previous=battle_parent;battle_parent=e.id;SetLastError(error);
+    uintptr_t value=original_capture(person,army,flag,option,force);error=GetLastError();battle_parent=previous;battle_capture=previous_capture;
+    e.native_return=value;e.target_after=battle_object(e.world,person);e.source_after=battle_object(e.world,army);
+    e.post_identity_matches=same_object(&e.target,&e.target_after);e.elapsed=GetTickCount64()-e.tick;
+    battle_enqueue(&e);SetLastError(error);return value;
 }
 static void battle_text(wchar_t out[512],const wchar_t *text,int *truncated) {
     if (!text) return;
@@ -388,6 +439,12 @@ void s14_battle_log(uintptr_t caller,const uintptr_t args[10],const wchar_t *sho
     if (!s14_battle_enabled() || (!battle_parent && (caller<0x160000 || caller>=0x390000))) return;
     DWORD error=GetLastError(); BattleEvent e=battle_begin(B_LOG,caller);
     memcpy(e.args,args,sizeof(e.args)); battle_text(e.text,long_text?long_text:short_text,&e.text_truncated);
+    if(battle_capture && e.parent==battle_capture->id && caller==0x2aebe8 && !e.text_truncated){
+        wchar_t clean[512];int at=0;for(int i=0;e.text[i] && at<511;i++){if(e.text[i]==L'^' && e.text[i+1]>=L'0' && e.text[i+1]<=L'9' && e.text[i+2]>=L'0' && e.text[i+2]<=L'9'){i+=2;continue;}clean[at++]=e.text[i];}clean[at]=0;
+        const wchar_t *victim=battle_capture->target.name,*captor=battle_capture->source.name;
+        const wchar_t *v=victim[0]?wcsstr(clean,victim):NULL,*by=v?wcsstr(v,L"被"):NULL,*a=by && captor[0]?wcsstr(by,captor):NULL;
+        if(a && wcsstr(a,L"俘虏"))battle_capture->capture_report_matches=1;
+    }
     battle_enqueue(&e); SetLastError(error);
 }
 void s14_battle_planning(uintptr_t world,int day,int force) {
@@ -404,23 +461,38 @@ void s14_battle_progress(void) {
 #include "battle_save.inc"
 int s14_battle_install(uintptr_t base,uintptr_t end,unsigned char **manager) {
     battle_base=base; battle_end=end; battle_manager=manager;
-    void *detours[]={hooked_battle_troops,hooked_battle_remove,hooked_battle_injury,hooked_battle_status,hooked_battle_action,hooked_battle_effect,hooked_battle_fire,hooked_battle_category,hooked_battle_wound_rate,hooked_battle_abnormal,hooked_battle_save_commit,hooked_battle_load,hooked_battle_load_reader,hooked_battle_new_game};
-    void **originals[]={(void**)&original_troops,(void**)&original_remove,(void**)&original_injury,(void**)&original_status,(void**)&original_action,(void**)&original_effect,(void**)&original_fire,(void**)&original_category,(void**)&original_wound_rate,(void**)&original_abnormal,(void**)&original_save_commit,(void**)&original_load,(void**)&original_load_reader,(void**)&original_new_game};
-    for (int i=0;i<BATTLE_ENTRY_COUNT;i++) {
+    void *detours[]={hooked_battle_troops,hooked_battle_remove,hooked_battle_injury,hooked_battle_status,hooked_battle_action,hooked_battle_effect,hooked_battle_fire,hooked_battle_category,hooked_battle_wound_rate,hooked_battle_abnormal,hooked_battle_save_commit,hooked_battle_load,hooked_battle_load_reader,hooked_battle_new_game,hooked_duel_settlement,hooked_capture_settlement};
+    void **originals[]={(void**)&original_troops,(void**)&original_remove,(void**)&original_injury,(void**)&original_status,(void**)&original_action,(void**)&original_effect,(void**)&original_fire,(void**)&original_category,(void**)&original_wound_rate,(void**)&original_abnormal,(void**)&original_save_commit,(void**)&original_load,(void**)&original_load_reader,(void**)&original_new_game,(void**)&original_duel,(void**)&original_capture};
+    special_hooks=0;duel_semantics_ready=capture_semantics_ready=0;
+    for (int i=0;i<BATTLE_BASE_ENTRY_COUNT;i++) {
         const S14BattleEntry *entry=&battle_entries[i]; unsigned char bytes[16];
         if (end<base || entry->rva>end-base || sizeof(bytes)>end-base-entry->rva ||
             !battle_read((void*)(base+entry->rva),bytes,sizeof(bytes)) || memcmp(bytes,entry->bytes,sizeof(bytes))) return 0;
     }
-    for (int i=0;i<BATTLE_ENTRY_COUNT;i++) if (MH_CreateHook((void*)(base+battle_entries[i].rva),detours[i],originals[i])!=MH_OK) {
+    for (int i=0;i<BATTLE_BASE_ENTRY_COUNT;i++) if (MH_CreateHook((void*)(base+battle_entries[i].rva),detours[i],originals[i])!=MH_OK) {
         for (int j=0;j<i;j++) MH_RemoveHook((void*)(base+battle_entries[j].rva)); return 0;
     }
+    // Optional probes cannot disable existing battle counters on another layout.
+    for(int i=BATTLE_BASE_ENTRY_COUNT;i<BATTLE_ENTRY_COUNT;i++){
+        const S14BattleEntry *entry=&battle_entries[i];unsigned char bytes[16];
+        if(end>=base && entry->rva<=end-base && 16<=end-base-entry->rva && battle_read((void*)(base+entry->rva),bytes,16) && !memcmp(bytes,entry->bytes,16) &&
+           MH_CreateHook((void*)(base+entry->rva),detours[i],originals[i])==MH_OK)special_hooks|=1<<(i-BATTLE_BASE_ENTRY_COUNT);
+    }
+    if(special_hooks&1){
+        duel_semantics_ready=1;
+        for(int i=0;i<3;i++){const S14DuelAnchor *a=&duel_anchors[i];unsigned char bytes[23];
+            if(end<base || a->rva>end-base || a->size>end-base-a->rva || !battle_read((void*)(base+a->rva),bytes,a->size) || memcmp(bytes,a->bytes,a->size))duel_semantics_ready=0;
+        }
+    }
+    if(special_hooks&2){capture_semantics_ready=1;for(int i=0;i<3;i++){const S14CaptureAnchor *a=&capture_anchors[i];unsigned char bytes[32];
+        if(end<base || a->rva>end-base || a->size>end-base-a->rva || !battle_read((void*)(base+a->rva),bytes,a->size) || memcmp(bytes,a->bytes,a->size))capture_semantics_ready=0;}}
     InterlockedExchange(&battle_ready,1); return 1;
 }
 void s14_battle_configure(unsigned int flags,int enabled) {
     InterlockedExchange(&battle_requested,enabled!=0);
     int active=enabled && (flags&S14_MASTER) && InterlockedCompareExchange(&battle_ready,0,0) && !InterlockedCompareExchange(&battle_fault,0,0);
     LONG before=InterlockedExchange(&battle_active,active);
-    if(before && !active) {s14_battle_round_capture_gap();s14_stats_gap();}
+    if(before && !active) {s14_battle_round_capture_gap();s14_stats_gap();s14_special_gap();s14_timeline_gap();}
     if(!before && active) InterlockedExchange64(&planning_world,0);
 }
 #ifdef S14_SELFTEST
@@ -450,15 +522,34 @@ static int json_object(char **p,size_t *left,const char *key,const BattleObject 
     for(int i=0;i<o->raw_size;i++) if(!append(p,left,"%02x",o->raw[i])) return 0;
     return append(p,left,"\"}");
 }
+static int ordinary_duel_verified(const BattleEvent *e){
+    return duel_semantics_ready && e->kind==B_DUEL && (e->caller==0x331f03 || e->caller==0x331f3e) && (int)e->args[2]==0 &&
+        ((int)e->args[3]==0 || (int)e->args[3]==1) && e->post_identity_matches &&
+        e->source.kind==1 && e->target.kind==1 && e->source.active && e->target.active &&
+        e->source.id>0 && e->source.id!=e->target.id && e->source.raw_status>=1 && e->source.raw_status<=4 && e->target.raw_status>=1 && e->target.raw_status<=4 &&
+        e->source.force_id>0 && e->target.force_id>0 && e->source.force_id!=e->target.force_id;
+}
+__declspec(dllexport) int S14TestDuelAnchor(int index,unsigned char *out,int *length){
+    if(index<0 || index>=3 || !out || !length)return 0;
+    memcpy(out,duel_anchors[index].bytes,duel_anchors[index].size);*length=duel_anchors[index].size;return (int)duel_anchors[index].rva;
+}
+static int capture_verified(const BattleEvent *e){
+    return capture_semantics_ready && e->kind==B_CAPTURE && e->caller==0x236391 && e->args[2]==1 && e->args[3]==1 && e->native_return==1 &&
+        e->capture_report_matches && e->capture_status_matches && e->post_identity_matches && e->target.kind==1 && e->target.active && e->target.raw_status>=2 && e->target.raw_status<=5 && e->target_after.raw_status==6 &&
+        e->source.kind==2 && e->source.active && same_object(&e->source,&e->source_after) && e->source.force_id>0 && e->target.force_id>0 && e->source.force_id!=e->target.force_id;
+}
+__declspec(dllexport) int S14TestCaptureAnchor(int index,unsigned char *out,int *size){if(index<0 || index>=3 || !out || !size)return 0;const S14CaptureAnchor *a=&capture_anchors[index];memcpy(out,a->bytes,a->size);*size=a->size;return (int)a->rva;}
 static int battle_json(const BattleEvent *e,char out[BATTLE_JSON_SIZE]) {
-    static const char *kinds[]={"unknown","troop_change","unit_remove","officer_injury","person_status","native_log","planning","progress","skill_action_attempt","skill_effect_dispatch","hex_fire_transition","planning_army_snapshot","skill_effect_category","wounded_generation_ratio","army_abnormal_application","save_completed","load_begin","load_completed","new_campaign"};
-    if (e->kind<1 || e->kind>B_NEW_GAME) return 0;
+    static const char *kinds[]={"unknown","troop_change","unit_remove","officer_injury","person_status","native_log","planning","progress","skill_action_attempt","skill_effect_dispatch","hex_fire_transition","planning_army_snapshot","skill_effect_category","wounded_generation_ratio","army_abnormal_application","save_completed","load_begin","load_completed","new_campaign","duel_settlement_candidate","capture_settlement_candidate"};
+    if (e->kind<1 || e->kind>B_CAPTURE) return 0;
     char text[4096]; json_text(text,sizeof(text),e->text); char *p=out; size_t left=BATTLE_JSON_SIZE;
     if (!append(&p,&left,"{\"event\":\"battle_observation\",\"kind\":\"%s\",\"id\":%lld,\"parent_id\":%lld,\"thread\":%lu,\"tick_ms\":%llu,\"elapsed_ms\":%llu,\"caller_rva\":\"0x%llx\",\"world\":\"0x%llx\",\"planning_day\":%d,\"player_force\":%d,\"clock_raw\":\"%02x%02x%02x%02x%02x%02x\",\"native_return\":\"0x%llx\",\"post_identity_matches\":%d,\"args\":[",
         kinds[e->kind],(long long)e->id,(long long)e->parent,(unsigned long)e->tid,(unsigned long long)e->tick,(unsigned long long)e->elapsed,
         (unsigned long long)e->caller,(unsigned long long)e->world,e->planning_day,e->force,e->clock_raw[0],e->clock_raw[1],e->clock_raw[2],e->clock_raw[3],e->clock_raw[4],e->clock_raw[5],(unsigned long long)e->native_return,e->post_identity_matches)) return 0;
     for (int i=0;i<10;i++) if (!append(&p,&left,"%s\"0x%llx\"",i?",":"",(unsigned long long)e->args[i])) return 0;
     if (!append(&p,&left,"],")) return 0;
+    char city[256],area[256];json_text(city,sizeof(city),e->place.city);json_text(area,sizeof(area),e->place.area);
+    if(!append(&p,&left,"\"capture_report_matches\":%d,\"capture_status_matches\":%d,\"capture_verified\":%s,\"battle_place\":{\"tile\":%d,\"city_id\":%d,\"area_id\":%d,\"basis\":%d,\"city\":\"%s\",\"area\":\"%s\"},",e->capture_report_matches,e->capture_status_matches,capture_verified(e)?"true":"false",e->place.basis?e->place.tile:-1,e->place.city_id,e->place.area_id,e->place.basis,city,area))return 0;
     if(!append(&p,&left,"\"save_hash_valid\":%d,\"save_content_sha256\":\"",e->save_hash_valid)) return 0;
     for(int i=0;i<32;i++) if(!append(&p,&left,"%02x",e->save_hash[i])) return 0;
     if(!append(&p,&left,"\",")) return 0;
@@ -475,7 +566,8 @@ static int battle_json(const BattleEvent *e,char out[BATTLE_JSON_SIZE]) {
     for(int i=0;i<e->parameter_count;i++) if(!append(&p,&left,"%s%d",i?",":"",e->parameters[i])) return 0;
     if(!append(&p,&left,"],")) return 0;
     if(!append(&p,&left,"\"wound_rate_count\":%d,\"wound_rate_float_bits\":\"0x%08x\",\"attrition_parameters_read\":%d,\"attrition_percent_raw\":%d,\"attrition_divisor_float_bits\":\"0x%08x\",\"abnormal_mode_raw\":%d,\"abnormal_requested_duration\":%d,\"abnormal_before\":%d,\"abnormal_after\":%d,",e->wound_rate_count,e->wound_rate_bits,e->attrition_read,e->attrition_percent,e->attrition_divisor_bits,e->abnormal_mode,e->abnormal_requested,e->abnormal_before,e->abnormal_after)) return 0;
-    if (!append(&p,&left,"\"text\":\"%s\",\"text_truncated\":%d,\"semantics_verified\":false}\n",text,e->text_truncated)) return 0;
+    if (!append(&p,&left,"\"text\":\"%s\",\"text_truncated\":%d,\"semantics_verified\":%s,\"ordinary_duel_normalized_outcome\":%d}\n",text,e->text_truncated,
+        ordinary_duel_verified(e) || capture_verified(e)?"true":"false",ordinary_duel_verified(e)?0:-1)) return 0;
     return (int)(p-out);
 }
 static int battle_write(const char *line,size_t length) {
@@ -511,9 +603,38 @@ static void battle_report_event(const BattleEvent *e) {
     if(e->kind==B_LOAD_BEGIN) {s14_stats_load_begin();return;}
     if(e->kind==B_LOAD_END || e->kind==B_NEW_GAME) {
         if((int)e->native_return==1) {s14_battle_round_reset();s14_turn_report_reset();}
-        s14_stats_load_end(e->world,e->planning_day,(int)e->native_return==1,e->save_hash,e->save_hash_valid,e->kind==B_NEW_GAME);return;
+        s14_stats_load_end(e->world,e->planning_day,(int)e->native_return==1,e->save_hash,e->save_hash_valid,e->kind==B_NEW_GAME);
+        s14_special_load(e->world,e->planning_day,(int)e->native_return==1,e->save_hash,e->save_hash_valid,e->kind==B_NEW_GAME);
+        s14_timeline_load(e->world,e->planning_day,(int)e->native_return==1,e->save_hash,e->save_hash_valid,e->kind==B_NEW_GAME);
+        if((int)e->native_return==1){S14SpecialSnapshot *s=malloc(sizeof(*s));if(s && s14_special_snapshot(e->world,s))s14_timeline_import_special(s);free(s);}return;
     }
-    if(e->kind==B_SAVE) {if(e->native_return==0) {if(!s14_stats_save(e->world,e->save_hash,e->save_hash_valid)) s14_stats_gap();}return;}
+    if(e->kind==B_SAVE) {if(e->native_return==0) {
+        if(!s14_stats_save(e->world,e->save_hash,e->save_hash_valid)) s14_stats_gap();
+        if(!s14_special_save(e->world,e->save_hash,e->save_hash_valid)) s14_special_gap();
+        if(!s14_timeline_save(e->world,e->save_hash,e->save_hash_valid)) s14_timeline_gap();
+    }return;}
+    if(e->kind==B_PROGRESS || e->kind==B_PLANNING){s14_special_begin(e->world,e->planning_day);s14_timeline_begin(e->world,e->planning_day);}
+    if(e->kind==B_DUEL || e->kind==B_CAPTURE) {
+        if(!e->post_identity_matches || e->target.kind!=1 || e->planning_day<0)return;
+        int capture=e->kind==B_CAPTURE;
+        if(capture && (e->target.raw_status==6 || e->target_after.raw_status!=6 || (int)e->native_return!=1))return;
+        if(!capture && e->source.kind!=1)return;
+        S14SpecialEvent candidate={.id=(uint64_t)e->id,.kind=capture?S14_SPECIAL_CAPTURE:S14_SPECIAL_DUEL,
+            .day=e->planning_day,.actor=(!capture || (e->source.kind==2 && e->source.active && same_object(&e->source,&e->source_after)))?e->source.leader:0,.target=e->target.id,
+            .actor_force=e->source.force_id,.target_force=e->target.force_id,
+            .outcome=capture?1:ordinary_duel_verified(e)?0:(int)e->args[3],
+            .actor_role=capture && !capture_verified(e)?S14_SPECIAL_ACTOR_COMMANDER:S14_SPECIAL_ACTOR_PERSON,
+            .verified=capture?capture_verified(e):ordinary_duel_verified(e)};
+        // The caller selects the winner before dispatch: first argument is winner,
+        // second loser on both player-position branches. Integer arguments encode
+        // consequences/report context, not winner selection. Verified against
+        // Cao Ren (first, 518) defeating Zhang Ni (second, 613), and the losing-side injury.
+        // Persist normalized outcome 0=actor wins; other paths stay candidates.
+        memcpy(candidate.actor_name,e->source.name,sizeof(candidate.actor_name));
+        memcpy(candidate.target_name,e->target.name,sizeof(candidate.target_name));
+        memcpy(candidate.clock,e->clock_raw,6);if(!candidate.actor)candidate.actor_name[0]=0;
+        s14_special_consume(e->world,&candidate);s14_timeline_special(e->world,&candidate,&e->place);s14_battle_round_special_at(e->world,&candidate,&e->place);return;
+    }
     int kind=e->kind==B_PROGRESS?S14_ROUND_BEGIN:e->kind==B_PLANNING?S14_ROUND_END:
         e->kind==B_TROOPS?S14_ROUND_DAMAGE:e->kind==B_EFFECT?S14_ROUND_SKILL:e->kind==B_FIRE?S14_ROUND_FIRE:
         e->kind==B_ABNORMAL?S14_ROUND_ABNORMAL:e->kind==B_REMOVE?S14_ROUND_REMOVE:e->kind==B_INJURY?S14_ROUND_INJURY:0;
@@ -526,20 +647,20 @@ static void battle_report_event(const BattleEvent *e) {
         .before=kind==S14_ROUND_FIRE?e->fire_before:e->abnormal_before,.after=kind==S14_ROUND_FIRE?e->fire_after:e->abnormal_after,
         .source_verified=e->source_context_verified,.fault=battle_fault!=0 || battle_dropped!=0 || battle_read_errors!=0,
         .source=round_object(&e->source),.target=round_object(&e->target),.source_after=round_object(&e->source_after),.target_after=round_object(&e->target_after)};
-    memcpy(event.tactic,e->tactic_name,sizeof(event.tactic));memcpy(event.clock,e->clock_raw,6);s14_stats_consume(&event);s14_battle_round_consume(&event);
+    event.place=e->place;memcpy(event.tactic,e->tactic_name,sizeof(event.tactic));memcpy(event.clock,e->clock_raw,6);s14_stats_consume(&event);s14_battle_round_consume(&event);
 }
 static int compare_battle_slots(const void *a,const void *b) {
     LONG64 x=(*(const BattleSlot*const*)a)->e.id,y=(*(const BattleSlot*const*)b)->e.id;return (x>y)-(x<y);
 }
 void s14_battle_worker(const wchar_t *root) {
-    s14_stats_root(root);if(root && wcslen(root)<MAX_PATH) wcscpy(battle_save_root,root);
-    if(battle_fault || battle_dropped || battle_read_errors) s14_stats_gap();
+    s14_stats_root(root);s14_special_root(root);s14_timeline_root(root);if(root && wcslen(root)<MAX_PATH) wcscpy(battle_save_root,root);
+    if(battle_fault || battle_dropped || battle_read_errors) {s14_stats_gap();s14_special_gap();s14_timeline_gap();}
     if (!InterlockedCompareExchange(&battle_requested,0,0) && battle_file==INVALID_HANDLE_VALUE) {
         BattleSlot *meta[BATTLE_QSIZE];int count=0;
         for(int i=0;i<BATTLE_QSIZE;i++) if(InterlockedCompareExchange(&battle_queue[i].state,3,2)==2) meta[count++]=&battle_queue[i];
         qsort(meta,(size_t)count,sizeof(meta[0]),compare_battle_slots);
         for(int i=0;i<count;i++) {if(meta[i]->e.kind>=B_SAVE) battle_report_event(&meta[i]->e);InterlockedExchange(&meta[i]->state,0);}
-        s14_stats_gap();return;
+        s14_stats_gap();s14_special_gap();s14_timeline_gap();return;
     }
     if (battle_file==INVALID_HANDLE_VALUE && !InterlockedCompareExchange(&battle_fault,0,0)) {
         SYSTEMTIME now; GetLocalTime(&now);
@@ -576,6 +697,11 @@ void s14_battle_worker(const wchar_t *root) {
             for (int i=0;i<7;i++) { swprintf(values[i],40,L"%lld",(long long)vals[i]); WritePrivateProfileStringW(L"BattleObservation",keys[i],values[i],path); }
             WritePrivateProfileStringW(L"BattleObservation",L"LogPath",battle_file_path,path);
             WritePrivateProfileStringW(L"BattleObservation",L"Version",S14_MANAGER_VERSION,path);
+            wchar_t special_text[16];swprintf(special_text,16,L"%d",special_hooks);
+            WritePrivateProfileStringW(L"BattleObservation",L"SpecialHooks",special_text,path);
+            WritePrivateProfileStringW(L"BattleObservation",L"SpecialSemanticsVerified",L"0",path);
+            WritePrivateProfileStringW(L"BattleObservation",L"OrdinaryDuelVerified",duel_semantics_ready?L"1":L"0",path);
+            WritePrivateProfileStringW(L"BattleObservation",L"CaptureReportVerified",capture_semantics_ready?L"1":L"0",path);
             wchar_t pid_text[32];swprintf(pid_text,32,L"%lu",(unsigned long)GetCurrentProcessId());
             WritePrivateProfileStringW(L"BattleObservation",L"Pid",pid_text,path);
             WritePrivateProfileStringW(L"BattleObservation",L"Reason",NULL,path);

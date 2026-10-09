@@ -22,7 +22,7 @@ MINHOOK=HERE/'vendor'/'minhook'
 BUILD.mkdir(exist_ok=True)
 sources=[MINHOOK/'src'/x for x in ('buffer.c','hook.c','trampoline.c','hde/hde64.c')]
 common=[str(ZIG),'cc','-target','x86_64-windows-gnu','-std=c11','-O2','-Werror','-fno-emulated-tls',
-        '-DUNICODE','-D_UNICODE','-I',str(MINHOOK/'include'),'-I',str(HERE)]
+        '-DUNICODE','-D_UNICODE','-DMINIZ_NO_ZLIB_APIS','-DMINIZ_NO_ARCHIVE_APIS','-DMINIZ_NO_DEFLATE_APIS','-DMINIZ_NO_TIME','-I',str(MINHOOK/'include'),'-I',str(HERE)]
 
 def run(extra):
     subprocess.run(common+[str(x) for x in extra],check=True,cwd=HERE)
@@ -34,28 +34,36 @@ def run_test(extra):
 
 run_test([HERE/'test_native.c',HERE/'rule.c',*sources,'-o',BUILD/'test_native.exe'])
 run_test([HERE/'test_interaction.c',HERE/'interaction.c',HERE/'toast.c',*sources,'-luser32','-lgdi32','-o',BUILD/'test_interaction.exe'])
-stats_sources=[HERE/'battle_stats.c']
+timeline_sources=[HERE/'battle_place.c',HERE/'battle_timeline.c']
+stats_sources=[HERE/'battle_stats.c',HERE/'special_stats.c',*timeline_sources]
 manager_sources=[*stats_sources,HERE/'features.c',HERE/'manager_ui.c',HERE/'package.c',HERE/'cleanup.c',HERE/'search_model.c']
 update_sources=[HERE/'update.c',HERE/'update_model.c']
 run_test([HERE/'test_update.c',HERE/'update_model.c','-o',BUILD/'test_update.exe'])
 run_test([HERE/'test_search.c',HERE/'search_model.c','-o',BUILD/'test_search.exe'])
-round_sources=[HERE/'battle_report.c',HERE/'turn_report.c',*stats_sources,'-lbcrypt']
+round_sources=[HERE/'battle_report.c',HERE/'turn_report.c',HERE/'report_model.c',*stats_sources,'-lbcrypt']
 run_test([HERE/'test_battle_stats.c',*stats_sources,'-lbcrypt','-o',BUILD/'test_battle_stats.exe'])
+run_test([HERE/'test_special_stats.c',HERE/'special_stats.c','-o',BUILD/'test_special_stats.exe'])
+run_test([HERE/'test_timeline.c',*stats_sources,'-lbcrypt','-o',BUILD/'test_timeline.exe'])
 run_test([HERE/'test_battle_report.c',*round_sources,'-o',BUILD/'test_battle_report.exe'])
 run_test([HERE/'test_search_bridge.c',HERE/'search_model.c',HERE/'battle_probe.c',*round_sources,*sources,'-o',BUILD/'test_search_bridge.exe'])
 run_test([HERE/'test_battle_probe.c',*round_sources,*sources,'-o',BUILD/'test_battle_probe.exe'])
 run_test([HERE/'test_battle_skills.c',*round_sources,*sources,'-o',BUILD/'test_battle_skills.exe'])
 run_test([HERE/'test_battle_details.c',*round_sources,*sources,'-o',BUILD/'test_battle_details.exe'])
 run_test([HERE/'test_battle_save.c',*round_sources,*sources,'-o',BUILD/'test_battle_save.exe'])
+run_test([HERE/'test_battle_special.c',*round_sources,*sources,'-o',BUILD/'test_battle_special.exe'])
 subprocess.run([str(ZIG),'rc','/fo',str(BUILD/'officer-controls.res'),str(HERE/'officer-controls.rc')],check=True,cwd=HERE)
-officer_sources=[HERE/'pinyin.c',HERE/'officer_model.c',HERE/'officer_ui.c',BUILD/'officer-controls.res']
+officer_sources=[HERE/'pinyin.c',HERE/'officer_model.c',HERE/'officer_ui.c',HERE/'officer_history.c',BUILD/'officer-controls.res']
 detail_sources=[HERE/'detail_model.c',HERE/'detail_ui.c']
 run_test([HERE/'test_native_detail.c',HERE/'detail_model.c','-o',BUILD/'test_native_detail.exe'])
 run_test([HERE/'test_detail_ui.c',HERE/'detail_model.c',*stats_sources,'-lbcrypt','-luser32','-lgdi32','-o',BUILD/'test_detail_ui.exe'])
 run([HERE/'detail_probe.c',HERE/'detail_model.c','-municode','-lpsapi','-o',BUILD/'detail_probe.exe'])
-run_test([HERE/'test_officers.c',*officer_sources,'-luser32','-lgdi32','-lcomctl32','-o',BUILD/'test_officers.exe'])
-run([HERE/'officer_probe.c',*officer_sources,'-municode','-lpsapi','-luser32','-lgdi32','-lcomctl32','-o',BUILD/'officer_probe.exe'])
-plugin_sources=[HERE/'plugin.c',HERE/'auto_search.c',HERE/'battle_probe.c',*round_sources[:2],HERE/'rule.c',HERE/'interaction.c',HERE/'toast.c',*officer_sources,*detail_sources,*manager_sources,*sources,HERE/'exports.def','-lbcrypt','-luser32','-lgdi32','-lshell32','-lcomctl32']
+run_test([HERE/'test_officers.c',*officer_sources,HERE/'special_stats.c',*timeline_sources,'-luser32','-lgdi32','-lcomctl32','-o',BUILD/'test_officers.exe'])
+run([HERE/'officer_probe.c',*officer_sources,HERE/'special_stats.c',*timeline_sources,'-municode','-lpsapi','-luser32','-lgdi32','-lcomctl32','-o',BUILD/'officer_probe.exe'])
+portrait_sources=[HERE/'portrait.c',HERE/'vendor/miniz/miniz_tinfl.c']
+report_sources=[HERE/'report_ui.c',HERE/'report_model.c',*portrait_sources]
+run_test([HERE/'test_report_ui.c',*report_sources[1:],'-municode','-luser32','-lgdi32','-o',BUILD/'test_report_ui.exe'])
+run_test([HERE/'test_portrait.c',*portrait_sources,'-municode','-luser32','-lgdi32','-o',BUILD/'test_portrait.exe'])
+plugin_sources=[HERE/'plugin.c',HERE/'auto_search.c',HERE/'battle_probe.c',*round_sources[:2],*report_sources,HERE/'rule.c',HERE/'interaction.c',HERE/'toast.c',*officer_sources,*detail_sources,*manager_sources,*sources,HERE/'exports.def','-lbcrypt','-luser32','-lgdi32','-lshell32','-lcomctl32']
 run(['-shared',*plugin_sources,'-o',BUILD/'dinput8.dll'])
 run(['-shared','-DS14_SELFTEST',*plugin_sources,'-o',BUILD/'plugin_test.dll'])
 payload=(BUILD/'dinput8.dll').read_bytes()
@@ -66,8 +74,10 @@ run(['-DS14_INSTALLER','-I',BUILD,HERE/'manager_main.c',*manager_sources,*update
 run_test([HERE/'test_manager.c',*manager_sources,'-lbcrypt','-luser32','-lgdi32','-o',BUILD/'test_manager.exe'])
 run(['-shared','-DS14_INSTALLER','-I',BUILD,HERE/'test_package_exports.c',HERE/'package.c',HERE/'cleanup.c',HERE/'features.c',*stats_sources,'-lbcrypt','-o',BUILD/'package_test.dll'])
 shutil.copyfile(MINHOOK/'LICENSE.txt',BUILD/'MinHook-LICENSE.txt')
+shutil.copyfile(HERE/'vendor/miniz/LICENSE',BUILD/'Miniz-MIT-LICENSE.txt')
 commit=json.loads((MINHOOK/'UPSTREAM.json').read_text(encoding='utf-8'))['commit']
 (BUILD/'build-provenance.json').write_text(json.dumps({'compiler':'Zig '+version,'minhook_commit':commit,
+    'portrait_decompressor':json.loads((HERE/'vendor/miniz/UPSTREAM.json').read_text(encoding='utf-8-sig')),
     'pinyin_data':json.loads((HERE/'vendor/pinyin/UPSTREAM.json').read_text(encoding='utf-8')),
     'target':'x86_64-windows-gnu','optimization':'O2','native_tests_assertions_enabled':True},indent=2),encoding='utf-8')
 print(str(BUILD))

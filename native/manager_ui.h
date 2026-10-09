@@ -6,7 +6,7 @@ typedef struct S14ManagerUI S14ManagerUI;
 typedef void (*S14ManagerAction)(S14ManagerUI*,int,void*);
 enum { S14_ACTION_CONFIG=1,S14_ACTION_CHOOSE,S14_ACTION_INSTALL,S14_ACTION_REMOVE,S14_ACTION_LOGS,S14_ACTION_CLEAN,S14_ACTION_CHECK_UPDATE,S14_ACTION_DOWNLOAD_UPDATE };
 struct S14ManagerUI {
-    HWND window,owner,directory_edit;
+    HWND window,owner,directory_edit,mod_scrollbar;
     HINSTANCE instance;
     HFONT title_font,body_font,small_font;
     HBRUSH edit_brush;
@@ -17,12 +17,15 @@ struct S14ManagerUI {
     wchar_t search_status[192],search_summary[256],search_details[4096];
     int search_scroll;
     int officers_enabled;
+    int views_enabled;
     int native_stats_enabled;
     int battle_enabled;
     int report_requested;
     int update_busy,update_ready;
     wchar_t update_status[192];
     int in_game,attached,fault,installed,game_found,running,tab,focus,pressed,scale,scroll,notice_error;
+    unsigned int expanded;
+    int mod_sort;
     S14ManagerAction action; void *context;
 };
 int s14_manager_create(S14ManagerUI *ui,HINSTANCE instance,HWND owner,int in_game);
@@ -32,4 +35,12 @@ void s14_manager_paint(S14ManagerUI *ui,HDC dc,int width,int height);
 void s14_manager_destroy(S14ManagerUI *ui);
 int s14_manager_hit(S14ManagerUI *ui,POINT point);
 int s14_manager_activate(S14ManagerUI *ui,int action);
+int s14_manager_mod_enabled(const S14ManagerUI *ui,int mod);
+int s14_manager_view_enabled(const S14ManagerUI *ui,int native);
+int s14_manager_mod_index(const S14ManagerUI *ui,int position);
+int s14_manager_mod_top(const S14ManagerUI *ui,int mod);
+#define S14_MANAGER_WIDTH 860
+#define S14_MANAGER_HEIGHT 790
+#define S14_MOD_LIST_TOP 216
+#define S14_MOD_LIST_BOTTOM 688
 #endif

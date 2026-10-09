@@ -6,6 +6,8 @@
 #include <wchar.h>
 #include "package.h"
 #include "battle_stats.h"
+#include "special_stats.h"
+#include "battle_timeline.h"
 
 // Only the fixed application paths are visited; no recursive directory delete.
 #define CLEAN_MAX 2048
@@ -55,7 +57,7 @@ static int add(CleanPlan *p,const wchar_t *name,int kind) {
     else if (kind==6) { const wchar_t *leaf=wcsrchr(path,L'\\'); own=own_log(path,leaf?leaf+1:path); }
     else if (kind==7) own=metadata(path,L"SearchReport",L"Version") && metadata(path,L"SearchReport",L"Summary");
     else if (kind==8) own=metadata(path,L"BattleObservation",L"Version") && metadata(path,L"BattleObservation",L"Enabled");
-    else if (kind==9) own=s14_stats_checkpoint_owned(path);
+    else if (kind==9) own=s14_stats_checkpoint_owned(path) || s14_special_checkpoint_owned(path) || s14_timeline_checkpoint_owned(path);
     if (!own) { p->report->preserved++; return 1; }
     if (p->count>=CLEAN_MAX) return failure(p,L"待清理文件过多，请先整理日志；未删除文件。");
     if (!plain_path(path) || (a&FILE_ATTRIBUTE_READONLY)) return failure(p,L"待清理文件是只读文件或链接路径，未删除文件。");

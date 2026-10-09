@@ -44,6 +44,7 @@ static int add_line(S14SearchReport *r,const S14SearchEvent *e) {
     else if (e->detail[0]) clean_text(result,300,e->detail);
     else if (e->type==S14_SEARCH_MONEY) swprintf(result,300,L"找到金钱 %d",e->amount);
     else wcscpy(result,e->type==S14_SEARCH_PERSON?L"发现武将":e->type==S14_SEARCH_ITEM?L"发现名品":L"发现战法书");
+    r->types[r->lines]=(unsigned char)e->type;
     swprintf(r->details[r->lines++],S14_SEARCH_LINE,L"%ls → %ls：%ls",actor[0]?actor:L"未识别武将",location[0]?location:L"未识别地点",result);
     return 1;
 }

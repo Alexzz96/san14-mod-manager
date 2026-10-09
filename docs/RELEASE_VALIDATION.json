@@ -1,6 +1,6 @@
 {
-  "release": "0.7.3",
-  "validation_date": "2026-10-08",
+  "release": "0.9.0",
+  "validation_date": "2026-10-09",
   "evidence": "User-confirmed behavior of earlier local builds; independent verification for the release build is required by packaging.",
   "accepted_prior_builds": {
     "exploration_results_and_manual_dismiss": "0.4.3",
@@ -11,7 +11,9 @@
   },
   "pending_in_game_checks": [
     "Nonzero career totals after process restart and rollback to an older game save",
-    "Online update between two released manager versions"
+    "Online update between two released manager versions",
+    "New single-page portrait turn report after completing an entire in-game turn",
+    "Capture attribution on paths other than the verified native report and status correlation"
   ],
   "limitations": [
     "Only validated native adapters and attributable battle events are counted",
@@ -25,5 +27,166 @@
     "search_executors": "各官员以外",
     "battle_events": true
   },
-  "existing_explicit_settings_preserved": true
+  "existing_explicit_settings_preserved": true,
+  "local_development": {
+    "version": "0.9.0",
+    "special_event_semantics": "ordinary_duel_and_report_matched_capture_verified_other_paths_pending",
+    "special_candidates_credited": false,
+    "ordinary_duel_human_sample": "Cao Ren defeated Zhang Ni",
+    "ordinary_duel_input_roles": "native ordered winner then loser",
+    "ordinary_duel_integers_not_winner_flags": true,
+    "officer_view_tabs": [
+      "battle_stats",
+      "original_data"
+    ],
+    "officer_view_tab_hotkey": "Tab",
+    "officer_view_fixed_columns": [
+      "name",
+      "force",
+      "location"
+    ],
+    "officer_view_archive_panel": false,
+    "officer_view_unknown_counts_display": 0,
+    "officer_view_in_game_acceptance": "pending_085_restart",
+    "officer_ui_independent_tests": {
+      "checks": 307,
+      "status": "passed",
+      "read_only": true,
+      "career_unknown_distinct_from_zero": true,
+      "nested_owner_focus": true,
+      "focus_changes_do_not_hide": true,
+      "search_and_dropdown_keep_open": true,
+      "manual_close_button": true,
+      "two_tabs": true,
+      "tab_message_pump": true,
+      "pinned_identity_columns": true,
+      "synchronized_rows_and_scroll": true,
+      "unknown_counts_display_zero": true,
+      "archive_panel_removed": true,
+      "no_horizontal_scroll": true,
+      "four_character_battle_headers": true,
+      "kda_exact_sort_and_zero_denominator": true,
+      "officer_timeline_menu_and_window": true,
+      "pinyin_and_initials": true,
+      "polyphonic_names": true,
+      "inner_attributes": true,
+      "search_14000_ms": 0,
+      "inactive_duration_ms": 1200
+    },
+    "officer_view_prior_build_accepted": "0.8.2",
+    "timeline_independent_tests": {
+      "status": "passed",
+      "place_read_only": true,
+      "city_area_dictionary": true,
+      "unstable_place_rejected": true,
+      "rout_duplicate_and_unit_lifetime": true,
+      "actor_and_victim_timelines": true,
+      "duel_and_capture_candidates_distinct": true,
+      "save_rollback_and_failure": true,
+      "session_id_reset": true,
+      "legacy_place_not_invented": true,
+      "bounded_recent_history": true,
+      "cross_process_restore": true
+    },
+    "capture_independent_tests": {
+      "status": "passed",
+      "written_events": 10,
+      "optional_hooks": 3,
+      "args_and_return_preserved": true,
+      "last_error_preserved": true,
+      "nested_capture_status": true,
+      "failed_capture_excluded": true,
+      "candidate_not_credited": true,
+      "ordinary_duel_winner_argument_first": true,
+      "ordinary_duel_swapped_participants_and_report_context": true,
+      "duel_semantics_anchor_guard": true,
+      "unknown_result_not_credited": true,
+      "capture_native_report_and_status_matched": true,
+      "capture_attribution_guard": true,
+      "capture_actor_and_victim_counters": true
+    },
+    "timeline_in_game_acceptance": "pending",
+    "capture_in_game_acceptance": "pending",
+    "officer_view_no_horizontal_scroll": true,
+    "officer_view_four_character_headers": true,
+    "officer_view_hidden_counts": [
+      "duels",
+      "unique_captives"
+    ],
+    "officer_kda_formula": "enemy_troop_loss_including_wounded / own_troop_loss",
+    "timeline_capacity": 16384,
+    "timeline_sidecar": ".s14timeline",
+    "manager_tabs": [
+      "mods",
+      "settings"
+    ],
+    "manager_mod_list": true,
+    "manager_mod_count": 5,
+    "manager_expansion_and_sort": true,
+    "manager_child_preferences_preserved": true,
+    "manager_views_parent_default_enabled": true,
+    "manager_ui_independent_tests": {
+      "config_roundtrip": true,
+      "search_settings": true,
+      "search_controls": true,
+      "unknown_keys_preserved": true,
+      "master_off_on": true,
+      "dependency_preserves_preference": true,
+      "all_flag_combinations": 32,
+      "ui_live_callbacks": 18,
+      "cleanup_callback": 1,
+      "rendered_views": 7,
+      "manager_tabs": [
+        "mods",
+        "settings"
+      ],
+      "expandable_mod_list": true,
+      "stable_mod_sort": true,
+      "child_preferences_preserved": true,
+      "views_parent_runtime_gate": true,
+      "scroll_and_keyboard_reveal": true,
+      "dpi_scales": [
+        96,
+        192
+      ],
+      "game_process_touched": false
+    },
+    "manager_in_game_acceptance": "pending_085_restart",
+    "manager_expanded_group_border": true,
+    "manager_parent_child_divider": true,
+    "manager_border_visual_scales": [
+      96,
+      192
+    ],
+    "end_of_turn_report_view": "native_portrait_cards",
+    "end_of_turn_report_tabs": [],
+    "end_of_turn_report_in_game_acceptance": "pending_090_restart_and_complete_turn",
+    "end_of_turn_report_ui_tests": {
+      "status": "passed",
+      "single_page_no_tabs": true,
+      "pinned_exploration": true,
+      "typed_exploration_details": true,
+      "officer_details": true,
+      "manual_close_and_reopen": true,
+      "full_record_scroll": true,
+      "own_defeat_capture_breakthrough_styles": true,
+      "immutable_snapshot": true,
+      "scale_96_192": true,
+      "narrow_layout": true,
+      "load_reset_clears_report": true,
+      "no_game_process_calls": true
+    },
+    "end_of_turn_report_portrait_tests": {
+      "status": "passed",
+      "malformed_resource_bounds": true,
+      "dxt1_dxt5": true,
+      "person_id_separate_from_portrait": true,
+      "scene_and_record_guards": true,
+      "local_portraits_extracted": 5,
+      "gameplay_modified": false
+    },
+    "publication": "included_in_0.9.0_release",
+    "release_tag": "v0.9.0"
+  },
+  "release_status": "prerelease"
 }

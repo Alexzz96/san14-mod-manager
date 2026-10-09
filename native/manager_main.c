@@ -55,6 +55,7 @@ static void refresh(S14ManagerUI *ui,int check_directory) {
     ui->requested=s14_config_read(ui->ini);
     ui->search_settings=s14_search_settings_read(ui->ini);
     ui->officers_enabled=GetPrivateProfileIntW(L"Views",L"Officers",1,ui->ini)!=0;
+    ui->views_enabled=s14_views_setting_read(ui->ini);
     ui->native_stats_enabled=GetPrivateProfileIntW(L"Views",L"NativeOfficerStats",1,ui->ini)!=0;
     ui->battle_enabled=s14_battle_setting_read(ui->ini);
     s14_search_report_read(ui->root,ui->search_summary,ui->search_details);

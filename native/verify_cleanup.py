@@ -204,7 +204,24 @@ def run_cleanup_tests(package, build, legacy=None):
         unknown=root/'SAN14ModManager/career/keep.txt';unknown.write_bytes(b'keep-my-data')
         cleanup(root);assert checkpoint.read_bytes()==data and unknown.read_bytes()==b'keep-my-data'
 
-    return {'temporary_folder_cases':cases,'complete_uninstall':True,'missing_receipt':True,'orphan_receipt_and_config':True,
+        special_save=package.S14TestSpecialSave;special_save.argtypes=[C.c_wchar_p];special_save.restype=C.c_int
+        root=installed();assert special_save(str(root))==1
+        checkpoint=next((root/'SAN14ModManager/career/checkpoints').glob('*.s14special'))
+        cleanup(root);assert not checkpoint.exists() and not (root/'SAN14ModManager').exists()
+        root=installed();assert special_save(str(root))==1
+        checkpoint=next((root/'SAN14ModManager/career/checkpoints').glob('*.s14special'));data=bytearray(checkpoint.read_bytes());data[-1]^=1;checkpoint.write_bytes(data)
+        cleanup(root);assert checkpoint.read_bytes()==data
+
+        timeline_save=package.S14TestTimelineSave;timeline_save.argtypes=[C.c_wchar_p];timeline_save.restype=C.c_int
+        root=installed();assert timeline_save(str(root))==1
+        checkpoint=next((root/'SAN14ModManager/career/checkpoints').glob('*.s14timeline'));assert checkpoint.stat().st_size<1024
+        cleanup(root);assert not checkpoint.exists() and not (root/'SAN14ModManager').exists()
+        root=folder();(root/'SAN14ModManager').mkdir();assert timeline_save(str(root))==1
+        assert detect(str(root),source)&4;cleanup(root);assert not (root/'SAN14ModManager').exists()
+        root=installed();assert timeline_save(str(root))==1
+        checkpoint=next((root/'SAN14ModManager/career/checkpoints').glob('*.s14timeline'));data=bytearray(checkpoint.read_bytes());data[-1]^=1;checkpoint.write_bytes(data)
+        cleanup(root);assert checkpoint.read_bytes()==data
+    return {'timeline_checkpoint_cleanup':True,'timeline_corruption_preserved':True,'special_checkpoint_cleanup':True,'special_corruption_preserved':True,'temporary_folder_cases':cases,'complete_uninstall':True,'missing_receipt':True,'orphan_receipt_and_config':True,
             'same_name_copy_detected':True,'legacy_copy_removed':bool(legacy),'unknown_files_preserved':True,
             'locked_files_preflight':True,'read_only_preflight':True,'junctions_not_followed':True,
             'hard_links_rejected':True,'running_self_rejected_before_changes':True,

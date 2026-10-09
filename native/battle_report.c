@@ -7,12 +7,13 @@
 #define MAX_LINES 4096
 #define LINE_SIZE 256
 #define SEEN_SIZE 16384
-typedef struct {wchar_t name[32];uint64_t inflicted,lost,absorbed;int effects,routs,injuries;} Actor;
+typedef S14ReportActor Actor;
+static S14ReportLine line_context;
 static struct {
-    int active,day,force,end,incomplete,lines,skipped,participants,unknown,routs,injuries,effects;
+    int active,day,force,end,incomplete,lines,skipped,participants,unknown,routs,defeats,injuries,effects;
     uintptr_t world;uint64_t inflicted,lost,absorbed,seen[SEEN_SIZE];
     unsigned char clock[6],end_clock[6];
-    Actor actors[6001];wchar_t (*details)[LINE_SIZE];
+    Actor actors[6001];S14ReportLine *details;
 } round_data;
 void s14_battle_round_reset(void) {
     if(round_data.details) free(round_data.details);memset(&round_data,0,sizeof(round_data));
@@ -22,16 +23,46 @@ static int known(const S14RoundObject *o) {return (o->kind==1 || o->kind==2) && 
 static int own(const S14RoundObject *o) {return round_data.force>0 && known(o) && o->force==round_data.force;}
 static Actor *actor(const S14RoundObject *o) {
     if(!own(o)) return NULL;Actor *a=&round_data.actors[o->leader];
-    if(!a->name[0]) {wcsncpy(a->name,o->name[0]?o->name:L"未识别武将",31);round_data.participants++;}return a;
+    if(!a->name[0]) {a->id=o->leader;a->portrait=-1;wcsncpy(a->name,o->name[0]?o->name:L"未识别武将",31);round_data.participants++;}return a;
 }
 static const wchar_t *name(const S14RoundObject *o) {return o->name[0]?o->name:L"来源未知";}
 static void line(const wchar_t *format,...) {
     if(round_data.lines>=MAX_LINES) {round_data.skipped++;return;}
     if(!round_data.details) round_data.details=calloc(MAX_LINES,sizeof(*round_data.details));
     if(!round_data.details) {round_data.incomplete=1;round_data.skipped++;return;}
-    va_list args;va_start(args,format);int n=vswprintf(round_data.details[round_data.lines],LINE_SIZE,format,args);va_end(args);
+    round_data.details[round_data.lines]=line_context;
+    va_list args;va_start(args,format);int n=vswprintf(round_data.details[round_data.lines].text,LINE_SIZE,format,args);va_end(args);
     if(n<0) {round_data.skipped++;return;}round_data.lines++;
 }
+void s14_battle_round_special_at(uintptr_t world,const S14SpecialEvent *e,const S14BattlePlace *place){
+    if(!e || !e->id || !round_data.active || world!=round_data.world || e->day!=round_data.day || round_data.force<=0)return;
+    if(e->actor_force!=round_data.force && e->target_force!=round_data.force)return;
+    if(e->kind!=S14_SPECIAL_DUEL && e->kind!=S14_SPECIAL_CAPTURE)return;
+    unsigned int slot=(unsigned int)e->id&(SEEN_SIZE-1),n;
+    for(n=0;n<SEEN_SIZE;n++,slot=(slot+1)&(SEEN_SIZE-1)){if(round_data.seen[slot]==e->id)return;if(!round_data.seen[slot]){round_data.seen[slot]=e->id;break;}}
+    if(n==SEEN_SIZE){round_data.incomplete=1;return;}
+    line_context=(S14ReportLine){.actor=e->actor,.target=e->target,.kind=e->kind==S14_SPECIAL_DUEL?S14_REPORT_DUEL:S14_REPORT_CAPTURE,.important=1};
+    memcpy(line_context.clock,e->clock,6);if(place&&place->basis)s14_place_text(place,line_context.place,96);else wcscpy(line_context.place,L"地点未记录");
+    int verified=e->verified && e->actor_role==S14_SPECIAL_ACTOR_PERSON && e->actor>0 && e->actor<=6000 && e->target>0 && e->target<=6000 && e->actor!=e->target && e->actor_force>0 && e->target_force>0 && e->actor_force!=e->target_force;
+    if(e->kind==S14_SPECIAL_DUEL && e->outcome!=0 && e->outcome!=1)verified=0;
+    line_context.verified=verified;
+    if(verified){
+        S14RoundObject oa={.kind=1,.leader=e->actor,.force=e->actor_force,.active=1},ob={.kind=1,.leader=e->target,.force=e->target_force,.active=1};
+        memcpy(oa.name,e->actor_name,sizeof(oa.name));memcpy(ob.name,e->target_name,sizeof(ob.name));Actor *a=actor(&oa),*b=actor(&ob);
+        if(a && line_context.place[0])wcscpy(a->place,line_context.place);if(b && line_context.place[0])wcscpy(b->place,line_context.place);
+        if(e->kind==S14_SPECIAL_DUEL){if(a){if(e->outcome==0)a->wins++;else a->losses++;}if(b){if(e->outcome==1)b->wins++;else b->losses++;}}
+        else{if(a)a->captures++;if(b)b->captured++;}
+    }
+    if(verified && e->kind==S14_SPECIAL_DUEL){
+        line(L"普通单挑：%ls 获胜，%ls 战败（已计入战绩）",e->outcome==0?e->actor_name:e->target_name,e->outcome==0?e->target_name:e->actor_name);return;
+    }
+    if(verified && e->kind==S14_SPECIAL_CAPTURE){line(L"擒获敌将：%ls 擒获 %ls",e->actor_name,e->target_name);return;}
+    line(L"%ls：%ls → %ls（%ls%ls）",e->kind==S14_SPECIAL_DUEL?L"单挑结算候选":L"被俘变化",
+        e->actor_name[0]?e->actor_name:L"来源未知",e->target_name[0]?e->target_name:L"姓名未知",
+        e->actor_role==S14_SPECIAL_ACTOR_COMMANDER?L"来源部队主将，实际抓捕者待核对；":L"",
+        e->verified?L"已核实":L"待核对，未计入战绩");
+}
+void s14_battle_round_special(uintptr_t world,const S14SpecialEvent *e){s14_battle_round_special_at(world,e,NULL);}
 static void publish(void) {
     size_t capacity=2048+(size_t)round_data.lines*(LINE_SIZE+24)+(size_t)round_data.participants*256;
     wchar_t *text=calloc(capacity,sizeof(wchar_t));if(!text) return;size_t at=0;
@@ -51,9 +82,18 @@ static void publish(void) {
         }ROUND_TEXT(L"\n");
     }
     ROUND_TEXT(L"战斗明细\n");if(!round_data.lines) ROUND_TEXT(L"本回合未观察到自势力相关战斗事件。\n");
-    for(int i=0;i<round_data.lines;i++) ROUND_TEXT(L"%d. %ls\n",i+1,round_data.details[i]);
+    for(int i=0;i<round_data.lines;i++) ROUND_TEXT(L"%d. %ls\n",i+1,round_data.details[i].text);
     if(round_data.skipped) ROUND_TEXT(L"另有 %d 条明细未展示；请查阅原始战斗日志。\n",round_data.skipped);
     s14_turn_report_battle(round_data.day,round_data.end,text);free(text);
+    S14ReportBattle view={.start=round_data.day,.end=round_data.end,.force=round_data.force,.available=1,.world=round_data.world,
+        .incomplete=round_data.incomplete,.skipped=round_data.skipped,.actor_count=round_data.participants,.line_count=round_data.lines,
+        .routs=round_data.routs,.defeats=round_data.defeats,.injuries=round_data.injuries,.inflicted=round_data.inflicted,.lost=round_data.lost,.absorbed=round_data.absorbed,.lines=round_data.details};
+    memcpy(view.clock,round_data.clock,6);memcpy(view.end_clock,round_data.end_clock,6);
+    if(!view.actor_count || (view.actors=calloc((size_t)view.actor_count,sizeof(*view.actors)))){
+        int n=0;for(int i=1;i<=6000;i++)if(round_data.actors[i].name[0])view.actors[n++]=round_data.actors[i];
+        if(n)qsort(view.actors,(size_t)n,sizeof(*view.actors),s14_report_actor_compare);
+        s14_turn_report_battle_data(&view);free(view.actors);
+    }
 #undef ROUND_TEXT
 }
 void s14_battle_round_consume(const S14RoundEvent *e) {
@@ -77,28 +117,40 @@ void s14_battle_round_consume(const S14RoundEvent *e) {
     }
     if(n==SEEN_SIZE) {round_data.incomplete=1;return;}
     if(!own(&e->source) && !own(&e->target)) return;
-    if(!e->stable && e->kind!=S14_ROUND_SKILL) {round_data.incomplete=1;return;}
+    int destroyed_identity=e->kind==S14_ROUND_REMOVE && e->target_after.kind==2 && e->target_after.id==e->target.id && !e->target_after.active;
+    if(!e->stable && !destroyed_identity && e->kind!=S14_ROUND_SKILL) {round_data.incomplete=1;return;}
     Actor *a=actor(&e->source),*b=actor(&e->target);
+    line_context=(S14ReportLine){.actor=e->source.leader,.target=e->target.leader,.kind=S14_REPORT_OTHER,.verified=1};memcpy(line_context.clock,e->clock,6);if(e->place.basis)s14_place_text(&e->place,line_context.place,96);else wcscpy(line_context.place,L"地点未记录");
+    if(a && e->place.basis)wcscpy(a->place,line_context.place);if(b && e->place.basis)wcscpy(b->place,line_context.place);
     if(e->kind==S14_ROUND_DAMAGE) {
+        line_context.kind=S14_REPORT_DAMAGE;
         int loss=e->target.troops-e->target_after.troops;if(loss<=0) return;
         if(b) {b->lost+=loss;round_data.lost+=loss;}
         if(a && known(&e->target) && !own(&e->target)) {a->inflicted+=loss;round_data.inflicted+=loss;}
         if(!known(&e->source) || !known(&e->target)) round_data.unknown++;
         line(L"%ls → %ls：兵力 %d → %d，减少 %d%ls",name(&e->source),name(&e->target),e->target.troops,e->target_after.troops,loss,!known(&e->source)?L"（来源未确认）":L"");
     } else if(e->kind==S14_ROUND_SKILL && a) {
+        line_context.kind=S14_REPORT_SKILL;
         a->effects++;round_data.effects++;line(L"%ls：%ls 战法效果已触发",name(&e->source),e->tactic[0]?e->tactic:L"未知战法");
     } else if(e->kind==S14_ROUND_FIRE && e->before==0 && e->after>0) {
+        line_context.kind=S14_REPORT_FIRE;line_context.verified=e->source_verified;
         line(L"%ls → %ls：%ls，起火%ls",name(&e->source),name(&e->target),e->tactic,e->source_verified?L"":L"（施放归属待核对）");
     } else if(e->kind==S14_ROUND_ABNORMAL) {
+        line_context.kind=S14_REPORT_STATE;line_context.verified=e->source_verified;
         const wchar_t *state=e->mode==1?L"止步":e->mode==0?L"混乱（待核对）":e->mode==2?L"挑衅（待核对）":L"异常状态";
         line(L"%ls → %ls：%ls · %ls，%ls%ls",name(&e->source),name(&e->target),e->tactic,state,e->before>=0 && e->after>e->before?L"状态已施加／延长":L"未观察到状态增加",e->source_verified?L"":L"（归属待核对）");
     } else if(e->kind==S14_ROUND_REMOVE) {
         int rout=e->reason==1 && e->target.kind==2 && e->target.troops==0 && e->source.kind==2 && known(&e->source) && known(&e->target) && e->source.force!=e->target.force;
         int received=e->source_stable?e->source_after.wounded-e->source.wounded:0;if(received<0) received=0;
         if(rout && a) {a->routs++;round_data.routs++;a->absorbed+=received;round_data.absorbed+=received;}
+        int destroyed=e->reason==1 && e->target.kind==2 && e->target.troops==0 && known(&e->target);
+        if(destroyed && b){b->defeats++;round_data.defeats++;}
+        if(destroyed){line_context.kind=S14_REPORT_ROUT;line_context.important=1;line_context.verified=rout;}
         if(rout) line(L"%ls 击溃 %ls 部队；吸收伤兵 %d",name(&e->source),name(&e->target),received);
+        else if(destroyed)line(L"%ls 所部覆灭，击溃来源未确认",name(&e->target));
         else line(L"%ls 部队移除（原因未确认为击溃）",name(&e->target));
     } else if(e->kind==S14_ROUND_INJURY && e->target_after.health>e->target.health && e->target_after.health>=1 && e->target_after.health<=3) {
+        line_context.kind=S14_REPORT_INJURY;line_context.important=1;
         if(a && known(&e->target) && !own(&e->target)) {a->injuries++;round_data.injuries++;}
         line(L"%ls → %ls：%ls",name(&e->source),name(&e->target),e->target_after.health==1?L"轻伤":e->target_after.health==2?L"重伤（待核对）":L"伤势等级 3（待核对）");
     }

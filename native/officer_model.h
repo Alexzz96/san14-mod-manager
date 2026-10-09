@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <wchar.h>
 #include "battle_stats.h"
+#include "special_stats.h"
 #define S14_OFFICER_MAX 6001
 #define S14_PERSONALITY_MAX 356
 #define S14_TACTICS_MAX 201
@@ -33,6 +34,7 @@ typedef struct {
     wchar_t home_name[40],location[96],personality_text[240],tactics_text[240];
     S14OfficerCareer career;
     S14BattleTotals battle;
+    S14SpecialTotals special;
 } S14Officer;
 typedef struct { wchar_t name[12],description[64]; } S14OfficerDefinition;
 typedef struct {
@@ -49,7 +51,8 @@ typedef int (*S14OfficerRead)(void*,uintptr_t,void*,size_t);
 enum { S14_SORT_NAME=0,S14_SORT_FORCE,S14_SORT_STATUS,S14_SORT_LOCATION,
        S14_SORT_LEADERSHIP,S14_SORT_WAR,S14_SORT_INTELLIGENCE,S14_SORT_POLITICS,S14_SORT_CHARM,
        S14_SORT_TOTAL,S14_SORT_PERSONALITY,S14_SORT_TROOPS,S14_SORT_KILLS,S14_SORT_ROUTS,S14_SORT_AMBITION,S14_SORT_BOND,S14_SORT_LOYALTY,
-       S14_SORT_ENEMY_LOSS,S14_SORT_DEFEATS,S14_SORT_OWN_LOSS,S14_SORT_INJURIES,S14_SORT_COUNT };
+       S14_SORT_ENEMY_LOSS,S14_SORT_DEFEATS,S14_SORT_OWN_LOSS,S14_SORT_INJURIES,
+       S14_SORT_DUELS,S14_SORT_DUEL_WINS,S14_SORT_DUEL_LOSSES,S14_SORT_CAPTURES,S14_SORT_CAPTURED,S14_SORT_UNIQUE_CAPTIVES,S14_SORT_KDA,S14_SORT_COUNT };
 typedef struct {
     wchar_t query[128];
     int own_force,place,include_history,sort,descending;
@@ -58,7 +61,12 @@ int s14_officer_inner_grade(int raw);
 void s14_officer_decode_character(const unsigned char raw[512],S14Officer *out);
 int s14_officers_capture(S14OfficerRead,void*,uintptr_t,S14OfficerSnapshot*);
 int s14_officer_matches(const S14Officer*,int,const S14OfficerFilter*);
+int s14_officer_count_key(int);
+uint64_t s14_officer_count_value(const S14Officer*,int);
+void s14_officer_kda_text(const S14Officer*,wchar_t*,size_t);
 int s14_officer_compare(const S14Officer*,const S14Officer*,int,int);
 void s14_officers_attach_career(S14OfficerSnapshot*,const S14OfficerCareerProvider*);
 void s14_officers_attach_battle(S14OfficerSnapshot*,const S14BattleStatsSnapshot*);
+uint64_t s14_officer_special_value(const S14Officer*,int);
+unsigned int s14_officer_special_flag(int);
 #endif

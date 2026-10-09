@@ -7,6 +7,8 @@
 #include <string.h>
 #include "package.h"
 #include "battle_stats.h"
+#include "special_stats.h"
+#include "battle_timeline.h"
 #include "features.h"
 #ifdef S14_INSTALLER
 #include "payload.h"
@@ -77,6 +79,14 @@ static int fail(wchar_t error[192],const wchar_t *text) { wcsncpy(error,text,191
 
 static int known_previous_manager(const char *hash) {
     static const char *known[]={
+        "4b46d2d923a65f70af7a514c4757a3dbfdea957aee433a4f9a78a5c5f8aedb94", // local 0.8.5
+        "7447aac1a8b218ba0c1aa54d6a945c0140dc603ff943264c9b41bbf7fce9c5e8", // local 0.8.4
+        "c96de53337ba48b1fc749857564bba0aa67431663121ee572f56c72e7e742387", // local 0.8.3
+        "f9eb8e46c8fe40da83b41b38da92b911c5f4e065840f2703ffce057e568da113", // local 0.8.2
+        "3d9497be3e12c93c7b3b71ba2203acbbab1288518120a37a85537ee9d5796418", // local 0.8.1
+        "c38c1e8edd187928e9eebb59ba0ad9ca0bb346c78828630e602ac07d4231f58a", // local 0.8.0
+        "4e7199ce2cbdb86492225327b6c54eec9ba6e96778c26c2e438ad8e324e59a82", // public 0.7.3
+        "900a6ab7c55f54393e8c1cbffa3d8916a17181469fe37b8d7d1397a82810d7bd", // local 0.7.3
         "a12bde5634abcb4f3841d76852da523968f48fef73beab782c744a382c67764a", // local 0.5.2
         "4063432b33717b6d9ce4cfecd1d23e096926ab607e1187a7af43baa3e7bdf0ba", // local 0.5.1
         "deab45bf5bbb0538f5a4ed9492e50ad0676347189b7bbb674dcd8f6cb472f8f2", // local 0.5.0
@@ -102,6 +112,14 @@ static int known_previous_manager(const char *hash) {
 }
 static int known_previous_dll(const char *hash) {
     static const char *known[]={
+        "e8af2fbf61c0ff98c4a9fbe6ae829a0280d58f49ba0f950fab0dea680fb5b314", // local 0.8.5
+        "a4ab351b5155641447ca1ae8df78954eb03ad6832aecdd8b2f10fc4c749a497a", // local 0.8.4
+        "e46c449697800f463fced8e6577f3708e4387ffedcd27384f109e1562d7c207a", // local 0.8.3
+        "d8759bda19530a307876b8a29cba079c9e1f23764517499237f8b94c2578e1f0", // local 0.8.2
+        "36ec26bf5ab9fc4c834ebf95bd9205103c9d32e6cba44b7aab5b25f2302ffebc", // local 0.8.1
+        "dc1e000458c57d420ca976dca30ef42bfc12f54ae219ea5ca73175d4977611aa", // local 0.8.0
+        "2877110002c1146ae15ce29dafa3b665377a5d43d3ba78ccc2b7dafc20f0c1bc", // public 0.7.3
+        "313373dfa6eb690e4f703d313b659527a6677c6a82547c11ebfbe2b3a5d3e3ba", // local 0.7.3
         "456289dad3e746e1a5731846858151fc79297a8606e5da724acb33fbf681e346", // public 0.7.2
         "6d6964e52255be65aa3b86859dd10221f9a6ec4d1e8ecdd6dbe4cfe16e14df30", // accepted local 0.7.1
         "3383059ff8e8a90550bf958ff48b5015d05613cb06e5b7152fb120f6072b848c", // local 0.5.2
@@ -171,9 +189,10 @@ unsigned int s14_package_detect(const wchar_t *root,const wchar_t *source) {
         if(version[0] && (!wcscmp(enabled,L"0") || !wcscmp(enabled,L"1"))) found|=S14_FOUND_DATA;
     }
     wchar_t folder[MAX_PATH],pattern[MAX_PATH];
-    if(s14_join(folder,root,L"SAN14ModManager\\career\\checkpoints") && ordinary_directory(folder) && s14_join(pattern,folder,L"*.s14career")) {
+    if(s14_join(folder,root,L"SAN14ModManager\\career\\checkpoints") && ordinary_directory(folder) && s14_join(pattern,folder,L"*")) {
         WIN32_FIND_DATAW data;HANDLE find=FindFirstFileW(pattern,&data);int examined=0;
-        if(find!=INVALID_HANDLE_VALUE) {do {if(++examined>2048) break;if(s14_join(path,folder,data.cFileName) && s14_stats_checkpoint_owned(path)) {found|=S14_FOUND_DATA;break;}} while(FindNextFileW(find,&data));FindClose(find);}
+        if(find!=INVALID_HANDLE_VALUE) {do {if(++examined>2048) break;const wchar_t *ext=wcsrchr(data.cFileName,L'.');if(!ext || (_wcsicmp(ext,L".s14career") && _wcsicmp(ext,L".s14special") && _wcsicmp(ext,L".s14timeline") && _wcsicmp(ext,L".tmp")))continue;
+            if(s14_join(path,folder,data.cFileName) && (s14_stats_checkpoint_owned(path) || s14_special_checkpoint_owned(path) || s14_timeline_checkpoint_owned(path))) {found|=S14_FOUND_DATA;break;}} while(FindNextFileW(find,&data));FindClose(find);}
     }
     return found;
 }

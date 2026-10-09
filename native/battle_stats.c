@@ -1,4 +1,5 @@
 #include "battle_stats.h"
+#include "battle_timeline.h"
 #include <bcrypt.h>
 #include <stdio.h>
 #include <string.h>
@@ -85,7 +86,7 @@ void s14_stats_consume(const S14RoundEvent *e) {
     if(e->kind==S14_ROUND_BEGIN || e->kind==S14_ROUND_END) {
         if(!initialized || totals.world!=e->world || e->day<totals.last_day) fresh(e->world,e->day);
         if(e->kind==S14_ROUND_BEGIN) memset(seen,0,sizeof(seen));
-        totals.last_day=e->day;if(e->fault) totals.incomplete=1;return;
+        totals.last_day=e->day;s14_timeline_begin(e->world,e->day);if(e->fault) totals.incomplete=1;return;
     }
     if(!initialized || totals.world!=e->world || e->day<totals.start_day) return;
     if(e->fault) totals.incomplete=1;
@@ -104,7 +105,8 @@ void s14_stats_consume(const S14RoundEvent *e) {
         UnitLife *u=&lives[e->target.id];if(u->routed) return;u->routed=1;u->leader=target;
         if(source && e->source.kind==2 && e->source.force!=e->target.force) totals.rows[source].units_routed++;
         totals.rows[target].units_defeated++;
-    } else if(e->kind==S14_ROUND_INJURY && source && target && e->source.force!=e->target.force && e->target_after.health>e->target.health && e->target.health>=0 && e->target_after.health<=3) totals.rows[source].officers_injured++;
+        s14_timeline_battle(e,source && e->source.kind==2 && e->source.force!=e->target.force);
+    } else if(e->kind==S14_ROUND_INJURY && source && target && e->source.force!=e->target.force && e->target_after.health>e->target.health && e->target.health>=0 && e->target_after.health<=3){totals.rows[source].officers_injured++;s14_timeline_battle(e,1);}
 }
 int s14_stats_snapshot(void *unused,uintptr_t world,S14BattleStatsSnapshot *out) {
     (void)unused;if(!out || !initialized || loading || totals.world!=world) return 0;*out=totals;return 1;
