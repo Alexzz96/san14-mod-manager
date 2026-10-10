@@ -315,6 +315,13 @@ void s14_publish_search_runtime(const wchar_t *root,int state,int force,int grou
     swprintf(text,32,L"%d",force);WritePrivateProfileStringW(L"Runtime",L"SearchForce",text,path);
     swprintf(text,32,L"%d",group);WritePrivateProfileStringW(L"Runtime",L"SearchGroup",text,path);
     WritePrivateProfileStringW(L"Runtime",L"SearchDetail",detail?detail:L"",path);
+    /* Existing runtime INIs can be ANSI. The W profile API still converts to
+       that file's system code page, so transport localized IPC as ASCII hex
+       of UTF-8 while keeping the legacy key for older managers. */
+    char bytes[768];wchar_t hex[1536];const wchar_t digits[]=L"0123456789abcdef";
+    int length=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,detail?detail:L"",-1,bytes,sizeof(bytes),NULL,NULL);
+    if(length>0){for(int i=0;i<length-1;i++){unsigned char ch=(unsigned char)bytes[i];hex[2*i]=digits[ch>>4];hex[2*i+1]=digits[ch&15];}hex[2*(length-1)]=0;WritePrivateProfileStringW(L"Runtime",L"SearchDetailUtf8",hex,path);}
+    else WritePrivateProfileStringW(L"Runtime",L"SearchDetailUtf8",L"",path);
 }
 void s14_read_search_runtime(const wchar_t *root,int *state,int *force,int *group,wchar_t detail[192]) {
     wchar_t path[MAX_PATH];*state=S14_SEARCH_WAITING;*force=*group=0;detail[0]=0;
@@ -324,6 +331,9 @@ void s14_read_search_runtime(const wchar_t *root,int *state,int *force,int *grou
     *force=(int)GetPrivateProfileIntW(L"Runtime",L"SearchForce",0,path);
     *group=(int)GetPrivateProfileIntW(L"Runtime",L"SearchGroup",0,path);
     GetPrivateProfileStringW(L"Runtime",L"SearchDetail",L"",detail,192,path);
+    wchar_t hex[1536];DWORD length=GetPrivateProfileStringW(L"Runtime",L"SearchDetailUtf8",L"",hex,1536,path);
+    if(length){char bytes[768];int valid=length%2==0 && length<1535;for(DWORD i=0;valid && i<length;i+=2){int a=hex[i]>=L'0' && hex[i]<=L'9'?hex[i]-L'0':hex[i]>=L'a' && hex[i]<=L'f'?hex[i]-L'a'+10:-1;int b=hex[i+1]>=L'0' && hex[i+1]<=L'9'?hex[i+1]-L'0':hex[i+1]>=L'a' && hex[i+1]<=L'f'?hex[i+1]-L'a'+10:-1;if(a<0 || b<0 || !(a*16+b))valid=0;else bytes[i/2]=(char)(a*16+b);}
+        int chars=valid?MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,bytes,(int)length/2,detail,191):0;detail[chars]=0;}
 }
 void s14_publish_runtime(const wchar_t *root,unsigned int desired,unsigned int effective,int ready,int fault) {
     wchar_t path[MAX_PATH],text[64]; if (!s14_join(path,root,L"SAN14ModManager\\runtime.ini")) return;

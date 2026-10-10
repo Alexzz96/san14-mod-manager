@@ -16,6 +16,13 @@ import tempfile
 import uuid
 import os
 
+def native_failure_output(kind,value,trace):
+    if isinstance(value,subprocess.CalledProcessError):
+        for output in (value.stdout,value.stderr):
+            if output:print(output.decode('utf8',errors='replace') if isinstance(output,bytes) else output,file=sys.stderr)
+    sys.__excepthook__(kind,value,trace)
+sys.excepthook=native_failure_output
+
 # Child Python and native reports use UTF-8 JSON, including localized names.
 os.environ['PYTHONUTF8']='1'
 

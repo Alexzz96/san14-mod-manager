@@ -96,6 +96,11 @@ int main(void) {
     int read_state=-1,read_force=-1,read_group=-1;wchar_t read_detail[192];
     s14_read_search_runtime(root,&read_state,&read_force,&read_group,read_detail);
     REQUIRE(read_state==S14_SEARCH_CONTEXT_PAUSED && read_force==3 && read_group==4 && !wcscmp(read_detail,L"等待玩家势力重新匹配"));
+    /* Non-ACP text must round-trip even on an English Windows runner. */
+    s14_publish_search_runtime(root,S14_SEARCH_MATCHED,3,4,L"已匹配 \U0001f6e1");s14_read_search_runtime(root,&read_state,&read_force,&read_group,read_detail);REQUIRE(!wcscmp(read_detail,L"已匹配 \U0001f6e1"));
+    REQUIRE(s14_join(runtime_file,runtime_folder,L"runtime.ini"));
+    REQUIRE(WritePrivateProfileStringW(L"Runtime",L"SearchDetailUtf8",L"bad hex",runtime_file));s14_read_search_runtime(root,&read_state,&read_force,&read_group,read_detail);REQUIRE(!read_detail[0]);
+    REQUIRE(WritePrivateProfileStringW(L"Runtime",L"SearchDetailUtf8",NULL,runtime_file) && WritePrivateProfileStringW(L"Runtime",L"SearchDetail",L"legacy ascii",runtime_file));s14_read_search_runtime(root,&read_state,&read_force,&read_group,read_detail);REQUIRE(!wcscmp(read_detail,L"legacy ascii"));
     REQUIRE(s14_join(runtime_file,runtime_folder,L"runtime.ini") && DeleteFileW(runtime_file) && RemoveDirectoryW(runtime_folder));
     REQUIRE(GetForegroundWindow()==foreground && !IsWindowVisible(ui.window));
     REQUIRE(s14_views_setting_read(ini) && ui.views_enabled);

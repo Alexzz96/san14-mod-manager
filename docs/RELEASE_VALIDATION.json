@@ -1,5 +1,5 @@
 {
-  "version": "0.10.11",
+  "version": "0.10.12",
   "distribution": "github_test_release",
   "native_independent_tests": "passed",
   "python_tests": 32,
@@ -43,5 +43,7 @@
   "city_pity_in_game_acceptance": "pending",
   "full_turn_visual_acceptance": "pending",
   "modified_exe_damage_adapter": "pending",
-  "private_runtime_files_uploaded": false
+  "private_runtime_files_uploaded": false,
+  "cloud_validation": "pending",
+  "localized_status_ipc": "UTF8_hex_with_legacy_fallback"
 }
