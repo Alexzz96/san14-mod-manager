@@ -1,5 +1,7 @@
 #include "officer_model.h"
 #include "pinyin.h"
+#include "career_affix.h"
+#include "ai_affix.h"
 #include <string.h>
 #include <stdio.h>
 #include <wctype.h>
@@ -22,6 +24,18 @@ static int get(Reader *r,uintptr_t address,void *out,size_t size) {
 static unsigned short u16(const unsigned char *p) { unsigned short n;memcpy(&n,p,2);return n; }
 static uintptr_t uptr(const unsigned char *p) { uintptr_t n;memcpy(&n,p,sizeof(n));return n; }
 static unsigned int u32(const unsigned char *p) { unsigned int n;memcpy(&n,p,4);return n; }
+static int zero_bytes(const unsigned char *p,size_t n){for(size_t i=0;i<n;i++)if(p[i])return 0;return 1;}
+/* Allocated but uninitialized person records have ID zero and empty identity,
+   gameplay and effect fields. Padding/default counters need not be all zero.
+   Never accept a named/mismatched live officer as an empty record. */
+static int empty_person(const unsigned char raw[512]){
+    /* Some reserved/custom officer templates initialize the five abilities
+       to 1 rather than 0. Both patterns were observed in this game's table. */
+    for(int i=0;i<5;i++)if(raw[0x124+i]>1)return 0;
+    return !u16(raw+0x10) && zero_bytes(raw+0x12,54) &&
+        zero_bytes(raw+0x118,7) && !raw[0x198] &&
+        zero_bytes(raw+0x150,18) && zero_bytes(raw+0x168,10);
+}
 /* Native display callbacks 0x310ef0 / 0x312470 map these signed
    inner values to five grades. Preserve unusual mod values as unknown grades.
    Loyalty callback 0x3177c0 uses the full byte, including mod values over 100. */
@@ -120,12 +134,14 @@ int s14_officers_capture(S14OfficerRead read,void *context,uintptr_t base,S14Off
         unsigned char raw[512],second[512];if (!people[id]) continue;
         if (!get(&r,people[id],raw,sizeof(raw))) break;
         if (uptr(raw)!=base+PERSON_VT) continue;
-        if (u16(raw+0x10)!=id || raw[0x118]>51 || raw[0x11e]>9 || raw[0x198]>3) { out->read_errors++;break; }
         if (!get(&r,people[id],second,sizeof(second))) break;
         if (memcmp(raw,second,sizeof(raw))) { out->unstable++;continue; }
+        if(empty_person(raw))continue;
+        if (u16(raw+0x10)!=id || raw[0x118]>51 || raw[0x11e]>9 || raw[0x198]>3) { out->read_errors++;break; }
         S14Officer *p=&out->rows[out->count];p->id=id;p->raw_force=raw[0x118];p->force=force_map[p->raw_force];p->status=raw[0x11e];p->health=raw[0x198];
         text(p->name,24,raw+0x12,9);wchar_t family[12]={0};text(family,12,raw+0x24,9);wcsncat(p->name,family,23-wcslen(p->name));
         if (!p->name[0]) continue;
+        wchar_t titled[24];s14_affix_display(world,id,p->name,titled,24);if(titled[0])wcscpy(p->name,titled);if(s14_ai_person_name(world,id,p->name,titled,24))wcscpy(p->name,titled);
         text(p->courtesy,12,raw+0x36,9);
         wcscpy(p->status_name,statuses[p->status]);wcscpy(p->health_name,health[p->health]);
         s14_officer_decode_character(raw,p);

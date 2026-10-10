@@ -40,6 +40,7 @@ static void layout(S14OfficerUI *ui){
     MoveWindow(ui->tabs[0],px(ui,30),px(ui,212),px(ui,120),px(ui,34),TRUE);
     MoveWindow(ui->tabs[1],px(ui,160),px(ui,212),px(ui,120),px(ui,34),TRUE);
     MoveWindow(ui->timeline_button,w-px(ui,154),px(ui,212),px(ui,124),px(ui,34),TRUE);
+    MoveWindow(ui->personality_button,w-px(ui,284),px(ui,212),px(ui,120),px(ui,34),TRUE);
     int all=w-px(ui,60),frozen=all*29/100,height=h-px(ui,282);
     if(frozen>px(ui,350))frozen=px(ui,350);
     MoveWindow(ui->list,px(ui,30)+frozen,px(ui,258),w-px(ui,60)-frozen,height,TRUE);
@@ -67,6 +68,7 @@ static void select_row(S14OfficerUI *ui,HWND from,int index){
     if(ui->syncing || index<0 || index>=ui->visible_count)return;
     ui->selected_id=ui->snapshot->rows[ui->indices[index]].id;ui->syncing=1;
     EnableWindow(ui->timeline_button,TRUE);
+    EnableWindow(ui->personality_button,TRUE);
     HWND to=from==ui->pinned?ui->list:ui->pinned;
     ListView_SetItemState(to,index,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);ui->syncing=0;
 }
@@ -85,6 +87,7 @@ static void rebuild(S14OfficerUI *ui){
     if(selected>=0){ListView_SetItemState(ui->list,selected,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);ListView_SetItemState(ui->pinned,selected,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);ListView_EnsureVisible(ui->list,selected,FALSE);}
     ui->syncing=0;layout(ui);sync_scroll(ui,ui->list);
     EnableWindow(ui->timeline_button,selected>=0);
+    EnableWindow(ui->personality_button,selected>=0);
     InvalidateRect(ui->list,NULL,FALSE);InvalidateRect(ui->pinned,NULL,FALSE);InvalidateRect(ui->window,NULL,FALSE);
 }
 static void update_sort_control(S14OfficerUI *ui){
@@ -142,8 +145,9 @@ static void cell_text(const S14Officer *p,int column,wchar_t *out,size_t size){
     else if(column>=S14_SORT_AMBITION && column<=S14_SORT_LOYALTY){int v=column==S14_SORT_AMBITION?p->ambition:column==S14_SORT_BOND?p->bond:p->loyalty;if(v>=0)swprintf(out,size,L"%d",v);else wcscpy(out,L"—");}
     else wcscpy(out,L"—");
 }
-static void hide(S14OfficerUI *ui) {s14_history_hide(&ui->timeline);ShowWindow(ui->window,SW_HIDE);if (ui->owner) SetForegroundWindow(ui->owner); }
+static void hide(S14OfficerUI *ui) {s14_personality_ui_hide(&ui->personality);s14_history_hide(&ui->timeline);ShowWindow(ui->window,SW_HIDE);if (ui->owner) SetForegroundWindow(ui->owner); }
 static void show_timeline(S14OfficerUI *ui){for(int i=0;i<ui->visible_count;i++){S14Officer *p=&ui->snapshot->rows[ui->indices[i]];if(p->id==ui->selected_id){s14_history_show(&ui->timeline,p);return;}}}
+static void show_personality(S14OfficerUI *ui){for(int i=0;i<ui->visible_count;i++){S14Officer *p=&ui->snapshot->rows[ui->indices[i]];if(p->id==ui->selected_id){s14_personality_ui_show(&ui->personality,ui->snapshot,p);return;}}}
 int s14_owned_foreground(HWND owner,HWND panel,HWND foreground) {
     if (!foreground) return 0;
     /* An overlapped panel's GA_ROOTOWNER can be the panel itself, despite its
@@ -160,7 +164,7 @@ int s14_owned_foreground(HWND owner,HWND panel,HWND foreground) {
 int s14_officer_ui_sync_enabled(S14OfficerUI *ui,int enabled) {
     if (enabled || !ui->window || !IsWindowVisible(ui->window)) return 0;
     /* Turning off the feature is an explicit user action, not a focus test. */
-    s14_history_hide(&ui->timeline);ShowWindow(ui->window,SW_HIDE);return 1;
+    s14_personality_ui_hide(&ui->personality);s14_history_hide(&ui->timeline);ShowWindow(ui->window,SW_HIDE);return 1;
 }
 static int tab_key(S14OfficerUI *ui,UINT message,WPARAM key,LPARAM state){
     if(message==WM_CHAR && key==L'\t')return 1;
@@ -170,13 +174,26 @@ static LRESULT CALLBACK officer_proc(HWND window,UINT message,WPARAM wparam,LPAR
     S14OfficerUI *ui=(S14OfficerUI*)GetWindowLongPtrW(window,GWLP_USERDATA);
     if(message==WM_NCCREATE){ui=((CREATESTRUCTW*)lparam)->lpCreateParams;ui->window=window;SetWindowLongPtrW(window,GWLP_USERDATA,(LONG_PTR)ui);}
     if(!ui)return DefWindowProcW(window,message,wparam,lparam);
+    if(message==S14_PERSONALITY_CHANGED){
+        const S14Officer *edited=(const S14Officer*)lparam;
+        if(edited && ui->snapshot->world==(uintptr_t)wparam){
+            for(int i=0;i<ui->snapshot->count;i++)if(ui->snapshot->rows[i].id==edited->id){
+                S14Officer *row=&ui->snapshot->rows[i];memcpy(row->personalities,edited->personalities,sizeof(row->personalities));row->personality_text[0]=0;
+                for(int j=0;j<9;j++){unsigned id=row->personalities[j];if(!id || id>=356)continue;
+                    const wchar_t *name=ui->snapshot->personalities[id].name;if(!*name)continue;
+                    size_t n=wcslen(row->personality_text);if(n && n+1<239){row->personality_text[n++]=L'、';row->personality_text[n]=0;}
+                    wcsncat(row->personality_text,name,239-n);
+                }rebuild(ui);break;
+            }
+        }return 0;
+    }
     if(message==WM_GETDLGCODE)return DefWindowProcW(window,message,wparam,lparam)|DLGC_WANTTAB;
     if(tab_key(ui,message,wparam,lparam))return 0;
     if(message==WM_ERASEBKGND)return 1;
     if(message==WM_TIMER && wparam==538){if(ui->menu_active && ui->pump_events)ui->pump_events();return 0;}
     if(message==WM_SIZE){layout(ui);sync_scroll(ui,ui->list);return 0;}
     if(message==WM_GETMINMAXINFO){((MINMAXINFO*)lparam)->ptMinTrackSize=(POINT){px(ui,1020),px(ui,640)};return 0;}
-    if(message==WM_DRAWITEM && (wparam==506 || wparam==509 || wparam==510 || wparam==511 || wparam==513)){
+    if(message==WM_DRAWITEM && (wparam==506 || wparam==509 || wparam==510 || wparam==511 || wparam==513 || wparam==514)){
         DRAWITEMSTRUCT *d=(DRAWITEMSTRUCT*)lparam;int active=wparam>=510 && ui->active_tab==(int)wparam-510;
         card(d->hDC,ui,d->rcItem,(d->itemState&ODS_SELECTED)||active?S14_ACCENT_SOFT:S14_CARD);
         wchar_t label[32];GetWindowTextW(d->hwndItem,label,32);paint_text(d->hDC,ui->font,label,d->rcItem,active || wparam==509?S14_ACCENT:S14_INK,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
@@ -188,6 +205,7 @@ static LRESULT CALLBACK officer_proc(HWND window,UINT message,WPARAM wparam,LPAR
         if(id==IDCANCEL || (id==509 && n==BN_CLICKED)){hide(ui);return 0;}
         if((id==510 || id==511) && n==BN_CLICKED){s14_officer_ui_set_tab(ui,id-510);return 0;}
         if(id==513 && n==BN_CLICKED){show_timeline(ui);return 0;}
+        if(id==514 && n==BN_CLICKED){show_personality(ui);return 0;}
         if((id==501 && n==EN_CHANGE) || ((id==502 || id==503 || id==504) && n==CBN_SELCHANGE))rebuild(ui);
         if(id==505 && n==CBN_SELCHANGE){int i=(int)SendMessageW(ui->sort,CB_GETCURSEL,0,0);if(i>=0 && i<ui->sort_count){ui->filter.sort=ui->sort_keys[i];rebuild(ui);}}
         if(id==506 && n==BN_CLICKED){ui->filter.descending=!ui->filter.descending;update_sort_control(ui);rebuild(ui);}return 0;
@@ -204,10 +222,10 @@ static LRESULT CALLBACK officer_proc(HWND window,UINT message,WPARAM wparam,LPAR
         if(table && (hdr->code==NM_DBLCLK || hdr->code==NM_RCLICK || (fixed && hdr->code==NM_CLICK && ((NMITEMACTIVATE*)lparam)->iSubItem==0))){
             NMITEMACTIVATE *v=(NMITEMACTIVATE*)lparam;if(v->iItem<0 || v->iItem>=ui->visible_count)return 0;select_row(ui,hdr->hwndFrom,v->iItem);ListView_SetItemState(hdr->hwndFrom,v->iItem,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);EnableWindow(ui->timeline_button,TRUE);
             if(hdr->code==NM_DBLCLK){show_timeline(ui);return 0;}
-            HMENU menu=CreatePopupMenu(),child=CreatePopupMenu();AppendMenuW(child,MF_STRING,530,L"查看时间线");AppendMenuW(menu,MF_POPUP,(UINT_PTR)child,L"战斗详情");POINT at;GetCursorPos(&at);
+            HMENU menu=CreatePopupMenu(),child=CreatePopupMenu();AppendMenuW(child,MF_STRING,530,L"查看时间线");AppendMenuW(menu,MF_POPUP,(UINT_PTR)child,L"战斗详情");AppendMenuW(menu,MF_STRING,531,L"个性配置");POINT at;GetCursorPos(&at);
             ui->menu_active=1;SetTimer(window,538,50,NULL);
             UINT command=TrackPopupMenuEx(menu,TPM_RETURNCMD|TPM_RIGHTBUTTON,at.x,at.y,window,NULL);
-            KillTimer(window,538);ui->menu_active=0;DestroyMenu(menu);if(command==530)show_timeline(ui);return 0;
+            KillTimer(window,538);ui->menu_active=0;DestroyMenu(menu);if(command==530)show_timeline(ui);else if(command==531)show_personality(ui);return 0;
         }
         if(table && hdr->code==NM_CUSTOMDRAW){NMLVCUSTOMDRAW *draw=(NMLVCUSTOMDRAW*)lparam;
             if(draw->nmcd.dwDrawStage==CDDS_PREPAINT)return CDRF_NOTIFYITEMDRAW;
@@ -222,7 +240,7 @@ static LRESULT CALLBACK officer_proc(HWND window,UINT message,WPARAM wparam,LPAR
         card(dc,ui,(RECT){px(ui,20),px(ui,102),r.right-px(ui,20),px(ui,200)},S14_CARD);
         card(dc,ui,(RECT){px(ui,20),px(ui,248),r.right-px(ui,20),r.bottom-px(ui,16)},S14_CARD);
         paint_text(dc,ui->small_font,L"排序",(RECT){px(ui,36),px(ui,163),px(ui,72),px(ui,189)},S14_MUTED,DT_SINGLELINE);
-        paint_text(dc,ui->small_font,ui->active_tab?L"基础能力、身份、个性与内心属性":L"斩敌含伤兵 · 杀损比值 = 斩敌 ÷ 折损 · 未记录计数为 0",(RECT){px(ui,304),px(ui,216),r.right-px(ui,166),px(ui,240)},S14_MUTED,DT_SINGLELINE|DT_END_ELLIPSIS);
+        paint_text(dc,ui->small_font,ui->active_tab?L"基础能力、身份、个性与内心属性":L"斩敌含伤兵 · 杀损比值 = 斩敌 ÷ 折损 · 未记录计数为 0",(RECT){px(ui,304),px(ui,216),r.right-px(ui,292),px(ui,240)},S14_MUTED,DT_SINGLELINE|DT_END_ELLIPSIS);
         wchar_t count[200];swprintf(count,200,L"显示 %d / %d 位    %ls",ui->visible_count,ui->snapshot->count,ui->notice);
         paint_text(dc,ui->small_font,count,(RECT){px(ui,362),px(ui,163),r.right-px(ui,36),px(ui,189)},ui->last_capture_ok?S14_MUTED:S14_ERROR,DT_SINGLELINE|DT_END_ELLIPSIS);
         if(message==WM_PAINT)EndPaint(window,&p);return 0;
@@ -296,9 +314,12 @@ int s14_officer_ui_create(S14OfficerUI *ui,HINSTANCE instance,HWND owner,uintptr
     ui->tabs[1]=CreateWindowExW(0,L"BUTTON",L"原始数据",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,ui->window,(HMENU)511,instance,NULL);
     ui->close_button=CreateWindowExW(0,L"BUTTON",L"关闭",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,ui->window,(HMENU)509,instance,NULL);
     ui->timeline_button=CreateWindowExW(0,L"BUTTON",L"查看时间线",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,ui->window,(HMENU)513,instance,NULL);
+    ui->personality_button=CreateWindowExW(0,L"BUTTON",L"个性配置",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,0,0,0,0,ui->window,(HMENU)514,instance,NULL);
     HWND controls[]={ui->query,ui->scope,ui->place,ui->history,ui->sort,ui->direction,ui->list,ui->pinned,ui->close_button,ui->tabs[0],ui->tabs[1],ui->timeline_button};
     for(int i=0;i<12;i++){if(!controls[i]){if(activated)DeactivateActCtx(0,activation_cookie);s14_officer_ui_destroy(ui);return 0;}SendMessageW(controls[i],WM_SETFONT,(WPARAM)ui->font,TRUE);SetWindowSubclass(controls[i],control_proc,1,(DWORD_PTR)ui);}
     if(!s14_history_create(&ui->timeline,instance,ui->window,ui->scale)){if(activated)DeactivateActCtx(0,activation_cookie);s14_officer_ui_destroy(ui);return 0;}
+    if(!ui->personality_button || !s14_personality_ui_create(&ui->personality,instance,ui->window,ui->scale)){if(activated)DeactivateActCtx(0,activation_cookie);s14_officer_ui_destroy(ui);return 0;}
+    SendMessageW(ui->personality_button,WM_SETFONT,(WPARAM)ui->font,TRUE);SetWindowSubclass(ui->personality_button,control_proc,1,(DWORD_PTR)ui);
     for(int i=0;i<2;i++)SetWindowSubclass(ListView_GetHeader(tables[i]),control_proc,1,(DWORD_PTR)ui);
     HWND combos[]={ui->scope,ui->place,ui->history,ui->sort};
     for(int i=0;i<4;i++){COMBOBOXINFO info={0};info.cbSize=sizeof(info);if(GetComboBoxInfo(combos[i],&info)){if(info.hwndList)SetWindowSubclass(info.hwndList,control_proc,1,(DWORD_PTR)ui);if(info.hwndItem && info.hwndItem!=combos[i])SetWindowSubclass(info.hwndItem,control_proc,1,(DWORD_PTR)ui);}}
@@ -314,6 +335,7 @@ void s14_officer_ui_toggle(S14OfficerUI *ui) {
     SetForegroundWindow(ui->window);capture_on_open(ui);SetFocus(ui->query);
 }
 void s14_officer_ui_destroy(S14OfficerUI *ui) {
+    s14_personality_ui_destroy(&ui->personality);
     s14_history_destroy(&ui->timeline);
     if (ui->window && IsWindow(ui->window)) DestroyWindow(ui->window);
     if (ui->font) DeleteObject(ui->font);if (ui->small_font) DeleteObject(ui->small_font);if (ui->title_font) DeleteObject(ui->title_font);if (ui->brush) DeleteObject(ui->brush);

@@ -31,7 +31,7 @@ jobs:
         run: python native/verify_native.py
       - name: Candidate installer
         shell: pwsh
-        run: python native/package_release.py
+        run: python native/package_release.py --local
       - uses: actions/upload-artifact@v4
         with:
           name: san14-mod-manager-candidate

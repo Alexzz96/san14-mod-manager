@@ -20,6 +20,17 @@
 #include "search_model.h"
 #include "officer_ui.h"
 #include "detail_ui.h"
+#include "army_ui.h"
+#include "army_buff.h"
+#include "career_affix.h"
+#include "ai_affix.h"
+#include "affix_names.h"
+#include "map_effects_ui.h"
+#include "map_render.h"
+#include "troop_registry.h"
+#include "troop_runtime.h"
+#include "troop_ui.h"
+#include "personality_edit.h"
 
 #define COMMON_RVA 0x251610
 #define CREATE_RVA 0x2a7e60
@@ -376,14 +387,27 @@ static void drain_events(HANDLE file,S14Toast *toast,HWND owner) {
 static void apply_configuration(S14ManagerUI *ui) {
     ui->requested=s14_config_read(ini_path);
     ui->effective=hooks_ready && !runtime_fault && !InterlockedCompareExchange64(&decode_errors,0,0)?s14_effective_flags(ui->requested):0;
+    ui->search_state=s14_search_state(&ui->search_force,&ui->search_group);
+    if(ui->search_state==S14_SEARCH_WAITING)wcscpy(ui->search_status,L"等待游戏载入玩家势力；载入后自动匹配，不需要选择势力编号。");
+    if(ui->search_state==S14_SEARCH_UNAVAILABLE)wcscpy(ui->search_status,L"探索入口未通过指令校验，自动搜索不可用。");
     if (!s14_search_is_ready()) ui->effective&=~S14_AUTO_SEARCH;
+    if(!s14_army_buff_ready() || !s14_affix_names_ready())ui->effective&=~S14_CAO_REN_BUFF;
+    s14_army_buff_configure(!!(ui->effective&S14_CAO_REN_BUFF));
+    if(!s14_troop_ready())ui->effective&=~S14_PLUGIN_TROOPS;
+    s14_troop_configure(!!(ui->effective&S14_PLUGIN_TROOPS));
+    if(!s14_troop_ready() || !s14_army_buff_ready() || !s14_affix_names_ready())ui->effective&=~S14_AI_RANDOM_AFFIX;
+    s14_ai_configure(!!(ui->effective&S14_AI_RANDOM_AFFIX));
+    s14_personality_enabled(hooks_ready && !runtime_fault && !!(ui->effective&S14_MASTER) && s14_manager_view_enabled(ui,0));
     ui->search_settings=s14_search_settings_read(ini_path);
     ui->officers_enabled=GetPrivateProfileIntW(L"Views",L"Officers",1,ini_path)!=0;
     ui->views_enabled=s14_views_setting_read(ini_path);
     ui->native_stats_enabled=GetPrivateProfileIntW(L"Views",L"NativeOfficerStats",1,ini_path)!=0;
+    ui->native_army_enabled=GetPrivateProfileIntW(L"Views",L"NativeArmyValues",1,ini_path)!=0;
+    ui->visual_settings=s14_visual_settings_read(ini_path);
     ui->battle_enabled=s14_battle_setting_read(ini_path);
     s14_battle_configure(ui->effective,ui->battle_enabled);
-    s14_search_configure(ui->effective,ui->search_settings);
+    // Context matching must keep running even while its effective bit is off.
+    s14_search_configure(hooks_ready && !runtime_fault?s14_effective_flags(ui->requested):0,ui->search_settings);
     InterlockedExchange(&effective_flags,(LONG)ui->effective);
     InterlockedExchange(&mode,s14_runtime_mode(ui->effective));
     ui->fault=runtime_fault; ui->attached=hooks_ready;
@@ -391,9 +415,13 @@ static void apply_configuration(S14ManagerUI *ui) {
         (ui->requested&S14_MASTER?L"游戏已接入 · 开关从下一次检查起生效":L"扩展功能已关闭 · F10 管理器仍可使用"));
     s14_manager_refresh(ui);
 }
+static void publish_manager_runtime(S14ManagerUI *ui) {
+    s14_publish_search_runtime(game_folder,ui->search_state,ui->search_force,ui->search_group,ui->search_status);
+    s14_publish_runtime(game_folder,ui->requested,ui->effective,hooks_ready,runtime_fault);
+}
 static void game_manager_action(S14ManagerUI *ui,int action,void *context) {
     (void)context;
-    if (action==S14_ACTION_CONFIG) { apply_configuration(ui); s14_publish_runtime(game_folder,ui->requested,ui->effective,hooks_ready,runtime_fault); }
+    if (action==S14_ACTION_CONFIG) { apply_configuration(ui); publish_manager_runtime(ui); }
     if (action==S14_ACTION_LOGS) ShellExecuteW(ui->window,L"open",log_folder,NULL,NULL,SW_SHOWNORMAL);
     if(action==S14_ACTION_CHECK_UPDATE){
         wchar_t manager[MAX_PATH],args[MAX_PATH+64];
@@ -441,18 +469,40 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
     if (status==MH_OK) status=MH_CreateHook((void*)(image_base+EXIT_RVA),hooked_exit,(void**)&original_exit);
     int search_ready=status==MH_OK && s14_search_install(image_base,image_end,manager_slot);
     int battle_ready=status==MH_OK && search_ready && s14_battle_install(image_base,image_end,manager_slot);
+    int army_ready=status==MH_OK && s14_army_observer_install(image_base,image_end);
+    int buff_ready=status==MH_OK && s14_army_buff_install(image_base,image_end);
+    int name_ready=status==MH_OK && s14_affix_names_install(image_base,image_end);
+    s14_troop_root(game_folder);
+    int troop_ready=status==MH_OK && battle_ready && army_ready && buff_ready && name_ready && s14_troop_install(image_base,image_end);
+    s14_ai_attach(image_base,game_folder,troop_ready && buff_ready && name_ready && battle_ready);
+    int map_ready=status==MH_OK && s14_map_render_install();
+    int personality_ready=battle_ready && search_ready && s14_personality_init(image_base,image_end);
+    char personality_startup[192];snprintf(personality_startup,sizeof(personality_startup),"{\"event\":\"personality_editor_ready\",\"ready\":%d,\"slots\":9,\"preset_id\":6,\"native_setter\":true,\"in_game_acceptance\":\"pending\"}\n",personality_ready);write_line(log,personality_startup);
     if (status==MH_OK) status=MH_EnableHook(MH_ALL_HOOKS);
     char startup[384],version[32]={0}; WideCharToMultiByte(CP_UTF8,0,S14_MANAGER_VERSION,-1,version,sizeof(version),NULL,NULL);
     snprintf(startup,sizeof(startup),"{\"event\":\"startup\",\"requested_mode\":%d,\"hook_status\":%d,\"base\":\"0x%llx\",\"wall_owner_source\":\"tile_current_force\",\"interaction_version\":2,\"toast_duration_ms\":5000,\"manager_version\":\"%s\",\"game_version_check\":false,\"search_ready\":%d,\"requested_flags\":%u}\n",requested,(int)status,(unsigned long long)image_base,version,search_ready,requested_flags);
     write_line(log,startup);
+    const S14TroopRegistry *troop_catalog=s14_troop_builtin_registry();
+    char troop_startup[192];snprintf(troop_startup,sizeof(troop_startup),
+        "{\"event\":\"troop_registry\",\"schema_version\":%d,\"definitions\":%u,\"engine_capabilities\":%u,\"gameplay_integrated\":%s}\n",
+        S14_TROOP_SCHEMA,(unsigned)s14_troop_registry_count(troop_catalog),troop_ready?s14_troop_capabilities():0,troop_ready?"true":"false");write_line(log,troop_startup);
+    char name_startup[256];snprintf(name_startup,sizeof(name_startup),"{\"event\":\"career_affix_names_ready\",\"ready\":%d,\"officer_id\":518,\"threshold\":5000,\"name\":\"神 曹仁\",\"native_person_fields_modified\":false}\n",name_ready);write_line(log,name_startup);
+    char ai_startup[256];snprintf(ai_startup,sizeof(ai_startup),"{\"event\":\"ai_affix_hooks_ready\",\"ready\":%d,\"probability_percent\":10,\"city_guarantee_interval\":9,\"default_enabled\":false,\"native_rng_modified\":false,\"actual_ai_creation_path\":\"pending_in_game\"}\n",status==MH_OK && troop_ready && buff_ready && name_ready && battle_ready);write_line(log,ai_startup);
     char battle_startup[128];snprintf(battle_startup,sizeof(battle_startup),"{\"event\":\"battle_observer\",\"hooks_ready\":%d,\"schema_version\":7,\"gameplay_modified\":false}\n",battle_ready);write_line(log,battle_startup);
+    char army_startup[160];snprintf(army_startup,sizeof(army_startup),"{\"event\":\"army_value_observer\",\"hooks_ready\":%d,\"sample_officer\":518,\"extra_native_calls\":0,\"gameplay_modified\":false}\n",army_ready);write_line(log,army_startup);
+    char buff_startup[384];snprintf(buff_startup,sizeof(buff_startup),"{\"event\":\"army_buff_ready\",\"hooks_ready\":%d,\"officer_id\":518,\"attack_percent\":10,\"defense_percent\":10,\"default_enabled\":false,\"extra_native_calls\":0,\"install_code\":%d,\"failed_entry_rva\":\"0x%llx\"}\n",buff_ready,s14_army_buff_install_code(),(unsigned long long)s14_army_buff_failed_entry());write_line(log,buff_startup);
+    char map_startup[160];snprintf(map_startup,sizeof(map_startup),"{\"event\":\"map_renderer_install\",\"ready\":%d,\"backend\":\"D3D11_Present\"}\n",map_ready);write_line(log,map_startup);
     if (status!=MH_OK && prepared) { MH_DisableHook(MH_ALL_HOOKS); runtime_fault=S14_FAULT_HOOK; }
     hooks_ready=status==MH_OK;
     ULONGLONG last_summary=0,last_config=0;
-    HWND owner=NULL; S14Toast toast={0},search_toast={0};S14ReportUI turn_ui={0};
+    HWND owner=NULL; S14Toast toast={0},search_toast={0},affix_toast={0};S14ReportUI turn_ui={0};
+    S14AffixState last_affix={0};
     unsigned int report_epoch=s14_turn_report_epoch();
     S14OfficerUI officers={0};
     S14DetailUI native_detail={0};
+    S14ArmyUI army_values={0};S14ArmyTrace last_army_trace={0};int last_army_visible=-1;
+    S14TroopUI troop_ui={0};
+    S14MapEffectsUI map_effects={0};int last_map_state=-1;
     int last_detail_visible=-1,last_detail_officer=-1,last_detail_ready=-1;
     S14BattleTotals last_detail_stats={0};
     officers.battle=(S14BattleStatsProvider){1,NULL,s14_stats_snapshot};
@@ -511,7 +561,7 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
         }
         MSG message; while (PeekMessageW(&message,NULL,0,0,PM_REMOVE)) {
             if (message.message==WM_HOTKEY && message.wParam==hotkey_id && foreground_is(owner)) {
-                if (officers.window && IsWindowVisible(officers.window)) {s14_history_hide(&officers.timeline);ShowWindow(officers.window,SW_HIDE);KillTimer(officers.window,1);}
+                if (officers.window && IsWindowVisible(officers.window)) {s14_personality_ui_hide(&officers.personality);s14_history_hide(&officers.timeline);ShowWindow(officers.window,SW_HIDE);KillTimer(officers.window,1);}
                 s14_manager_toggle(&ui); char line[96];
                 snprintf(line,sizeof(line),"{\"event\":\"manager_toggle\",\"visible\":%d}\n",ui.window && IsWindowVisible(ui.window));
                 write_line(log,line);
@@ -526,6 +576,7 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
                     (unsigned long long)(uintptr_t)officers.window,(unsigned long long)(uintptr_t)owner,(unsigned long long)(uintptr_t)GetForegroundWindow(),
                     (unsigned long long)(uintptr_t)GetAncestor(officers.window,GA_ROOTOWNER));write_line(log,line);
             }
+            else if (officers.personality.window && IsWindowVisible(officers.personality.window) && IsDialogMessageW(officers.personality.window,&message)) { }
             else if (officers.timeline.window && IsWindowVisible(officers.timeline.window) && IsDialogMessageW(officers.timeline.window,&message)) { }
             else if (officers.window && IsWindowVisible(officers.window) && IsDialogMessageW(officers.window,&message)) { }
             else { TranslateMessage(&message); DispatchMessageW(&message); }
@@ -534,7 +585,35 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
         s14_search_worker(&ui,&search_toast,own_module,owner,log);
         s14_battle_worker(game_folder);
         ULONGLONG tick=GetTickCount64();
+        S14AffixState affix;s14_affix_snapshot(&affix);
+        if(memcmp(&affix,&last_affix,sizeof(affix))){
+            char line[512];snprintf(line,sizeof(line),"{\"event\":\"career_affix_state\",\"affix\":\"veteran_elite\",\"officer_id\":518,\"enemy_loss\":%llu,\"threshold\":5000,\"valid\":%d,\"active\":%d,\"suspended\":%d,\"epoch\":%u,\"day\":%d,\"bound_to_save\":%d,\"incomplete\":%d}\n",(unsigned long long)affix.enemy_loss,affix.valid,affix.active,affix.suspended,affix.epoch,affix.day,affix.bound,affix.incomplete);write_line(log,line);
+            if(affix.active && last_affix.valid && !last_affix.active && !last_affix.suspended && last_affix.epoch==affix.epoch && last_affix.enabled && last_affix.enemy_loss<5000 && owner){POINT at={80,180};ClientToScreen(owner,&at);s14_toast_text(&affix_toast,own_module,owner,at,tick,L"获得词条 · 百战精锐",L"神 曹仁 · 已记录斩敌达到 5000（含伤兵）\n攻军 +10%，防御 +10%。",2000);}
+            last_affix=affix;s14_manager_refresh(&ui);
+        }
+        s14_toast_tick(&affix_toast,tick,foreground_is(owner) && affix.active);
         s14_detail_tick(&native_detail,own_module,owner,image_base,s14_manager_view_enabled(&ui,1),tick);
+        s14_army_ui_tick(&army_values,own_module,owner,image_base,s14_manager_view_enabled(&ui,2),tick);
+        int map_blocked=(ui.window && IsWindowVisible(ui.window)) || (officers.window && IsWindowVisible(officers.window)) || turn_ui.visible || native_detail.shown || army_values.shown;
+        s14_troop_ui_tick(&troop_ui,own_module,owner,map_blocked);
+        s14_map_ui_tick(&map_effects,own_module,owner,image_base,(ui.effective&(S14_CAO_REN_BUFF|S14_AI_RANDOM_AFFIX)),ui.visual_settings,map_blocked,tick);
+        int map_state=map_effects.ready|map_effects.halo_shown<<1|map_effects.card_shown<<2;
+        HWND map_obstructions[4]={ui.window,officers.window,turn_ui.window,army_values.popup};
+        s14_map_render_publish_all(owner,image_base,!map_blocked,ui.effective,ui.visual_settings,&map_effects.batch,map_effects.cache.dialogs,map_obstructions,tick);
+        char map_line[512];if(s14_map_render_log(map_line,sizeof(map_line)))write_line(log,map_line);
+        char personality_line[512];if(s14_personality_next_log(personality_line,sizeof(personality_line)))write_line(log,personality_line);
+        if(last_map_state!=map_state){
+            S14MapFrame *f=&map_effects.frame;char line[512];snprintf(line,sizeof(line),"{\"event\":\"cao_ren_map_effects\",\"ready\":%d,\"halo\":%d,\"tooltip\":%d,\"army_id\":%d,\"read_calls\":%u,\"read_bytes\":%u,\"portrait\":[%ld,%ld,%ld,%ld],\"card\":[%ld,%ld,%ld,%ld]}\n",map_effects.ready,map_effects.halo_shown,map_effects.card_shown,f->army_id,f->calls,f->bytes,f->portrait.left,f->portrait.top,f->portrait.right,f->portrait.bottom,f->card.left,f->card.top,f->card.right,f->card.bottom);write_line(log,line);last_map_state=map_state;
+        }
+        static ULONGLONG next_ai_sweep;if(tick>=next_ai_sweep){s14_ai_sweep();next_ai_sweep=tick+250;}char ai_line[768];for(int n=0;n<32 && s14_ai_next_log(ai_line,sizeof(ai_line));n++)write_line(log,ai_line);
+        char troop_line[512];for(int n=0;n<16 && s14_troop_next_log(troop_line,sizeof(troop_line));n++)write_line(log,troop_line);
+        char buff_line[768];for(int n=0;n<16 && s14_army_buff_next_log(buff_line,sizeof(buff_line));n++)write_line(log,buff_line);
+        S14ArmyTrace stable_trace=army_values.frame.trace;stable_trace.tick=0;stable_trace.serial=0;
+        if(last_army_visible!=army_values.shown || (army_values.shown && memcmp(&last_army_trace,&stable_trace,sizeof(stable_trace)))){
+            char line[6144];
+            if(s14_army_format_trace(&army_values.frame,army_values.shown,line,sizeof(line)))write_line(log,line);
+            last_army_visible=army_values.shown;last_army_trace=stable_trace;
+        }
         if(last_detail_visible!=native_detail.shown || last_detail_officer!=native_detail.frame.officer_id || last_detail_ready!=native_detail.ready || memcmp(&last_detail_stats,&native_detail.stats,sizeof(last_detail_stats))) {
             char line[512];snprintf(line,sizeof(line),"{\"event\":\"native_detail_view\",\"ready\":%d,\"enabled\":%d,\"visible\":%d,\"officer_id\":%d,\"stats_connected\":%d,\"enemy_loss\":%llu,\"units_routed\":%llu,\"units_defeated\":%llu,\"read_calls\":%u,\"read_bytes\":%u}\n",native_detail.ready,native_detail.enabled,native_detail.shown,native_detail.frame.officer_id,native_detail.connected,(unsigned long long)native_detail.stats.enemy_loss,(unsigned long long)native_detail.stats.units_routed,(unsigned long long)native_detail.stats.units_defeated,native_detail.frame.calls,native_detail.frame.bytes);
             write_line(log,line);last_detail_visible=native_detail.shown;last_detail_officer=native_detail.frame.officer_id;last_detail_ready=native_detail.ready;last_detail_stats=native_detail.stats;
@@ -568,7 +647,7 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
         }
         if (tick-last_summary>=1000) {
             last_summary=tick;
-            s14_publish_runtime(game_folder,ui.requested,ui.effective,hooks_ready,runtime_fault);
+            publish_manager_runtime(&ui);
             char line[640];
             snprintf(line,sizeof(line),"{\"event\":\"summary\",\"mode\":%ld,\"checks\":%lld,\"original_rejected\":%lld,\"would_reject\":%lld,\"enforced\":%lld,\"creations\":%lld,\"decode_errors\":%lld,\"dropped\":%lld,\"peak_active_checks\":%ld,\"preview_allowed\":%lld,\"toast_requests\":%lld}\n",
                 (long)InterlockedCompareExchange(&mode,0,0),(long long)checks,(long long)original_rejected,

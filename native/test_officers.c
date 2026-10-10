@@ -230,6 +230,15 @@ int main(int argc,char **argv) {
     SetWindowTextW(ui.query,L"zy");CHECK(ui.visible_count==1);
     SendMessageW(ui.window,WM_COMMAND,MAKEWPARAM(506,BN_CLICKED),(LPARAM)ui.direction);
     CHECK(ui.snapshot==opened);CHECK(ui.candidate->read_errors==errors);CHECK(ui.last_capture_ok==1);
+    S14Officer *edit_officer=&ui.snapshot->rows[ui.indices[0]];edit_officer->personalities[5]=300;edit_officer->personalities[6]=0;
+    s14_personality_ui_show(&ui.personality,ui.snapshot,edit_officer);CHECK(IsWindowVisible(ui.personality.window));CHECK(ListView_GetItemCount(ui.personality.list)==9);
+    wchar_t hidden_name[80];ListView_GetItemText(ui.personality.list,5,2,hidden_name,80);CHECK(wcsstr(hidden_name,L"#300")!=NULL);
+    CHECK(!IsWindowEnabled(ui.personality.add));CHECK(!IsWindowEnabled(ui.personality.replace));CHECK(render_window(ui.personality.window,"personality-editor-preview.bmp"));
+    SendMessageW(ui.personality.close,BM_CLICK,0,0);CHECK(!IsWindowVisible(ui.personality.window));
+    S14Officer edited=*edit_officer;edited.personalities[6]=6;wcscpy(ui.snapshot->personalities[6].name,L"远矢");
+    SendMessageW(ui.window,S14_PERSONALITY_CHANGED,(WPARAM)(ui.snapshot->world+1),(LPARAM)&edited);CHECK(edit_officer->personalities[6]==0);
+    SendMessageW(ui.window,S14_PERSONALITY_CHANGED,(WPARAM)ui.snapshot->world,(LPARAM)&edited);CHECK(edit_officer->personalities[6]==6 && edit_officer->personalities[5]==300);CHECK(wcsstr(edit_officer->personality_text,L"远矢")!=NULL);
+    SetWindowTextW(ui.query,L"远矢");CHECK(ui.visible_count==1 && ui.snapshot->rows[ui.indices[0]].id==edited.id);
     SendMessageW(ui.close_button,BM_CLICK,0,0);CHECK(!IsWindowVisible(ui.window));
     SetWindowPos(ui.window,NULL,-20000,-20000,0,0,SWP_NOSIZE|SWP_NOACTIVATE|SWP_SHOWWINDOW);
     CHECK(!s14_officer_ui_sync_enabled(&ui,1));CHECK(IsWindowVisible(ui.window));

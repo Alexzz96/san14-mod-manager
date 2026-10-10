@@ -6,7 +6,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode('utf-8').split('\0')
 blocked_parts = {'.mod-analysis', 'build', 'dist', 'captures', 'backups', 'output', '.tools', '__pycache__'}
-blocked_suffixes = {'.exe', '.dll', '.sav', '.s14', '.s14career', '.s14special', '.s14timeline', '.jsonl', '.bmp', '.dmp', '.bin', '.log', '.zip', '.pem', '.key'}
+blocked_suffixes = {'.exe', '.dll', '.sav', '.s14', '.s14career', '.s14special', '.s14timeline', '.s14troops', '.s14aiaffix', '.jsonl', '.bmp', '.dmp', '.bin', '.log', '.zip', '.pem', '.key'}
 patterns = [
     re.compile(rb'[A-Za-z]:[/\\]Users[/\\]', re.I),
     re.compile(rb'(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}'),

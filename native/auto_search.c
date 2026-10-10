@@ -10,6 +10,7 @@
 #include <wchar.h>
 #include "MinHook.h"
 #include "auto_search.h"
+#include "personality_edit.h"
 #include "battle_probe.h"
 #include "turn_report.h"
 #include "search_model.h"
@@ -21,6 +22,11 @@ static unsigned char **manager_address;
 static int ready;
 static volatile LONG search_flags,search_settings,search_fault,queue_sequence,queue_dropped;
 static S14SearchGuard guard;
+// Context errors can recover after validation. Native/scratch/queue faults are
+// fatal for this process and must never be cleared merely by loading a save.
+static volatile LONG context_matched,matched_force,matched_group,matched_epoch;
+static unsigned int last_session_epoch;
+static uintptr_t last_manager;
 typedef struct { volatile LONG state; LONG sequence; S14SearchEvent event; } QueueSlot;
 static QueueSlot queue[QSIZE];
 typedef uintptr_t (*UpdateFunction)(void*,void*);
@@ -78,7 +84,12 @@ static void push(S14SearchEvent event) {
     slot->sequence=sequence; slot->event=event; InterlockedExchange(&slot->state,2);
 }
 static void fail(const wchar_t *text) {
-    if (InterlockedCompareExchange(&search_fault,1,0)) return;
+    if (InterlockedExchange(&search_fault,1)==1) return;
+    S14SearchEvent e={0}; e.kind=S14_SEARCH_FAULT; wcsncpy(e.detail,text,255); push(e);
+}
+static void context_fail(const wchar_t *text) {
+    InterlockedExchange(&context_matched,0);
+    if (InterlockedCompareExchange(&search_fault,2,0)) return;
     S14SearchEvent e={0}; e.kind=S14_SEARCH_FAULT; wcsncpy(e.detail,text,255); push(e);
 }
 static int world_clock(unsigned char **world,unsigned char **settings,int *day) {
@@ -94,6 +105,43 @@ static int world_clock(unsigned char **world,unsigned char **settings,int *day) 
 static int context(unsigned char **world,unsigned char **settings,int *force,int *day) {
     if (!world_clock(world,settings,day)) return 0;
     int id=(*settings)[0x3a]; if (id<1 || id>51) return 0; *force=id; return 1;
+}
+static int group_force(unsigned char *g,int group) {
+    if (group<1 || group>51 || !readable(g+0xde40+(size_t)group*8,8)) return 0;
+    unsigned char *record=((unsigned char**)(g+0xde40))[group];
+    if (!readable(record,0x15) || *(uintptr_t*)record!=base_address+0x129fec8 || record[0x10]>51) return 0;
+    return record[0x10];
+}
+static int player_binding(unsigned char *g,unsigned char *s,int id,unsigned char **group,void **data,int *group_id) {
+    if (s14_battle_is_loading() || id<1 || id>51 || !readable(g+0xde40,52*8) || !readable(g+0xdca0,52*8)) return 0;
+    void *owned=((void**)(g+0xdca0))[id];
+    if (!readable(owned,0x60) || *(uintptr_t*)owned!=base_address+0x129fe58) return 0;
+    // Exactly the original player's selection: settings -> force data -> its
+    // ruling/primary group. A force ID is never used as a group-table index.
+    unsigned char *selected=((void*(*)(void*))(base_address+0x2f1fc0))(s);
+    if (!readable(selected,0x15) || *(uintptr_t*)selected!=base_address+0x129fec8 || selected[0x10]!=id) return 0;
+    for (int i=1;i<52;i++) if (((void**)(g+0xde40))[i]==selected) {
+        *group=selected; *data=owned; *group_id=i; return 1;
+    }
+    return 0;
+}
+static void sync_session(unsigned char *g,unsigned char *s,int id,int day) {
+    unsigned int epoch=s14_battle_session_epoch();
+    if (last_world && (last_manager!=(uintptr_t)g || last_world!=(uintptr_t)s ||
+        last_session_epoch!=epoch || day<last_planning_day || id!=last_force)) {
+        memset(&guard,0,sizeof(guard)); last_planning_day=-1;
+        InterlockedExchange(&context_matched,0);
+        push((S14SearchEvent){.kind=S14_SEARCH_RESET});
+    }
+    last_manager=(uintptr_t)g; last_session_epoch=epoch;
+    InterlockedExchange(&matched_epoch,(LONG)epoch);
+    last_world=(uintptr_t)s; last_force=id;
+}
+static void binding_matched(int id,int group) {
+    InterlockedCompareExchange(&search_fault,0,2);
+    InterlockedExchange(&matched_force,id); InterlockedExchange(&matched_group,group);
+    InterlockedExchange(&matched_epoch,(LONG)s14_battle_session_epoch());
+    InterlockedExchange(&context_matched,1);
 }
 static void* list_head(void *handle,int *count) {
     if (!readable(handle,4)) return NULL;
@@ -112,7 +160,7 @@ static int pending_searches(unsigned char *g,int force) {
     for (int i=0;node && i<6001;i++) {
         if (!readable(node,16)) return -1;
         unsigned char *command=*(unsigned char**)node;
-        if (readable(command,0x41) && *(uintptr_t*)command==base_address+0x129bf20 && command[0x28]==force) total++;
+        if (readable(command,0x41) && *(uintptr_t*)command==base_address+0x129bf20 && group_force(g,command[0x28])==force) total++;
         node=*((void**)node+1);
     }
     return node?-1:total;
@@ -237,14 +285,14 @@ static int build_routes(void *force_data,RouteMap maps[52],int *initialized) {
 }
 static void dispatch_search(void) {
     unsigned int flags=(unsigned int)InterlockedCompareExchange(&search_flags,0,0);
-    if (!(flags&S14_AUTO_SEARCH) || !(flags&S14_MASTER) || !ready || InterlockedCompareExchange(&search_fault,0,0)) return;
+    if (!(flags&S14_AUTO_SEARCH) || !(flags&S14_MASTER) || !ready || InterlockedCompareExchange(&search_fault,0,0)==1 || s14_battle_is_loading()) return;
     unsigned char *g,*s; int id,day;
-    if (!context(&g,&s,&id,&day)) { fail(L"无法读取当前势力或日期，自动搜索已停止；原生探索仍可用。"); return; }
+    if (!context(&g,&s,&id,&day)) { context_fail(L"当前玩家势力或日期未就绪，等待载入后重新匹配。"); return; }
+    sync_session(g,s,id,day);
+    unsigned char *force; void *data; int group_id;
+    if (!player_binding(g,s,id,&force,&data,&group_id)) { context_fail(L"玩家势力与军团尚未匹配，本次未派遣；数据就绪后自动重试。"); return; }
+    binding_matched(id,group_id);
     if (!s14_search_claim(&guard,(uintptr_t)s,day,id,1,1)) return;
-    if (!readable(g+0xde40,52*8) || !readable(g+0xdca0,52*8)) { fail(L"势力数据不可用，自动搜索已停止。"); return; }
-    unsigned char *force=((unsigned char**)(g+0xde40))[id];
-    void *data=((void**)(g+0xdca0))[id];
-    if (!readable(force,0x15) || force[0x10]!=id || !readable(data,0x60)) { fail(L"势力记录不符合派遣条件，自动搜索已停止。"); return; }
     int cost=((int(*)(void))(base_address+0x62ab00))();
     int orders=force[0x14]; if (cost<=0 || cost>200 || orders>200) { fail(L"探索政令费用异常，自动搜索已停止。"); return; }
     S14SearchEvent event={0}; event.kind=S14_SEARCH_BEGIN; event.force=id; event.day=day;
@@ -296,34 +344,44 @@ cleanup:
 static void planning(void *state) {
     if (!readable(state,0x474) || *(int*)((unsigned char*)state+0x470)>2) return;
     if (!(InterlockedCompareExchange(&search_flags,0,0)&S14_AUTO_SEARCH)) return;
-    unsigned char *g,*s; int force,day; if (!context(&g,&s,&force,&day)) return;
-    if (last_planning_day==day && last_force==force && last_world==(uintptr_t)s) return;
-    if (last_world && (last_world!=(uintptr_t)s || day<last_planning_day || force!=last_force)) push((S14SearchEvent){.kind=S14_SEARCH_RESET});
-    else if (last_planning_day>=0) push((S14SearchEvent){.kind=S14_SEARCH_END,.day=day,.force=force,.pending=pending_searches(g,force)});
-    push((S14SearchEvent){.kind=S14_SEARCH_BEGIN,.day=day,.force=force,.pending=pending_searches(g,force)});
+    if (s14_battle_is_loading() || InterlockedCompareExchange(&search_fault,0,0)==1) return;
+    unsigned char *g,*s; int force,day;
+    if (!context(&g,&s,&force,&day)) { InterlockedExchange(&context_matched,0); return; }
+    sync_session(g,s,force,day);
+    if (last_planning_day==day && InterlockedCompareExchange(&context_matched,0,0) && !InterlockedCompareExchange(&search_fault,0,0)) return;
+    unsigned char *group; void *data; int group_id;
+    if (!player_binding(g,s,force,&group,&data,&group_id)) { context_fail(L"等待当前玩家势力与军团匹配；不会向其他势力派遣。"); return; }
+    binding_matched(force,group_id);
+    if (last_planning_day>=0 && day!=last_planning_day) push((S14SearchEvent){.kind=S14_SEARCH_END,.day=day,.force=force,.pending=pending_searches(g,force)});
+    S14SearchEvent begin={.kind=S14_SEARCH_BEGIN,.day=day,.force=force,.pending=pending_searches(g,force)};
+    swprintf(begin.detail,256,L"已匹配玩家势力 %d · 军团 %d；确认进行后按当前设置探索。",force,group_id); push(begin);
     last_planning_day=day; last_force=force; last_world=(uintptr_t)s;
 }
 static uintptr_t hooked_update(void *state,void *arg) {
+    DWORD error=GetLastError();
+    s14_personality_service(state);
     void *previous=current_user_state; current_user_state=state;
     if (s14_battle_enabled() && readable(state,0x474) && *(int*)((unsigned char*)state+0x470)<=2) {
         unsigned char *g,*s;int day;
         if (world_clock(&g,&s,&day)) s14_battle_planning((uintptr_t)g,day,s[0x3a]);
     }
-    planning(state); uintptr_t result=original_update(state,arg); current_user_state=previous; return result;
+    planning(state); SetLastError(error); uintptr_t result=original_update(state,arg); current_user_state=previous; return result;
 }
 static void hooked_progress(int value) {
+    DWORD error=GetLastError();
     uintptr_t caller=(uintptr_t)__builtin_return_address(0)-base_address;
     // This call exists only in the accepted progress branch, after the native
     // confirmation flag has been consumed and before strategy phase cleanup.
     if (!value && caller==0x3f9446 && current_user_state) { s14_battle_progress();dispatch_search(); }
-    original_progress(value);
+    SetLastError(error); original_progress(value);
 }
 static int hooked_execute(void *command) {
     S14SearchEvent event={0}; S14SearchEvent *previous=current_result;
     unsigned char *g,*s; int day;
     unsigned int flags=(unsigned int)InterlockedCompareExchange(&search_flags,0,0);
     int capture=(flags&(S14_MASTER|S14_AUTO_SEARCH))==(S14_MASTER|S14_AUTO_SEARCH) && last_force>0 && world_clock(&g,&s,&day) &&
-        (uintptr_t)s==last_world && readable(command,0x29) && ((unsigned char*)command)[0x28]==last_force;
+        !s14_battle_is_loading() && (uintptr_t)g==last_manager && (uintptr_t)s==last_world &&
+        s14_battle_session_epoch()==last_session_epoch && readable(command,0x29) && group_force(g,((unsigned char*)command)[0x28])==last_force;
     if (capture) { event.kind=S14_SEARCH_RESULT; event.force=last_force; event.day=day; current_result=&event; }
     int result=original_execute(command); current_result=previous; return result;
 }
@@ -415,7 +473,20 @@ void s14_search_configure(unsigned int flags,unsigned int settings) {
     if ((settings&15)>3 || ((settings>>4)&15)>2 || ((settings>>8)&15)>1) settings=0;
     InterlockedExchange(&search_settings,(LONG)settings); InterlockedExchange(&search_flags,(LONG)flags);
 }
-int s14_search_is_ready(void) { return ready && !InterlockedCompareExchange(&search_fault,0,0); }
+int s14_search_state(int *force,int *group) {
+    if(force)*force=0;
+    if(group)*group=0;
+    if(!ready)return S14_SEARCH_UNAVAILABLE;
+    LONG fault=InterlockedCompareExchange(&search_fault,0,0);
+    if(fault==1)return S14_SEARCH_STOPPED;
+    if(s14_battle_is_loading() || (unsigned int)InterlockedCompareExchange(&matched_epoch,0,0)!=s14_battle_session_epoch())return S14_SEARCH_WAITING;
+    if(fault==2)return S14_SEARCH_CONTEXT_PAUSED;
+    if(!InterlockedCompareExchange(&context_matched,0,0))return S14_SEARCH_WAITING;
+    if(force)*force=(int)InterlockedCompareExchange(&matched_force,0,0);
+    if(group)*group=(int)InterlockedCompareExchange(&matched_group,0,0);
+    return S14_SEARCH_MATCHED;
+}
+int s14_search_is_ready(void) { return s14_search_state(NULL,NULL)==S14_SEARCH_MATCHED; }
 static int compare_events(const void *a,const void *b) { LONG x=((const QueueSlot*)a)->sequence,y=((const QueueSlot*)b)->sequence; return (x>y)-(x<y); }
 static void log_event(HANDLE log,const S14SearchEvent *e) {
     char text[4096],json[4608]; int at=0; char utf8[1024]={0};
@@ -476,7 +547,7 @@ void s14_search_worker(S14ManagerUI *ui,S14Toast *toast,HINSTANCE instance,HWND 
             }
         } else {
             s14_search_reduce(&report,e);
-            if (e->kind==S14_SEARCH_RESET) { s14_turn_report_reset();ui->search_summary[0]=ui->search_details[0]=0; ui->search_scroll=0; changed=1; }
+            if (e->kind==S14_SEARCH_RESET) { s14_turn_report_reset();ui->search_status[0]=ui->search_summary[0]=ui->search_details[0]=0; ui->search_scroll=0; changed=1; }
         }
     }
     if (!ready) { wcscpy(ui->search_status,L"探索入口未通过指令校验，自动搜索不可用；原有墙体功能独立运行。"); changed=1; }
@@ -486,7 +557,8 @@ void s14_search_worker(S14ManagerUI *ui,S14Toast *toast,HINSTANCE instance,HWND 
 }
 #ifdef S14_SELFTEST
 __declspec(dllexport) int S14TestSearchPrologue(int index,unsigned char *bytes,int *length) {
-    if (index<0 || index>=8) return 0;
+    if (index<0 || index>=(int)(sizeof(search_entries)/sizeof(search_entries[0]))) return 0;
     *length=search_entries[index].length; memcpy(bytes,search_entries[index].signature,*length); return (int)search_entries[index].rva;
 }
+__declspec(dllexport) int S14TestSearchEntryCount(void) { return (int)(sizeof(search_entries)/sizeof(search_entries[0])); }
 #endif

@@ -59,6 +59,7 @@ static uintptr_t hooked_battle_save_commit(void *world,void *data) {
     SetLastError(error);uintptr_t result=original_save_commit(world,data);error=GetLastError();
     e.native_return=result;
     if(result==0 && battle_clock_day(e.world)==e.planning_day) e.save_hash_valid=battle_save_digest(e.text,e.save_hash);
+    if(result==0){s14_troop_save(e.world,e.save_hash_valid?e.save_hash:NULL);s14_ai_save(e.world,e.save_hash_valid?e.save_hash:NULL);}
     e.elapsed=GetTickCount64()-e.tick;battle_enqueue(&e);SetLastError(error);return result;
 }
 static uintptr_t hooked_battle_load_reader(void *data,int slot,void *name) {
@@ -69,17 +70,22 @@ static uintptr_t hooked_battle_load_reader(void *data,int slot,void *name) {
 }
 static uintptr_t hooked_battle_load(void *world,int slot,void *name) {
     DWORD error=GetLastError();BattleEvent start=battle_begin(B_LOAD_BEGIN,(uintptr_t)__builtin_return_address(0)-battle_base);
-    start.world=(uintptr_t)world;start.args[0]=(uintptr_t)world;start.args[1]=(uintptr_t)(intptr_t)slot;start.args[2]=(uintptr_t)name;
-    battle_enqueue(&start);InterlockedIncrement(&battle_loading);
-    BattleEvent e=battle_begin(B_LOAD_END,start.caller);e.world=(uintptr_t)world;e.parent=start.id;BattleEvent *old=battle_load_context;battle_load_context=&e;
+    start.affix_epoch=s14_affix_suspend();start.world=(uintptr_t)world;start.args[0]=(uintptr_t)world;start.args[1]=(uintptr_t)(intptr_t)slot;start.args[2]=(uintptr_t)name;
+    battle_enqueue(&start);s14_troop_load_begin();s14_ai_load_begin();InterlockedIncrement(&battle_loading);
+    BattleEvent e=battle_begin(B_LOAD_END,start.caller);e.affix_epoch=start.affix_epoch;e.world=(uintptr_t)world;e.parent=start.id;BattleEvent *old=battle_load_context;battle_load_context=&e;
     SetLastError(error);uintptr_t result=original_load(world,slot,name);error=GetLastError();battle_load_context=old;
     e.native_return=result;e.planning_day=battle_clock_day(e.world);
     if((int)result==1) e.save_hash_valid=battle_save_digest(e.text,e.save_hash);
+    s14_troop_load_end(e.world,(int)result==1,e.save_hash,e.save_hash_valid);s14_ai_load_end(e.world,(int)result==1,e.save_hash,e.save_hash_valid);
+    if((int)result==1) InterlockedIncrement(&battle_session_epoch);
     InterlockedDecrement(&battle_loading);e.elapsed=GetTickCount64()-e.tick;battle_enqueue(&e);SetLastError(error);return result;
 }
 static uintptr_t hooked_battle_new_game(void *world,int scenario) {
-    DWORD error=GetLastError();InterlockedIncrement(&battle_loading);SetLastError(error);
+    DWORD error=GetLastError();
+    if(!battle_load_context)s14_ai_load_begin();
+    unsigned int epoch=battle_load_context?battle_load_context->affix_epoch:s14_affix_suspend();InterlockedIncrement(&battle_loading);SetLastError(error);
     uintptr_t result=original_new_game(world,scenario);error=GetLastError();InterlockedDecrement(&battle_loading);
-    if((int)result==1 && !battle_load_context) {BattleEvent e=battle_begin(B_NEW_GAME,(uintptr_t)__builtin_return_address(0)-battle_base);e.world=(uintptr_t)world;e.native_return=result;e.planning_day=battle_clock_day(e.world);battle_enqueue(&e);}
+    if(!battle_load_context) {if((int)result==1) InterlockedIncrement(&battle_session_epoch);s14_troop_new_game((uintptr_t)world);if((int)result==1)s14_ai_new_game((uintptr_t)world);BattleEvent e=battle_begin(B_NEW_GAME,(uintptr_t)__builtin_return_address(0)-battle_base);e.affix_epoch=epoch;e.world=(uintptr_t)world;e.native_return=result;e.planning_day=battle_clock_day(e.world);battle_enqueue(&e);}
+    if(!battle_load_context && (int)result!=1)s14_ai_load_end((uintptr_t)world,0,NULL,0);
     SetLastError(error);return result;
 }

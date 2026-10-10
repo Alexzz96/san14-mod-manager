@@ -5,7 +5,10 @@
 int s14_battle_install(uintptr_t base,uintptr_t end,unsigned char **manager);
 void s14_battle_configure(unsigned int flags,int enabled);
 int s14_battle_enabled(void);
-void s14_battle_planning(uintptr_t world,int day,int force);
+unsigned int s14_battle_session_epoch(void);
+int s14_battle_is_loading(void);
+// player_force is the settings' actual force ID, never a group-table index.
+void s14_battle_planning(uintptr_t world,int day,int player_force);
 void s14_battle_progress(void);
 void s14_battle_log(uintptr_t caller,const uintptr_t args[10],const wchar_t *short_text,const wchar_t *long_text);
 void s14_battle_worker(const wchar_t *root);

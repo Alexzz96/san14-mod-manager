@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "troops": [
+    {
+      "id": "san14.xianzhen",
+      "revision": 1,
+      "name": "陷阵营",
+      "description": "所将七百余兵，号为千人，铠甲斗具皆精练齐整，每所攻击无不破者，名为陷阵营",
+      "native_carrier": 1,
+      "max_soldiers": 1000,
+      "commander_scope": "whitelist",
+      "commanders": [254],
+      "unlock_key": "troop.xianzhen",
+      "icon": "assets/troops/xianzhen.svg",
+      "attribute_bonus_bp": {
+        "attack": 30000,
+        "defense": 20000,
+        "siege_attack": 1000,
+        "siege_break": 2000,
+        "mobility": -2000
+      },
+      "effects": [
+        {"kind": "damage_reduction", "value_bp": 8000},
+        {"kind": "status_immunity", "status": "confusion", "value_bp": 10000},
+        {"kind": "surround_immunity", "value_bp": 10000}
+      ],
+      "extra_gold": {"fixed": 2000, "per_1000_soldiers": 500}
+    }
+  ]
+}

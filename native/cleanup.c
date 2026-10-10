@@ -8,6 +8,8 @@
 #include "battle_stats.h"
 #include "special_stats.h"
 #include "battle_timeline.h"
+#include "troop_store.h"
+#include "ai_affix.h"
 
 // Only the fixed application paths are visited; no recursive directory delete.
 #define CLEAN_MAX 2048
@@ -57,7 +59,7 @@ static int add(CleanPlan *p,const wchar_t *name,int kind) {
     else if (kind==6) { const wchar_t *leaf=wcsrchr(path,L'\\'); own=own_log(path,leaf?leaf+1:path); }
     else if (kind==7) own=metadata(path,L"SearchReport",L"Version") && metadata(path,L"SearchReport",L"Summary");
     else if (kind==8) own=metadata(path,L"BattleObservation",L"Version") && metadata(path,L"BattleObservation",L"Enabled");
-    else if (kind==9) own=s14_stats_checkpoint_owned(path) || s14_special_checkpoint_owned(path) || s14_timeline_checkpoint_owned(path);
+    else if (kind==9) own=s14_stats_checkpoint_owned(path) || s14_special_checkpoint_owned(path) || s14_timeline_checkpoint_owned(path) || s14_troop_checkpoint_owned(path) || s14_ai_checkpoint_owned(path);
     if (!own) { p->report->preserved++; return 1; }
     if (p->count>=CLEAN_MAX) return failure(p,L"待清理文件过多，请先整理日志；未删除文件。");
     if (!plain_path(path) || (a&FILE_ATTRIBUTE_READONLY)) return failure(p,L"待清理文件是只读文件或链接路径，未删除文件。");
@@ -112,13 +114,13 @@ int s14_package_clean(const wchar_t *root,const wchar_t *source,S14CleanupReport
         if (!plain_path(dir)) ok=failure(&p,L"管理器目录包含链接，未删除文件。");
         else ok=add(&p,L"SAN14ModManager\\runtime.ini",5) && add(&p,L"SAN14ModManager\\search-results.ini",7) && add(&p,L"SAN14ModManager\\battle-observation-status.ini",8) &&
             add(&p,L"SAN14ModManager\\install.dll.tmp",1) && add(&p,L"SAN14ModManager\\manager.exe.tmp",2) && add(&p,L"SAN14ModManager\\receipt.ini.tmp",4) &&
-            scan(&p,L"SAN14ModManager\\logs",1) && scan(&p,L"SAN14ModManager\\backups",0) && scan(&p,L"SAN14ModManager\\career\\checkpoints",2) && add(&p,L"SAN14ModManager\\installation.ini",4);
+            scan(&p,L"SAN14ModManager\\logs",1) && scan(&p,L"SAN14ModManager\\backups",0) && scan(&p,L"SAN14ModManager\\career\\checkpoints",2) && scan(&p,L"SAN14ModManager\\troops",2) && scan(&p,L"SAN14ModManager\\ai-affixes",2) && add(&p,L"SAN14ModManager\\installation.ini",4);
         // Unknown entries in the application directory are preserved, too.
         wchar_t pattern[MAX_PATH]; s14_join(pattern,dir,L"*"); WIN32_FIND_DATAW data; HANDLE search=FindFirstFileW(pattern,&data);
         if (search!=INVALID_HANDLE_VALUE) { do {
             if (!wcscmp(data.cFileName,L".") || !wcscmp(data.cFileName,L"..")) continue;
-            const wchar_t *known[]={L"runtime.ini",L"installation.ini",L"install.dll.tmp",L"manager.exe.tmp",L"receipt.ini.tmp",L"logs",L"backups",L"search-results.ini",L"battle-observation-status.ini",L"career"}; int recognized=0;
-            for (int i=0;i<10;i++) if (!_wcsicmp(data.cFileName,known[i])) recognized=1;
+            const wchar_t *known[]={L"runtime.ini",L"installation.ini",L"install.dll.tmp",L"manager.exe.tmp",L"receipt.ini.tmp",L"logs",L"backups",L"search-results.ini",L"battle-observation-status.ini",L"career",L"troops",L"ai-affixes"}; int recognized=0;
+            for (int i=0;i<12;i++) if (!_wcsicmp(data.cFileName,known[i])) recognized=1;
             if (!recognized) report->preserved++;
         } while (FindNextFileW(search,&data)); FindClose(search); }
         else if (ok) ok=failure(&p,L"无法检查管理器目录，未删除文件。");
@@ -142,8 +144,8 @@ int s14_package_clean(const wchar_t *root,const wchar_t *source,S14CleanupReport
     if (ok) report->files=p.count;
     free(p.files);
     if (ok) {
-        const wchar_t *folders[]={L"SAN14ModManager\\career\\checkpoints",L"SAN14ModManager\\career",L"SAN14ModManager\\logs",L"SAN14ModManager\\backups",L"SAN14ModManager"};
-        for (int i=0;i<5;i++) if (s14_join(dir,p.root,folders[i]) && plain_path(dir)) {
+        const wchar_t *folders[]={L"SAN14ModManager\\ai-affixes",L"SAN14ModManager\\troops",L"SAN14ModManager\\career\\checkpoints",L"SAN14ModManager\\career",L"SAN14ModManager\\logs",L"SAN14ModManager\\backups",L"SAN14ModManager"};
+        for (int i=0;i<7;i++) if (s14_join(dir,p.root,folders[i]) && plain_path(dir)) {
             if (RemoveDirectoryW(dir)) report->directories++;
             else if (GetLastError()!=ERROR_DIR_NOT_EMPTY) ok=failure(&p,L"本项目文件已清理，但空目录无法删除，请检查权限后重试。");
         }

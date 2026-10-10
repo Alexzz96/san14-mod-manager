@@ -6,6 +6,8 @@
 #include <wchar.h>
 #include <string.h>
 #include "package.h"
+#include "troop_store.h"
+#include "ai_affix.h"
 #include "battle_stats.h"
 #include "special_stats.h"
 #include "battle_timeline.h"
@@ -79,6 +81,16 @@ static int fail(wchar_t error[192],const wchar_t *text) { wcsncpy(error,text,191
 
 static int known_previous_manager(const char *hash) {
     static const char *known[]={
+        "155e8c42d85db39726ff30673a159b76dec226d5f45e55ba335d180f77a0f4ca", // local 0.9.8
+        "47e1aa6d5b7215fef5137790c2cd21ae8cfbda655ae2e9ff8a3790ad799e9dcc", // local 0.9.7
+        "c1a8f814b408b5a227f9aac1a3a2a8920d44346bb28656624823d9904fb5c03c", // local 0.9.6
+        "4d6d3013ce6910644f94cfd6a836bcc445fc66a25bd824b6dea8da44ccc68e16", // local 0.9.5
+        "c1b39322233efeb4ff41f501f6f8d95b914de340c4a874d29043802b1acd61f3", // local 0.9.4
+        "aca31f6bf9d5094614c4a498bb98f71e15f7130e258198c6c1f7f4148e653c84", // local 0.9.3
+        "c6e7abb83926bfddddb3a0586b5580ed8c2398de8a62836f2b6500a44f86056f", // local 0.9.2
+        "2c55ff9325680693b58b4c22f6a93978bf889369a41bebbf0005e078b340863f", // local 0.9.1
+        "112a0caeaa2d609f19aa3012053d851d856a1f45824683c05156c0752b81d6d8", // public 0.9.0
+        "19bb8927dcc9eff1d34076afab12671375ed4aa9dec1069f795f0494e10f1737", // local 0.9.0
         "4b46d2d923a65f70af7a514c4757a3dbfdea957aee433a4f9a78a5c5f8aedb94", // local 0.8.5
         "7447aac1a8b218ba0c1aa54d6a945c0140dc603ff943264c9b41bbf7fce9c5e8", // local 0.8.4
         "c96de53337ba48b1fc749857564bba0aa67431663121ee572f56c72e7e742387", // local 0.8.3
@@ -112,6 +124,15 @@ static int known_previous_manager(const char *hash) {
 }
 static int known_previous_dll(const char *hash) {
     static const char *known[]={
+        "8e1a2f1a0e321d65727d88065b97bf24d8ba7da410fe55888d318596960c8baa", // local 0.9.8
+        "d05d6aa4b8810f3656fea873546e0846ff57fb1c6a5be52cbd29011620a45c4c", // local 0.9.7
+        "d6a31eb8b9cc757fade080febe9fad5df3751a4b75ba9e359c7c8cd6eee11386", // local 0.9.6
+        "db12556b9b2bd05189a0f8bb4435a9d360e67a9c9d3f4f9f0105d96e670eacd6", // local 0.9.5
+        "1adef5cf304c45daae8d07019fad02c7332ef2a41941e4e4ccd784d9f0518351", // local 0.9.4
+        "91be4a3282ca42767811f7abf3aa573973499db8bf597a630bf012eedd1f3666", // local 0.9.3
+        "a80a43c7a029df448047b4bb46baf4b00aed49c6298ba750428712254c9303fe", // local 0.9.2
+        "fc06e1d9d7ce8bd31e02d9f249031765e2b39875819b02a5291df73e6720680e", // local 0.9.1
+        "f9f3cbb7a1e1142e93229d89182e78461a5e2b08f7d5725d0a2fdfb26aa0a6d3", // local 0.9.0
         "e8af2fbf61c0ff98c4a9fbe6ae829a0280d58f49ba0f950fab0dea680fb5b314", // local 0.8.5
         "a4ab351b5155641447ca1ae8df78954eb03ad6832aecdd8b2f10fc4c749a497a", // local 0.8.4
         "e46c449697800f463fced8e6577f3708e4387ffedcd27384f109e1562d7c207a", // local 0.8.3
@@ -193,6 +214,14 @@ unsigned int s14_package_detect(const wchar_t *root,const wchar_t *source) {
         WIN32_FIND_DATAW data;HANDLE find=FindFirstFileW(pattern,&data);int examined=0;
         if(find!=INVALID_HANDLE_VALUE) {do {if(++examined>2048) break;const wchar_t *ext=wcsrchr(data.cFileName,L'.');if(!ext || (_wcsicmp(ext,L".s14career") && _wcsicmp(ext,L".s14special") && _wcsicmp(ext,L".s14timeline") && _wcsicmp(ext,L".tmp")))continue;
             if(s14_join(path,folder,data.cFileName) && (s14_stats_checkpoint_owned(path) || s14_special_checkpoint_owned(path) || s14_timeline_checkpoint_owned(path))) {found|=S14_FOUND_DATA;break;}} while(FindNextFileW(find,&data));FindClose(find);}
+    }
+    if(s14_join(folder,root,L"SAN14ModManager\\troops") && ordinary_directory(folder) && s14_join(pattern,folder,L"*")) {
+        WIN32_FIND_DATAW data;HANDLE find=FindFirstFileW(pattern,&data);int examined=0;
+        if(find!=INVALID_HANDLE_VALUE){do{if(++examined>2048)break;if(s14_join(path,folder,data.cFileName) && s14_troop_checkpoint_owned(path)){found|=S14_FOUND_DATA;break;}}while(FindNextFileW(find,&data));FindClose(find);}
+    }
+    if(s14_join(folder,root,L"SAN14ModManager\\ai-affixes") && ordinary_directory(folder) && s14_join(pattern,folder,L"*")) {
+        WIN32_FIND_DATAW data;HANDLE find=FindFirstFileW(pattern,&data);int examined=0;
+        if(find!=INVALID_HANDLE_VALUE){do{if(++examined>2048)break;if(s14_join(path,folder,data.cFileName) && s14_ai_checkpoint_owned(path)){found|=S14_FOUND_DATA;break;}}while(FindNextFileW(find,&data));FindClose(find);}
     }
     return found;
 }
@@ -279,6 +308,22 @@ int s14_package_remove(const wchar_t *root,wchar_t error[192]) {
     wchar_t path[MAX_PATH]; if (!s14_join(path,root,L"dinput8.dll") || !DeleteFileW(path)) return fail(error,L"插件移除失败，请检查文件占用及目录权限。");
     // Retain manager, configuration, ownership receipt and backups for reinstall.
     return 1;
+}
+void s14_publish_search_runtime(const wchar_t *root,int state,int force,int group,const wchar_t *detail) {
+    wchar_t path[MAX_PATH],text[32];if(!s14_join(path,root,L"SAN14ModManager\\runtime.ini"))return;
+    swprintf(text,32,L"%d",state);WritePrivateProfileStringW(L"Runtime",L"SearchState",text,path);
+    swprintf(text,32,L"%d",force);WritePrivateProfileStringW(L"Runtime",L"SearchForce",text,path);
+    swprintf(text,32,L"%d",group);WritePrivateProfileStringW(L"Runtime",L"SearchGroup",text,path);
+    WritePrivateProfileStringW(L"Runtime",L"SearchDetail",detail?detail:L"",path);
+}
+void s14_read_search_runtime(const wchar_t *root,int *state,int *force,int *group,wchar_t detail[192]) {
+    wchar_t path[MAX_PATH];*state=S14_SEARCH_WAITING;*force=*group=0;detail[0]=0;
+    if(!s14_join(path,root,L"SAN14ModManager\\runtime.ini"))return;
+    *state=(int)GetPrivateProfileIntW(L"Runtime",L"SearchState",S14_SEARCH_WAITING,path);
+    if(*state<0 || *state>S14_SEARCH_UNAVAILABLE)*state=S14_SEARCH_WAITING;
+    *force=(int)GetPrivateProfileIntW(L"Runtime",L"SearchForce",0,path);
+    *group=(int)GetPrivateProfileIntW(L"Runtime",L"SearchGroup",0,path);
+    GetPrivateProfileStringW(L"Runtime",L"SearchDetail",L"",detail,192,path);
 }
 void s14_publish_runtime(const wchar_t *root,unsigned int desired,unsigned int effective,int ready,int fault) {
     wchar_t path[MAX_PATH],text[64]; if (!s14_join(path,root,L"SAN14ModManager\\runtime.ini")) return;

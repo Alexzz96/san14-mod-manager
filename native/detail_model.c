@@ -1,4 +1,5 @@
 #include "detail_model.h"
+#include "career_affix.h"
 #include <string.h>
 #include <wchar.h>
 #include <limits.h>
@@ -39,6 +40,7 @@ static int candidate(DetailReader *r,uintptr_t base,uintptr_t object,uintptr_t w
     if(x<0 || y<0 || w<800 || w>1920 || h<300 || h>1080 || x+w>1920 || y+h>1080) return 0;
     found->panel.right=x+w;found->panel.bottom=y+h;found->world=world;found->dialog=object;found->person=selected;found->officer_id=id;
     unsigned int length=0;for(int group=0;group<2;group++) for(int i=0;i<9 && length<23;i++) {wchar_t c=(wchar_t)half(person+0x12+group*18+i*2);if(!c) break;found->name[length++]=c;}found->name[length]=0;
+    wchar_t titled[24];s14_affix_display(world,id,found->name,titled,24);if(titled[0])wcscpy(found->name,titled);
     if(!length) return 0;
     // Close/switch/load races fail closed; no stale label is retained.
     unsigned char again[0x148],header[0x48];uintptr_t after_world=0;

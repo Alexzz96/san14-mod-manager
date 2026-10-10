@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <wchar.h>
 #include "officer_ui.h"
-static int memory(void *context,uintptr_t address,void *out,size_t size) { SIZE_T got=0;return ReadProcessMemory((HANDLE)context,(const void*)address,out,size,&got) && got==size; }
+static int memory(void *context,uintptr_t address,void *out,size_t size) { SIZE_T got=0;int ok=ReadProcessMemory((HANDLE)context,(const void*)address,out,size,&got) && got==size;if(!ok)fprintf(stderr,"read_failed address=%llx size=%llu error=%lu\n",(unsigned long long)address,(unsigned long long)size,(unsigned long)GetLastError());return ok; }
 static void json_text(FILE *f,const wchar_t *s) {
     char utf8[2048];int n=WideCharToMultiByte(CP_UTF8,0,s,-1,utf8,sizeof(utf8),NULL,NULL);fputc('"',f);
     for (int i=0;i<n-1;i++) { unsigned char c=(unsigned char)utf8[i];if (c=='"' || c=='\\') fputc('\\',f);if (c>=32) fputc(c,f); }

@@ -30,3 +30,7 @@ output/
 .env.*
 *.pem
 *.key
+
+*.s14troops
+
+*.s14aiaffix

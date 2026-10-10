@@ -27,12 +27,19 @@ int main(void) {
     wchar_t temp[MAX_PATH],root[MAX_PATH],ini[MAX_PATH]; REQUIRE(GetTempPathW(MAX_PATH,temp));
     swprintf(root,MAX_PATH,L"%lsS14-manager-test-%lu",temp,(unsigned long)GetCurrentProcessId()); REQUIRE(CreateDirectoryW(root,NULL));
     REQUIRE(s14_join(ini,root,L"SAN14BuildLimit.ini"));
-    REQUIRE(s14_config_read(ini)==(S14_MASTER|S14_LIMIT_HINT|S14_AUTO_SEARCH));
-    REQUIRE(s14_effective_flags(s14_config_read(ini))==(S14_MASTER|S14_AUTO_SEARCH));
+    REQUIRE(s14_config_read(ini)==(S14_MASTER|S14_LIMIT_HINT|S14_AUTO_SEARCH|S14_PLUGIN_TROOPS));
+    REQUIRE(s14_effective_flags(s14_config_read(ini))==(S14_MASTER|S14_AUTO_SEARCH|S14_PLUGIN_TROOPS));
     REQUIRE(s14_search_settings_read(ini)==1 && s14_battle_setting_read(ini));
     REQUIRE(WritePrivateProfileStringW(L"AutoSearch",L"Executors",L"99",ini));
     REQUIRE(s14_search_settings_read(ini)==1);
     REQUIRE(WritePrivateProfileStringW(L"AutoSearch",L"Executors",NULL,ini));
+    REQUIRE(!(s14_config_read(ini)&S14_CAO_REN_BUFF));
+    REQUIRE(s14_config_read(ini)&S14_PLUGIN_TROOPS);
+    REQUIRE(s14_config_set(ini,S14_PLUGIN_TROOPS,0) && !(s14_config_read(ini)&S14_PLUGIN_TROOPS));
+    REQUIRE(s14_config_set(ini,S14_PLUGIN_TROOPS,1));
+    REQUIRE(s14_config_set(ini,S14_CAO_REN_BUFF,1) && (s14_effective_flags(s14_config_read(ini))&S14_CAO_REN_BUFF));
+    REQUIRE(s14_config_set(ini,S14_MASTER,0) && !(s14_effective_flags(s14_config_read(ini))&S14_CAO_REN_BUFF));
+    REQUIRE(s14_config_set(ini,S14_MASTER,1));REQUIRE(s14_config_set(ini,S14_CAO_REN_BUFF,0));
     REQUIRE(s14_config_set(ini,S14_AUTO_SEARCH,0));
     REQUIRE(!(s14_config_read(ini)&S14_AUTO_SEARCH));
     REQUIRE(s14_search_setting_set(ini,0,0) && s14_search_settings_read(ini)==0);
@@ -63,7 +70,7 @@ int main(void) {
     REQUIRE(s14_search_setting_set(ini,0,3) && s14_search_setting_set(ini,1,2) && s14_search_setting_set(ini,2,1));
     REQUIRE(s14_search_settings_read(ini)==0x123);
     REQUIRE(!s14_search_setting_set(ini,0,4) && !s14_search_setting_set(ini,2,2));
-    for (unsigned int flags=0;flags<32;flags++) {
+    for (unsigned int flags=0;flags<=S14_KNOWN_FLAGS;flags++) {
         unsigned int effective=s14_effective_flags(flags);
         REQUIRE(!(effective&S14_LIMIT_HINT) || (effective&S14_WALL_LIMIT));
         REQUIRE(!(flags&S14_MASTER)?effective==0:1);
@@ -73,6 +80,23 @@ int main(void) {
     wcscpy(ui.ini,ini); wcscpy(ui.root,root); wcscpy(ui.status,L"游戏已接入 · 开关从下一次检查起生效");
     ui.game_found=ui.installed=ui.attached=1;
     REQUIRE(s14_manager_create(&ui,GetModuleHandleW(NULL),NULL,1));
+    unsigned int previous_requested=ui.requested,previous_effective=ui.effective;
+    ui.requested=S14_MASTER|S14_AUTO_SEARCH;ui.effective=S14_MASTER;
+    ui.search_state=S14_SEARCH_WAITING;REQUIRE(!wcscmp(s14_manager_mod_status(&ui,S14_MOD_SEARCH),L"等待载入"));
+    ui.search_state=S14_SEARCH_CONTEXT_PAUSED;REQUIRE(!wcscmp(s14_manager_mod_status(&ui,S14_MOD_SEARCH),L"等待匹配"));
+    ui.search_state=S14_SEARCH_STOPPED;REQUIRE(!wcscmp(s14_manager_mod_status(&ui,S14_MOD_SEARCH),L"异常停用"));
+    ui.search_state=S14_SEARCH_UNAVAILABLE;REQUIRE(!wcscmp(s14_manager_mod_status(&ui,S14_MOD_SEARCH),L"入口不兼容"));
+    ui.search_state=S14_SEARCH_MATCHED;ui.effective|=S14_AUTO_SEARCH;REQUIRE(!wcscmp(s14_manager_mod_status(&ui,S14_MOD_SEARCH),L"已开启"));
+    ui.requested=S14_AUTO_SEARCH;REQUIRE(!wcscmp(s14_manager_mod_status(&ui,S14_MOD_SEARCH),L"总开关关闭"));
+    ui.requested=S14_MASTER;REQUIRE(!wcscmp(s14_manager_mod_status(&ui,S14_MOD_SEARCH),L"已关闭"));
+    ui.requested=previous_requested;ui.effective=previous_effective;
+    wchar_t runtime_folder[MAX_PATH],runtime_file[MAX_PATH];
+    REQUIRE(s14_join(runtime_folder,root,L"SAN14ModManager") && CreateDirectoryW(runtime_folder,NULL));
+    s14_publish_search_runtime(root,S14_SEARCH_CONTEXT_PAUSED,3,4,L"等待玩家势力重新匹配");
+    int read_state=-1,read_force=-1,read_group=-1;wchar_t read_detail[192];
+    s14_read_search_runtime(root,&read_state,&read_force,&read_group,read_detail);
+    REQUIRE(read_state==S14_SEARCH_CONTEXT_PAUSED && read_force==3 && read_group==4 && !wcscmp(read_detail,L"等待玩家势力重新匹配"));
+    REQUIRE(s14_join(runtime_file,runtime_folder,L"runtime.ini") && DeleteFileW(runtime_file) && RemoveDirectoryW(runtime_folder));
     REQUIRE(GetForegroundWindow()==foreground && !IsWindowVisible(ui.window));
     REQUIRE(s14_views_setting_read(ini) && ui.views_enabled);
     REQUIRE(s14_manager_hit(&ui,(POINT){776,250})==10);
@@ -97,13 +121,34 @@ int main(void) {
     REQUIRE(s14_manager_activate(&ui,40) && !ui.officers_enabled);REQUIRE(GetPrivateProfileIntW(L"Views",L"Officers",1,ini)==0);
     REQUIRE(s14_manager_activate(&ui,40) && ui.officers_enabled);REQUIRE(s14_manager_view_enabled(&ui,0));
     REQUIRE(s14_manager_activate(&ui,43) && !ui.native_stats_enabled);REQUIRE(!s14_manager_view_enabled(&ui,1));
+    REQUIRE(ui.native_army_enabled && s14_manager_view_enabled(&ui,2));
+    REQUIRE(s14_manager_activate(&ui,46) && !ui.native_army_enabled && !s14_manager_view_enabled(&ui,2));
+    REQUIRE(GetPrivateProfileIntW(L"Views",L"NativeArmyValues",1,ini)==0);
     REQUIRE(s14_manager_activate(&ui,44) && !ui.views_enabled);REQUIRE(!s14_views_setting_read(ini));
     REQUIRE(!s14_manager_view_enabled(&ui,0) && !s14_manager_view_enabled(&ui,1));
     REQUIRE(ui.officers_enabled && !ui.native_stats_enabled); // Parent off preserves individual preferences.
     REQUIRE(s14_manager_activate(&ui,43) && ui.native_stats_enabled);REQUIRE(!s14_manager_view_enabled(&ui,1));
     REQUIRE(s14_manager_activate(&ui,44) && ui.views_enabled);REQUIRE(s14_manager_view_enabled(&ui,0) && s14_manager_view_enabled(&ui,1));
+    REQUIRE(!ui.native_army_enabled && !s14_manager_view_enabled(&ui,2));
+    REQUIRE(s14_manager_activate(&ui,46) && ui.native_army_enabled && s14_manager_view_enabled(&ui,2));
     REQUIRE(GetPrivateProfileIntW(L"Views",L"Officers",0,ini)==1 && GetPrivateProfileIntW(L"Views",L"NativeOfficerStats",0,ini)==1);
     REQUIRE(GetPrivateProfileIntW(L"Views",L"Enabled",0,ini)==1);
+    REQUIRE(s14_manager_activate(&ui,14) && s14_manager_mod_enabled(&ui,S14_MOD_CAO_REN_BUFF));
+    REQUIRE(ui.visual_settings==15 && s14_visual_settings_read(ini)==15);
+    REQUIRE(s14_manager_activate(&ui,47) && ui.visual_settings==14);
+    REQUIRE(s14_manager_activate(&ui,48) && ui.visual_settings==12);
+    REQUIRE(s14_manager_activate(&ui,14) && !(ui.effective&S14_CAO_REN_BUFF) && ui.visual_settings==12);
+    REQUIRE(s14_manager_activate(&ui,47) && ui.visual_settings==13 && !(ui.effective&S14_CAO_REN_BUFF));
+    REQUIRE(s14_manager_activate(&ui,14) && (ui.effective&S14_CAO_REN_BUFF) && ui.visual_settings==13);
+    REQUIRE(s14_manager_activate(&ui,48) && ui.visual_settings==15);
+    REQUIRE(s14_manager_activate(&ui,84));ui.scroll=9999;s14_manager_refresh(&ui);
+    y=s14_manager_mod_top(&ui,S14_MOD_CAO_REN_BUFF);
+    REQUIRE(s14_manager_hit(&ui,(POINT){776,y+100})==47 && s14_manager_hit(&ui,(POINT){776,y+170})==48);
+    preview(&ui,"manager-map-effects.bmp");
+    ui.focus=14;SendMessageW(ui.window,WM_KEYDOWN,VK_TAB,0);REQUIRE(ui.focus==47);
+    SendMessageW(ui.window,WM_KEYDOWN,VK_TAB,0);REQUIRE(ui.focus==48);
+    REQUIRE(s14_manager_activate(&ui,84));ui.scroll=0;s14_manager_refresh(&ui);
+    REQUIRE(s14_manager_activate(&ui,14) && !s14_manager_mod_enabled(&ui,S14_MOD_CAO_REN_BUFF));
     REQUIRE(s14_manager_activate(&ui,41) && !ui.battle_enabled && !s14_battle_setting_read(ini));
     REQUIRE(s14_manager_activate(&ui,41) && ui.battle_enabled && s14_battle_setting_read(ini));
     preview(&ui,"manager-mod-views.bmp");
@@ -123,6 +168,7 @@ int main(void) {
     REQUIRE(clipped>=S14_MOD_LIST_BOTTOM && s14_manager_hit(&ui,(POINT){776,clipped+30})==0);
     REQUIRE(GetWindowLongPtrW(ui.mod_scrollbar,GWL_STYLE)&WS_VISIBLE);
     SendMessageW(ui.window,WM_VSCROLL,SB_BOTTOM,(LPARAM)ui.mod_scrollbar);REQUIRE(ui.scroll>0);
+    ui.focus=221;SendMessageW(ui.window,WM_KEYDOWN,VK_TAB,0);REQUIRE(ui.focus==42);
     y=s14_manager_mod_top(&ui,S14_MOD_SEARCH);int report_y=y+76+277;
     REQUIRE(report_y>=S14_MOD_LIST_TOP && report_y<S14_MOD_LIST_BOTTOM);
     REQUIRE(s14_manager_hit(&ui,(POINT){100,report_y})==42 && s14_manager_activate(&ui,42) && ui.report_requested);
@@ -132,8 +178,21 @@ int main(void) {
     preview(&ui,"manager-auto-search.bmp");
     ui.focus=10;SendMessageW(ui.window,WM_KEYDOWN,VK_TAB,0);REQUIRE(ui.focus==81);
     REQUIRE(s14_manager_mod_top(&ui,S14_MOD_SEARCH)>=S14_MOD_LIST_TOP); // Keyboard focus reveals scrolled row.
-    REQUIRE(s14_manager_activate(&ui,81));ui.scroll=9999;s14_manager_refresh(&ui);REQUIRE(ui.scroll==0);
-    REQUIRE(!(GetWindowLongPtrW(ui.mod_scrollbar,GWL_STYLE)&WS_VISIBLE));
+    REQUIRE(s14_manager_activate(&ui,81));ui.scroll=9999;s14_manager_refresh(&ui);
+    REQUIRE(ui.scroll>0 && (GetWindowLongPtrW(ui.mod_scrollbar,GWL_STYLE)&WS_VISIBLE));
+    REQUIRE(s14_manager_mod_top(&ui,S14_MOD_TROOPS)+76<=S14_MOD_LIST_BOTTOM);
+    REQUIRE(s14_manager_activate(&ui,15) && !s14_manager_mod_enabled(&ui,S14_MOD_TROOPS));
+    REQUIRE(s14_manager_activate(&ui,15) && s14_manager_mod_enabled(&ui,S14_MOD_TROOPS));
+    REQUIRE(!s14_manager_mod_enabled(&ui,S14_MOD_AI_AFFIX) && (ui.visual_settings&12)==12);
+    REQUIRE(s14_manager_activate(&ui,87));REQUIRE(s14_manager_activate(&ui,16) && s14_manager_mod_enabled(&ui,S14_MOD_AI_AFFIX));
+    ui.focus=16;SendMessageW(ui.window,WM_KEYDOWN,VK_TAB,0);REQUIRE(ui.focus==49);
+    SendMessageW(ui.window,WM_KEYDOWN,VK_TAB,0);REQUIRE(ui.focus==50);
+    REQUIRE(s14_manager_activate(&ui,49) && !(ui.visual_settings&4) && (ui.visual_settings&8));
+    REQUIRE(s14_manager_activate(&ui,16) && !s14_manager_mod_enabled(&ui,S14_MOD_AI_AFFIX));
+    REQUIRE(s14_manager_activate(&ui,16) && !(ui.visual_settings&4));
+    REQUIRE(s14_manager_activate(&ui,49) && (ui.visual_settings&12)==12);
+    preview(&ui,"manager-ai-affix.bmp");
+    REQUIRE(s14_manager_activate(&ui,16) && !s14_manager_mod_enabled(&ui,S14_MOD_AI_AFFIX));
     REQUIRE(s14_manager_activate(&ui,101) && ui.tab==1);
     REQUIRE(!s14_manager_activate(&ui,31) && !s14_manager_activate(&ui,32) && !s14_manager_activate(&ui,34));
     REQUIRE(s14_manager_hit(&ui,(POINT){100,512})==35 && s14_manager_activate(&ui,35) && check_count==1);
@@ -152,10 +211,10 @@ int main(void) {
     ui.scale=192;HFONT *fonts[]={&ui.title_font,&ui.body_font,&ui.small_font};
     for(int i=0;i<3;i++){LOGFONTW font;REQUIRE(GetObjectW(*fonts[i],sizeof(font),&font));font.lfHeight*=2;DeleteObject(*fonts[i]);*fonts[i]=CreateFontIndirectW(&font);REQUIRE(*fonts[i]);}
     REQUIRE(s14_manager_hit(&ui,(POINT){200,910})==34);preview(&ui,"manager-install-2x.bmp");
-    ui.tab=0;ui.expanded=1;REQUIRE(s14_manager_hit(&ui,(POINT){1552,630})==11);preview(&ui,"manager-mods-2x.bmp");
+    ui.tab=0;ui.expanded=1;ui.scroll=0;REQUIRE(s14_manager_hit(&ui,(POINT){1552,630})==11);preview(&ui,"manager-mods-2x.bmp");
     GetPrivateProfileStringW(L"Future",L"UnknownFeature",L"",value,32,ini);REQUIRE(!wcscmp(value,L"keep-me"));
     s14_manager_destroy(&ui); REQUIRE(GetForegroundWindow()==foreground);
     REQUIRE(DeleteFileW(ini)); REQUIRE(RemoveDirectoryW(root));
-    printf("{\"config_roundtrip\":true,\"search_settings\":true,\"search_controls\":true,\"unknown_keys_preserved\":true,\"master_off_on\":true,\"dependency_preserves_preference\":true,\"all_flag_combinations\":32,\"ui_live_callbacks\":%d,\"cleanup_callback\":%d,\"rendered_views\":7,\"manager_tabs\":[\"mods\",\"settings\"],\"expandable_mod_list\":true,\"stable_mod_sort\":true,\"child_preferences_preserved\":true,\"views_parent_runtime_gate\":true,\"scroll_and_keyboard_reveal\":true,\"dpi_scales\":[96,192],\"game_process_touched\":false}\n",callback_count,clean_count);
+    printf("{\"config_roundtrip\":true,\"search_settings\":true,\"search_controls\":true,\"unknown_keys_preserved\":true,\"master_off_on\":true,\"dependency_preserves_preference\":true,\"all_flag_combinations\":256,\"ui_live_callbacks\":%d,\"cleanup_callback\":%d,\"rendered_views\":7,\"manager_tabs\":[\"mods\",\"settings\"],\"expandable_mod_list\":true,\"stable_mod_sort\":true,\"child_preferences_preserved\":true,\"views_parent_runtime_gate\":true,\"scroll_and_keyboard_reveal\":true,\"dpi_scales\":[96,192],\"game_process_touched\":false}\n",callback_count,clean_count);
     return 0;
 }

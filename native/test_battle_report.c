@@ -60,6 +60,14 @@ int main(void) {
     s14_turn_report_reset();s14_turn_report_battle(100,110,L"旧回合战斗");s14_turn_report_search(110,120,L"新回合搜索");
     assert(s14_turn_report_take(GetTickCount64()+300,&s,&b));assert(wcsstr(s,L"新回合搜索") && !wcsstr(b,L"旧回合战斗"));
     s14_turn_report_data(&sv,&bv);assert(!sv&&!bv);
+    // Exploration and combat must share the player's actual force, including
+    // the force-10 / group-8 layout observed in the user's current campaign.
+    s14_turn_report_reset();begin(3,75159,10);
+    S14ReportSearchLine matched_lines[2]={{.type=4,.text=L"成宜 → 三水：获得金钱 85"},{.type=1,.text=L"韩遂 → 翼县：发现武将"}};
+    S14ReportSearch matched={.start=75159,.end=75160,.force=10,.available=1,.money=301,.people=2,.completed=20,.line_count=2,.lines=matched_lines};
+    s14_turn_report_search(matched.start,matched.end,L"完成 20 次 · 金钱 301 · 武将 2");s14_turn_report_search_data(&matched);end(3,75160,10,0);
+    assert(s14_turn_report_take(GetTickCount64()+300,&s,&b));s14_turn_report_data(&sv,&bv);
+    assert(sv && bv && sv->force==10 && bv->force==10 && sv->money==301 && sv->people==2 && sv->completed==20 && sv->line_count==2);
     s14_battle_round_reset();s14_turn_report_reset();
-    printf("{\"status\":\"passed\",\"own_force_filter\":true,\"duplicate_and_out_of_order_ids\":true,\"initial_load_no_popup\":true,\"round_reset\":true,\"exploration_battle_same_round\":true,\"foreign_battle_excluded\":true,\"unknown_fire_source_preserved\":true,\"wounded_absorption_separate\":true,\"rout_and_injury_outcomes\":true,\"load_and_rollback_cancel\":true,\"partial_capture_warning\":true}\n");return 0;
+    printf("{\"status\":\"passed\",\"own_force_filter\":true,\"duplicate_and_out_of_order_ids\":true,\"initial_load_no_popup\":true,\"round_reset\":true,\"actual_player_force_report_merge\":true,\"exploration_battle_same_round\":true,\"foreign_battle_excluded\":true,\"unknown_fire_source_preserved\":true,\"wounded_absorption_separate\":true,\"rout_and_injury_outcomes\":true,\"load_and_rollback_cancel\":true,\"partial_capture_warning\":true}\n");return 0;
 }

@@ -13,6 +13,12 @@ static unsigned int mock_handle,allocated_maps,freed_maps,lists_created,lists_de
 static unsigned int people_handle=2;
 static int mock_day=100,mock_cost=2,mock_candidates=3,seen_settings;
 static int result_mode,log_calls,outcome_calls,progress_calls;
+static unsigned char mock_foreign_group[32],mock_second_group[32];
+static int primary_group=1;
+static void* player_group(void *settings) {
+    assert(settings==mock_settings);
+    return ((void**)(mock_world+0xde40))[primary_group];
+}
 typedef void (*PublishTarget)(void*,void*);
 static PublishTarget publish_target;
 static void jump_to(size_t rva,void *function) {
@@ -64,13 +70,13 @@ static int iterator_valid(CityIterator *it,void **slot) {
     return ((unsigned char*)*slot)[0x20]==it->force;
 }
 static void* iterator_start(void *data,CityIterator *it) {
-    assert(data==mock_data); *it=(CityIterator){mock_iterator_vt,mock_city_list,mock_city_list+52,1,0};
+    assert(data==mock_data); *it=(CityIterator){mock_iterator_vt,mock_city_list,mock_city_list+52,mock_settings[0x3a],0};
     while (it->current!=it->end && !iterator_valid(it,it->current)) it->current++;
     return it;
 }
 static void* city_owner(void *city) { return city; }
 static int city_force(unsigned char *city) { return city[0x20]; }
-static int data_force(void *data) { assert(data==mock_data); return 1; }
+static int data_force(void *data) { assert(data==mock_data); return mock_settings[0x3a]; }
 static int distance(void *a,void *b) { assert(a!=b); return 4; }
 static int travel(int days,void *person,void *data) { assert(days==4 && !person && data==mock_data); return 3; }
 static void* map_create(RouteMap *map) {
@@ -149,6 +155,9 @@ int main(int argc,char **argv) {
     *(void**)(mock_world+0x85130)=mock_settings; mock_settings[0x3a]=1;
     *(void**)(mock_image+0x1fc91d0)=mock_world;
     ((void**)(mock_world+0xde40))[1]=mock_force; ((void**)(mock_world+0xdca0))[1]=mock_data; mock_force[0x10]=1; mock_force[0x14]=5;
+    *(uintptr_t*)mock_force=base_address+0x129fec8;
+    *(uintptr_t*)mock_foreign_group=*(uintptr_t*)mock_second_group=base_address+0x129fec8;
+    mock_foreign_group[0x10]=2;mock_second_group[0x10]=1;
     *(void***)(mock_image+0x201c360)=mock_heads; *(uintptr_t**)(mock_image+0x201c378)=mock_counts; *(unsigned int*)(mock_image+0x201c390)=8;
     mock_city_vt[16]=(uintptr_t)city_owner; mock_iterator_vt[1]=(uintptr_t)iterator_valid;
     // These mock virtual methods must lie in the bounded synthetic image, too.
@@ -156,6 +165,8 @@ int main(int argc,char **argv) {
     jump_to(0x1020,iterator_valid); mock_iterator_vt[1]=base_address+0x1020;
     jump_to(0x1100,city_force); mock_city_vt[22]=base_address+0x1100;
     jump_to(0x1120,data_force); mock_data_vt[12]=base_address+0x1120; *(uintptr_t**)mock_data=mock_data_vt;
+    memcpy(mock_image+0x129fe58,mock_data_vt,sizeof(mock_data_vt));*(void**)mock_data=mock_image+0x129fe58;
+    jump_to(0x2f1fc0,player_group);
     for (int i=0;i<52;i++) {
         *(uintptr_t**)mock_cities[i]=mock_city_vt; mock_cities[i][0x11]=1;
         mock_cities[i][0x20]=(i==1 || i==50)?1:2; mock_city_list[i]=mock_cities[i];
@@ -258,7 +269,63 @@ int main(int argc,char **argv) {
     unsigned int before_lists=lists_created; other(0); assert(lists_created==before_lists);
     accepted(0); assert(lists_created==before_lists+1); accepted(0); assert(lists_created==before_lists+1);
     current_user_state=NULL; mock_day=150; accepted(0); assert(lists_created==before_lists+1 && progress_calls==4);
+    // New campaigns may assign completely different force and group IDs.
+    // The original player selector, not array-index equality, owns selection.
+    unsigned char strategy[0x480]={0};
+    memset(&guard,0,sizeof(guard));mock_day=160;mock_settings[0x3a]=3;
+    ((void**)(mock_world+0xde40))[1]=NULL;
+    ((void**)(mock_world+0xde40))[3]=mock_foreign_group;
+    ((void**)(mock_world+0xde40))[4]=mock_force;
+    ((void**)(mock_world+0xde40))[5]=mock_second_group;
+    ((void**)(mock_world+0xdca0))[3]=mock_data;
+    mock_force[0x10]=mock_second_group[0x10]=3;primary_group=4;
+    mock_cities[1][0x20]=mock_cities[50][0x20]=3;
+    assert(((unsigned char**)(mock_world+0xde40))[3][0x10]!=mock_settings[0x3a]);
+    planning(strategy);int force_id=0,group_id=0;
+    assert(s14_search_state(&force_id,&group_id)==S14_SEARCH_MATCHED && force_id==3 && group_id==4);
+    unsigned int previous_lists=lists_created;dispatch_search();assert(lists_created==previous_lists+1);
+    assert(latest_begin().force==3);dispatch_search();assert(lists_created==previous_lists+1);
+    unsigned char command_manager[32]={0},pending_commands[3][64]={{0}};
+    unsigned int commands_handle=3;void *pending_nodes[3][2];
+    *(void**)(mock_world+0x85128)=command_manager;*(void**)(command_manager+0x18)=&commands_handle;
+    mock_heads[commands_handle]=pending_nodes[0];mock_counts[commands_handle]=3;
+    for(int i=0;i<3;i++){
+        *(uintptr_t*)pending_commands[i]=base_address+0x129bf20;pending_commands[i][0x28]=(unsigned char)(3+i);
+        pending_nodes[i][0]=pending_commands[i];pending_nodes[i][1]=i==2?NULL:pending_nodes[i+1];
+    }
+    assert(pending_searches(mock_world,3)==2 && pending_searches(mock_world,2)==1);
+    // Results from our other group are included; another force is excluded.
+    command[0x28]=5;result_mode=3;before=queue_sequence;
+    assert(hooked_execute(command)==29 && queue_sequence==before+1);
+    assert(queue[(unsigned int)queue_sequence%QSIZE].event.force==3);
+    command[0x28]=3;before=queue_sequence;assert(hooked_execute(command)==29 && queue_sequence==before);
+    // Same-force, same-day loads can reuse both pointers. A successful native
+    // load epoch resets de-duplication even without pointer/date changes.
+    last_session_epoch=s14_battle_session_epoch()-1;
+    planning(strategy);previous_lists=lists_created;dispatch_search();assert(lists_created==previous_lists+1);
+    dispatch_search();assert(lists_created==previous_lists+1);
+    // Recover a context mismatch after validation, without toggling/restarting.
+    primary_group=3;mock_day=170;planning(strategy);
+    assert(search_fault==2 && s14_search_state(NULL,NULL)==S14_SEARCH_CONTEXT_PAUSED);
+    previous_lists=lists_created;dispatch_search();assert(lists_created==previous_lists);
+    primary_group=4;planning(strategy);assert(!search_fault && s14_search_is_ready());
+    dispatch_search();assert(lists_created==previous_lists+1);
+    // Every supported force ID can use a different group-table index.
+    for(int id=1;id<=51;id++){
+        int selected=(id+17)%51+1;mock_settings[0x3a]=(unsigned char)id;
+        mock_force[0x10]=(unsigned char)id;((void**)(mock_world+0xdca0))[id]=mock_data;
+        memset(mock_world+0xde40,0,52*8);((void**)(mock_world+0xde40))[selected]=mock_force;primary_group=selected;
+        unsigned char *matched=NULL;void *owned=NULL;int group=-1;
+        assert(player_binding(mock_world,mock_settings,id,&matched,&owned,&group));
+        assert(matched==mock_force && owned==mock_data && group==selected && group!=id);
+    }
+    unsigned char *matched=NULL;void *invalid_data=NULL;int group=-1;
+    assert(!player_binding(mock_world,mock_settings,0,&matched,&invalid_data,&group));
+    assert(!player_binding(mock_world,mock_settings,52,&matched,&invalid_data,&group));
+    // A new save must never clear a fatal native/scratch/queue fault.
+    fail(L"synthetic fatal fault");last_session_epoch=s14_battle_session_epoch()-1;planning(strategy);
+    assert(search_fault==1 && s14_search_state(NULL,NULL)==S14_SEARCH_STOPPED);
     assert(allocated_maps==freed_maps && lists_created==lists_destroyed && !*table_slot);scratch_restored();
     VirtualFree(mock_image,0,MEM_RELEASE); free(mock_world); free(mock_settings);
-    printf("{\"native_dispatch_mock\":true,\"confirmed_progress_provenance\":true,\"native_route_cache\":true,\"settings_abi\":true,\"native_rejection\":true,\"remaining_orders\":true,\"no_candidate\":true,\"cleanup_balanced\":true,\"feature_off\":true,\"invalid_cost_stops_search\":true,\"four_result_callbacks\":true,\"native_log_12_arguments\":true,\"native_log_full_width_return\":true,\"original_returns_preserved\":true,\"ai_faction_excluded\":true,\"city_predicate_two_arguments\":true,\"foreign_city_filter\":true,\"empty_city_iterator\":true,\"target_table_indirection\":true,\"target_table_last_person\":true,\"existing_table_preserved\":true,\"unwritable_table_rejected\":true,\"person_scratch_restored\":true,\"private_native_iterator_fixture\":%s,\"private_native_target_store\":%s,\"game_process_touched\":false}\n",native_fixture?"true":"false",native_fixture?"true":"false"); return 0;
+    printf("{\"supported_force_ids_tested\":51,\"pending_search_group_mapping\":true,\"adaptive_player_force\":true,\"distinct_force_group_ids\":true,\"multi_group_result_ownership\":true,\"same_day_load_resets_guard\":true,\"context_recovers_after_validation\":true,\"fatal_fault_not_cleared\":true,\"native_dispatch_mock\":true,\"confirmed_progress_provenance\":true,\"native_route_cache\":true,\"settings_abi\":true,\"native_rejection\":true,\"remaining_orders\":true,\"no_candidate\":true,\"cleanup_balanced\":true,\"feature_off\":true,\"invalid_cost_stops_search\":true,\"four_result_callbacks\":true,\"native_log_12_arguments\":true,\"native_log_full_width_return\":true,\"original_returns_preserved\":true,\"ai_faction_excluded\":true,\"city_predicate_two_arguments\":true,\"foreign_city_filter\":true,\"empty_city_iterator\":true,\"target_table_indirection\":true,\"target_table_last_person\":true,\"existing_table_preserved\":true,\"unwritable_table_rejected\":true,\"person_scratch_restored\":true,\"private_native_iterator_fixture\":%s,\"private_native_target_store\":%s,\"game_process_touched\":false}\n",native_fixture?"true":"false",native_fixture?"true":"false"); return 0;
 }

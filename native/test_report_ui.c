@@ -31,6 +31,11 @@ int wmain(int argc,wchar_t **argv){
     click(&ui,ui.done);assert(!ui.visible&&!IsWindowVisible(ui.window));s14_report_ui_tick(&ui,1);assert(!IsWindowVisible(ui.window));assert(s14_report_ui_reopen(&ui));assert(IsWindowVisible(ui.window));s14_report_ui_tick(&ui,0);assert(!IsWindowVisible(ui.window));s14_report_ui_tick(&ui,1);assert(IsWindowVisible(ui.window));
     assert(fonts(&ui,192));ui.width=2200;ui.height=1580;ui.scroll=ui.expanded=0;layout(&ui);paint(&ui,"native-turn-cards-dpi192.bmp");assert(ui.columns==3);
     assert(fonts(&ui,96));ui.width=520;ui.height=720;layout(&ui);paint(&ui,"native-turn-cards-narrow.bmp");assert(ui.columns==1);assert(card_rect(&ui,2).right<=ui.width);
-    s14_report_ui_clear(&ui);assert(!ui.search_data.available&&!ui.battle.available&&!s14_report_ui_reopen(&ui));assert(GetForegroundWindow()!=ui.window&&GetForegroundWindow()!=owner);s14_report_ui_destroy(&ui);DestroyWindow(owner);
-    printf("{\"status\":\"passed\",\"single_page_no_tabs\":true,\"pinned_exploration\":true,\"typed_exploration_details\":true,\"officer_details\":true,\"manual_close_and_reopen\":true,\"full_record_scroll\":true,\"own_defeat_capture_breakthrough_styles\":true,\"immutable_snapshot\":true,\"scale_96_192\":true,\"narrow_layout\":true,\"load_reset_clears_report\":true,\"no_game_process_calls\":true}\n");return 0;
+    s14_report_ui_clear(&ui);assert(!ui.search_data.available&&!ui.battle.available&&!s14_report_ui_reopen(&ui));
+    s.force=10;s.money=301;s.people=2;s.completed=20;b.force=10;
+    assert(s14_report_ui_show(&ui,instance,owner,0,root,&s,&b));
+    assert(ui.search_data.available && ui.search_data.money==301 && ui.search_data.people==2 && ui.battle.force==10);
+    b.force=12;assert(s14_report_ui_show(&ui,instance,owner,0,root,&s,&b));assert(!ui.search_data.available);
+    s14_report_ui_clear(&ui);assert(GetForegroundWindow()!=ui.window&&GetForegroundWindow()!=owner);s14_report_ui_destroy(&ui);DestroyWindow(owner);
+    printf("{\"status\":\"passed\",\"single_page_no_tabs\":true,\"pinned_exploration\":true,\"actual_force_exploration_retained\":true,\"foreign_force_exploration_rejected\":true,\"typed_exploration_details\":true,\"officer_details\":true,\"manual_close_and_reopen\":true,\"full_record_scroll\":true,\"own_defeat_capture_breakthrough_styles\":true,\"immutable_snapshot\":true,\"scale_96_192\":true,\"narrow_layout\":true,\"load_reset_clears_report\":true,\"no_game_process_calls\":true}\n");return 0;
 }

@@ -57,12 +57,18 @@ static void refresh(S14ManagerUI *ui,int check_directory) {
     ui->officers_enabled=GetPrivateProfileIntW(L"Views",L"Officers",1,ui->ini)!=0;
     ui->views_enabled=s14_views_setting_read(ui->ini);
     ui->native_stats_enabled=GetPrivateProfileIntW(L"Views",L"NativeOfficerStats",1,ui->ini)!=0;
+    ui->native_army_enabled=GetPrivateProfileIntW(L"Views",L"NativeArmyValues",1,ui->ini)!=0;
+    ui->visual_settings=s14_visual_settings_read(ui->ini);
     ui->battle_enabled=s14_battle_setting_read(ui->ini);
     s14_search_report_read(ui->root,ui->search_summary,ui->search_details);
     unsigned int applied=0; int fault=0; ui->attached=s14_read_runtime(ui->root,&applied,&fault); ui->fault=fault;
     ui->effective=s14_effective_flags(ui->requested);
+    if(ui->attached){
+        ui->effective=applied;
+        s14_read_search_runtime(ui->root,&ui->search_state,&ui->search_force,&ui->search_group,ui->search_status);
+    }else{ui->effective=0;ui->search_state=S14_SEARCH_WAITING;ui->search_force=ui->search_group=0;ui->search_status[0]=0;}
     if (ui->attached && fault) wcscpy(ui->status,s14_fault_message(fault));
-    else if (ui->attached) wcscpy(ui->status,applied==ui->effective?L"游戏已连接 · 当前设置已生效":L"设置已保存 · 等待游戏应用");
+    else if (ui->attached) wcscpy(ui->status,(ui->requested&S14_AUTO_SEARCH) && ui->search_state==S14_SEARCH_STOPPED?L"游戏已连接 · 自动搜索异常停用，请展开查看原因":L"游戏已连接 · 已显示实际生效状态");
     else if (ui->running) wcscpy(ui->status,L"游戏正在运行 · 尚未连接此版本管理器，更新后需要重启");
     else wcscpy(ui->status,L"游戏未运行 · 设置将在下次启动时载入");
     s14_manager_refresh(ui);

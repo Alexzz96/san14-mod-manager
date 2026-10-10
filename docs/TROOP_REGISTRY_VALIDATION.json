@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-09",
+  "scope": "plugin_troop_registry_and_xianzhen_definition",
+  "publication": "local_only",
+  "native_build": "passed",
+  "python_tests": {
+    "passed": 30,
+    "new_catalog_tests": 15
+  },
+  "native_registry": {
+    "status": "passed",
+    "registry_capacity": 256,
+    "beyond_native_21": true,
+    "duplicate_rejected": true,
+    "sealed_readers": true,
+    "deep_copy": true,
+    "commander_scoped": true,
+    "explicit_selection_required": true,
+    "unlocked_required": true,
+    "extra_gold_ceiling": true,
+    "no_funds_deducted": true,
+    "plan_no_compounding": true,
+    "pending_effects_not_applied": true,
+    "invalid_inputs_rejected": true,
+    "gameplay_integrated": false,
+    "compiled_catalog_matches_definition": true,
+    "extra_game_hooks": 0
+  },
+  "manifest_sha256": "300ac0c5dbfdbc53662e2d9c00f4f5de175f04d778005a4cca158cd4780b51c4",
+  "browser_preview": {
+    "exclusive_commander": true,
+    "locked_selection": true,
+    "insufficient_gold": true,
+    "ceil_1000_soldiers": true,
+    "attribute_calculation": true
+  },
+  "gameplay_integrated": false,
+  "installed": false,
+  "github_uploaded": false
+}

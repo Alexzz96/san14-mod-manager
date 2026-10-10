@@ -36,6 +36,7 @@ static BattleEvent *last_kind(int k) {
     return result;
 }
 int main(int argc,char **argv) {
+    SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);
     assert(argc==2);
     mock_image=VirtualAlloc(NULL,0x1900000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE);assert(mock_image);
     mock_g=calloc(1,0x85200);mock_settings=calloc(1,0x50);mock_armies=calloc(501,512);mock_people=calloc(2,0x220);
@@ -50,7 +51,8 @@ int main(int argc,char **argv) {
     }
     *(uintptr_t*)group_own=*(uintptr_t*)group_enemy=battle_base+0x129fec8;group_own[0x10]=1;group_enemy[0x10]=2;
     *(void**)(mock_g+0xde40+3*8)=group_own;*(void**)(mock_g+0xde40+4*8)=group_own;*(void**)(mock_g+0xde40+5*8)=group_enemy;
-    mock_people[0x118]=3;mock_people[0x220+0x118]=5;battle_force=3;
+    // Player settings use actual force 1; person fields use group IDs 3/5.
+    mock_people[0x118]=3;mock_people[0x220+0x118]=5;battle_force=1;
     assert(battle_actual_force((uintptr_t)mock_g,3)==1 && battle_actual_force((uintptr_t)mock_g,4)==1 && battle_actual_force((uintptr_t)mock_g,5)==2);
     int percent=15;float divisor=100.f;memcpy(mock_image+0x18ebb8c,&percent,4);memcpy(mock_image+0x123ea5c,&divisor,4);
     original_troops=damage_with_rate;original_wound_rate=rate;original_abnormal=abnormal;

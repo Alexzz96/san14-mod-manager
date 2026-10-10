@@ -14,7 +14,7 @@ static uintptr_t load_reader(void *data,int slot,void *name) {
     assert(data==archive_data && slot==7 && name==(void*)sentinel && GetLastError()==1234);archive_name("svdexSC00.s14");SetLastError(777);return 0;
 }
 static uintptr_t load_game(void *world,int slot,void *name) {
-    assert(world==mock_g && slot==7 && name==(void*)sentinel && GetLastError()==1234 && !s14_battle_enabled());native_loads++;
+    assert(world==mock_g && slot==7 && name==(void*)sentinel && GetLastError()==1234 && !s14_battle_enabled() && !s14_affix_active((uintptr_t)world,518));native_loads++;
     SetLastError(1234);assert(hooked_battle_load_reader(archive_data,slot,name)==0 && GetLastError()==777);
     mock_settings[0x36]=6;mock_settings[0x37]=1;SetLastError(777);return fail_load?0:1;
 }
@@ -32,10 +32,14 @@ int main(int argc,char **argv) {
     BattleEvent *e=latest(B_SAVE);assert(e && e->save_hash_valid && e->planning_day==94820 && !wcscmp(e->text,L"svdexSC00.s14"));
     unsigned char hash[32];memcpy(hash,e->save_hash,32);int count=queued();archive_name("configS_SC.s14");SetLastError(1234);assert(hooked_battle_save_commit(mock_g,archive_data)==0 && GetLastError()==777 && queued()==count);
     fail_save=1;archive_name("svdexSC00.s14");SetLastError(1234);assert(hooked_battle_save_commit(mock_g,archive_data)==sentinel && GetLastError()==777 && !latest(B_SAVE)->save_hash_valid);
+    s14_affix_configure(1);assert(s14_affix_publish((uintptr_t)mock_g,5000,1,1,0,94820,s14_affix_epoch(),0));assert(s14_affix_active((uintptr_t)mock_g,518));
     SetLastError(1234);assert(hooked_battle_load(mock_g,7,(void*)sentinel)==1 && GetLastError()==777 && s14_battle_enabled());e=latest(B_LOAD_END);
+    assert(s14_battle_session_epoch()==1 && !s14_battle_is_loading());
     assert(e && e->save_hash_valid && !memcmp(e->save_hash,hash,32) && e->planning_day==94830 && e->parent==latest(B_LOAD_BEGIN)->id);
     fail_load=1;SetLastError(1234);assert(hooked_battle_load(mock_g,7,(void*)sentinel)==0 && GetLastError()==777 && !latest(B_LOAD_END)->save_hash_valid && !battle_load_context && !battle_loading);
+    assert(s14_battle_session_epoch()==1);
     SetLastError(1234);assert(hooked_battle_new_game(mock_g,8)==1 && GetLastError()==777 && latest(B_NEW_GAME));
+    assert(s14_battle_session_epoch()==2 && !s14_battle_is_loading());
     s14_battle_worker(fixture_root);assert(!battle_fault && !battle_dropped);FlushFileBuffers(battle_file);CloseHandle(battle_file);
-    printf("{\"status\":\"passed\",\"written_events\":%lld,\"save_name_before_free\":true,\"successful_load_only\":true,\"failed_save_no_checkpoint\":true,\"load_mutes_combat\":true,\"file_digest_binding\":true,\"noncampaign_files_excluded\":true,\"last_error_preserved\":true}\n",(long long)battle_events);free(mock_g);free(mock_settings);return 0;
+    printf("{\"load_session_epoch\":true,\"failed_load_keeps_epoch\":true,\"status\":\"passed\",\"written_events\":%lld,\"save_name_before_free\":true,\"successful_load_only\":true,\"failed_save_no_checkpoint\":true,\"load_mutes_combat\":true,\"file_digest_binding\":true,\"noncampaign_files_excluded\":true,\"last_error_preserved\":true}\n",(long long)battle_events);free(mock_g);free(mock_settings);return 0;
 }

@@ -1,0 +1,82 @@
+#include <assert.h>
+#ifdef NDEBUG
+#error Assertions required
+#endif
+#define S14_ARMY_TEST
+#define S14_ARMY_BUFF_TEST
+#include "army_observer.c"
+#include "army_buff.c"
+#include "army_ui.c"
+#include <stdlib.h>
+typedef struct {uintptr_t at;unsigned char *data;size_t size;} Segment;
+static Segment segments[24];static int count,change;
+static unsigned char registry[128],controller[404],world_data[0x85200],dlg[0x330],tab[0x148],basic[0x178],person[512],army_pool[1024],formation[184],definition[224],head_node[16],table[8],pages[16],handle_data[4];
+static const uintptr_t base=0x140000000,world_addr=0x1000000,dlg_addr=0x2000000,page_addr=0x2100000,tab_addr=0x2200000,army_addr=0x2300200,person_addr=0x2400000;
+static void u64(unsigned char *p,int at,uintptr_t v){memcpy(p+at,&v,8);}static void u32(unsigned char *p,int at,unsigned int v){memcpy(p+at,&v,4);}static void u16(unsigned char *p,int at,unsigned short v){memcpy(p+at,&v,2);}
+static void add(uintptr_t at,void *p,size_t n){segments[count++]=(Segment){at,p,n};}
+static int fixture_read(void *unused,uintptr_t at,void *out,size_t n){(void)unused;for(int i=0;i<count;i++)if(at>=segments[i].at && at-segments[i].at<=segments[i].size && n<=segments[i].size-(at-segments[i].at)){memcpy(out,segments[i].data+at-segments[i].at,n);if(change && at==tab_addr && n==sizeof(tab)){u64(tab,0x140,0);change=0;}return 1;}return 0;}
+static void fixture(void){
+    count=0;memset(formation,0,sizeof(formation));memset(world_data,0,sizeof(world_data));memset(dlg,0,sizeof(dlg));memset(tab,0,sizeof(tab));memset(basic,0,sizeof(basic));memset(person,0,sizeof(person));memset(army_pool,0,sizeof(army_pool));
+    static uintptr_t world_ptr;world_ptr=world_addr;add(base+0x1fc91d0,&world_ptr,8);u64(registry,0x38,1);u64(registry,0x40,0x2500000);u32(registry,0x70,1);add(base+0x201c320,registry,128);
+    u64(controller,56,0x2501000);add(base+0x19e6390,controller,404);u32(handle_data,0,0);add(0x2501000,handle_data,4);u64(table,0,0x2502000);add(0x2500000,table,8);u64(head_node,0,dlg_addr);u64(head_node,8,0);add(0x2502000,head_node,16);
+    u64(dlg,0,base+0x137e970);u32(dlg,0x40,47);u64(dlg,0x2e0,tab_addr);int rect[]={191,147,1538,735};memcpy(dlg+0x20,rect,16);add(dlg_addr,dlg,sizeof(dlg));
+    u64(tab,0,base+0x1351680);u32(tab,0x40,15);u32(tab,0x138,2);u64(tab,0x140,army_addr);u64(tab,0x130,0x2503000);add(tab_addr,tab,sizeof(tab));u64(pages,0,page_addr);add(0x2503000,pages,16);
+    u64(basic,0,base+0x137ebf0);u64(basic,0x168,army_addr);add(page_addr,basic,sizeof(basic));unsigned char *army=army_pool+512;u64(army,0,base+0x123e288);army[16]=1;u16(army,18,518);u16(army,22,5387);u16(army,24,261);army[26]=130;army[28]=3;u16(army,42,100*220+100);add(army_addr-512,army_pool,1024);
+    u64(world_data,0x7df60,army_addr-512);u64(world_data,0x7df68,army_addr);u64(world_data,0x148+518*8,person_addr);add(world_addr,world_data,sizeof(world_data));u64(person,0,base+0x12a00d0);u16(person,16,518);memcpy(person+18,L"曹",4);memcpy(person+36,L"仁",4);person[0x124]=93;person[0x125]=87;u16(person,0x150,156);add(person_addr,person,512);
+    u64(world_data,0x76b58+3*8,0x2504000);memcpy(formation+0x10,L"重骑",6);u64(formation,0,base+0x12a0300);formation[0x83]=35;formation[0x84]=10;formation[0x85]=30;formation[0x7f]=25;formation[0x86]=20;add(0x2504000,formation,sizeof(formation));u64(world_data,0x7d440+156*8,0x2505000);u64(definition,0,base+0x12a0658);memcpy(definition+0x10,L"铁壁",6);memcpy(definition+0x3c,L"部队防御效果",14);add(0x2505000,definition,224);
+}
+static int base_calls,actual_calls,page_calls,factor_calls,extra_calls,aggregate_calls,ability_calls,policy_calls,strength_calls,area_calls,link_calls;
+static uintptr_t fake_aggregate(void *army,int zero,int *out,int mode,int flag){assert(army && zero==0 && mode==0 && flag==0);aggregate_calls++;memset(out,0,476);out[5]=6;out[19]=2;SetLastError(12345);return 0x1234567812345678ull;}
+static int fake_extra(void *army,int mode){assert(army && mode==0);extra_calls++;SetLastError(12345);return 1;}
+static int fake_ability(void *person,int index,int flags){assert(person && index==0 && flags==0xfff);ability_calls++;SetLastError(12345);return 93;}
+static int fake_strength(void *force,int id){assert(force && id==3);strength_calls++;SetLastError(12345);return 6;}
+static int fake_policy(void *army,void *formation_ptr){assert(army && !formation_ptr);policy_calls++;assert(strength_hook(army,3)==6);SetLastError(12345);return 130;}
+static float fake_area(void *tile,int force,int *out){assert(tile && force==7);area_calls++;*out=300;SetLastError(12345);return 2.5f;}
+static int fake_link(void *army,void *list){assert(army && list);link_calls++;SetLastError(12345);return 2;}
+static float fake_factor(void *army,void *city,int mode,int actual){
+    assert(army && !city && mode==1);factor_calls++;uintptr_t person=0,world=0;assert(read_at(image+0x1fc91d0,&world,8) && read_at(world+0x148+518*8,&person,8));
+    test_caller=image+0x27b306;assert(ability_hook((void*)person,0,0xfff)==93);test_caller=0;
+    if(actual){unsigned char tile[32]={0};u16(tile,0x12,112);int units;assert(area_hook(tile,7,&units)==2.5f && units==300);assert(link_hook(army,(void*)1)==2);}
+    SetLastError(12345);return actual?17.75f:12.25f;
+}
+static int fake_baseline(int *out,void *army,void *formation_ptr,int mode){assert(formation_ptr && mode==0);base_calls++;assert(factor_hook(army,NULL,1,0)==12.25f);test_caller=image+0x283ba9;assert(policy_hook(army,NULL)==130);test_caller=0;int values[]={1114,318,20,25,531};memcpy(out,values,20);SetLastError(12345);return 531;}
+static int attribute_calls;
+static float fake_attribute(float base,void *army,void *target,void *formation_ptr,int actual,int mode){assert(army && !target && formation_ptr && actual==1 && mode==0);attribute_calls++;SetLastError(12345);return base;}
+static int fake_actual(int *out,void *army,void *formation_ptr,int mode){assert(formation_ptr && mode==0);actual_calls++;assert(factor_hook(army,NULL,1,1)==17.75f);test_caller=image+0x283ba9;assert(policy_hook(army,NULL)==130);test_caller=image+0x283bfa;int mods[119];assert(aggregate_hook(army,0,mods,0,0)==0x1234567812345678ull);assert(extra_hook(army,0)==1);test_caller=0;int values[]={0,756,18,23,0};values[0]=(int)buff_attack_hook(2647.9f,army,NULL,formation_ptr,1,0);values[4]=(int)buff_defense_hook(1891.2f,army,NULL,formation_ptr,1,0);memcpy(out,values,20);SetLastError(12345);return values[4];}
+static uintptr_t fake_page(void *page,void *army){assert(page && army);page_calls++;int out[5];assert(baseline_hook(out,army,(void*)1,0)==531);assert(actual_hook(out,army,(void*)1,0)==2080);SetLastError(54321);return 0x7788990011223344ull;}
+static int bitmap(S14ArmyUI *ui,int detail,const char *path){HDC dc=CreateCompatibleDC(NULL);BITMAPINFO info={0};info.bmiHeader.biSize=40;info.bmiHeader.biWidth=detail?1200:944;info.bmiHeader.biHeight=-(detail?920:76);info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;void *bits;HBITMAP b=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,NULL,0);HGDIOBJ old=SelectObject(dc,b);s14_army_ui_paint(ui,dc,detail);GdiFlush();BITMAPFILEHEADER h={0};h.bfType=0x4d42;h.bfOffBits=54;h.bfSize=54+info.bmiHeader.biWidth*(-info.bmiHeader.biHeight)*4;FILE *file=fopen(path,"wb");int ok=file && fwrite(&h,14,1,file) && fwrite(&info.bmiHeader,40,1,file) && fwrite(bits,h.bfSize-54,1,file);if(file)fclose(file);SelectObject(dc,old);DeleteObject(b);DeleteDC(dc);return ok;}
+int main(int argc,char **argv){
+    S14ArmyFrame f;fixture();assert(s14_army_capture(fixture_read,NULL,base,&f));assert(f.officer_id==518 && f.army_id==1 && !wcscmp(f.name,L"曹仁") && !wcscmp(f.formation,L"重骑") && f.troops==5387 && f.wounded==261 && f.bytes<262144);
+    change=1;assert(!s14_army_capture(fixture_read,NULL,base,&f));fixture();u32(dlg,0x40,46);assert(!s14_army_capture(fixture_read,NULL,base,&f));fixture();u16(army_pool+512,18,613);assert(!s14_army_capture(fixture_read,NULL,base,&f));fixture();u64(basic,0x168,army_addr+512);assert(!s14_army_capture(fixture_read,NULL,base,&f));fixture();assert(s14_army_capture(fixture_read,NULL,base,&f));
+    int coeff[5];assert(s14_army_formation(fixture_read,NULL,base,0x2504000,coeff) && coeff[0]==35 && coeff[4]==20);
+    unsigned char encoded[32]={0};static uintptr_t decoder;decoder=base+0xbfa0;add(base+0x12a0300+0x48,&decoder,8);add(0x2506000,encoded,32);
+    u64(world_data,0x76b58,0x2504000-3*192);u64(formation,0xa8,0x2506000);u64(formation,0xb0,0x2506020);const int enc_off[]={12,16,20,0,24},enc_rot[]={1,3,5,5,7},enc_values[]={42,12,20,25,20};
+    for(int i=0;i<5;i++){unsigned int v=enc_values[i]^3u,r=enc_rot[i];encoded[enc_off[i]]=(unsigned char)((v>>r)|(v<<(8-r)));}
+    assert(s14_army_formation(fixture_read,NULL,base,0x2504000,coeff) && coeff[0]==42 && coeff[1]==12 && coeff[3]==25 && coeff[4]==20);decoder=base+1;assert(!s14_army_formation(fixture_read,NULL,base,0x2504000,coeff));decoder=base+0xbfa0;
+    fixture();memset(formation+0xa8,0,16);assert(s14_army_capture(fixture_read,NULL,base,&f));assert(s14_army_formation(fixture_read,NULL,base,0x2504000,coeff));
+    f.connected=1;f.trace.sources_seen=1;f.trace.source_ids[36]=156;f.trace.source_mask=1;definition[0xb6]=5;u16(definition,0xb8,6);definition[0xba]=19;u16(definition,0xbc,2);
+    for(int i=0;i<5;i++){f.trace.observed[i]=1;f.trace.all[i]=2;f.trace.steps[i]=5;}f.trace.aggregate[0]=6;s14_army_explain(fixture_read,NULL,base,&f);assert(f.sources_verified && wcsstr(f.active_sources,L"+30%"));
+    f.trace.all[2]=3;f.active_sources[0]=0;s14_army_explain(fixture_read,NULL,base,&f);assert(!f.sources_verified && wcsstr(f.active_sources,L"尚未"));
+    S14ArmyTrace t={.world=f.world,.army=f.army,.page=f.page,.officer_id=518,.army_id=1,.packets=3};memcpy(t.identity,f.trace.identity,16);assert(s14_army_trace_matches(&f,&t));t.page++;assert(!s14_army_trace_matches(&f,&t));t.page--;t.identity[6]++;assert(!s14_army_trace_matches(&f,&t));t.identity[6]--;t.actual_mode=1;assert(!s14_army_trace_matches(&f,&t));t.actual_mode=0;t.baseline[0]=-1;assert(!s14_army_trace_matches(&f,&t));
+    t.baseline[0]=0;t.buff_seen[0]=1;t.buff_percent[0]=10;t.native_attribute[0]=NAN;assert(!s14_army_trace_matches(&f,&t));t.native_attribute[0]=100;t.buffed_attribute[0]=110;assert(s14_army_trace_matches(&f,&t));t.buff_percent[0]=20;assert(!s14_army_trace_matches(&f,&t));
+    t=(S14ArmyTrace){0};int pct=0;assert(!s14_army_percent(&t,0,&pct));t.observed[0]=t.extra_observed[0]=1;t.steps[0]=5;t.limits[0]=12;t.aggregate[0]=30;t.all[0]=2;t.extra[0]=1;assert(s14_army_percent(&t,0,&pct) && pct==60);t.aggregate[0]=-30;assert(s14_army_percent(&t,0,&pct) && pct==-60);
+    S14ArmyTrace formula={0};for(int i=0;i<5;i++){formula.base_observed[i]=formula.base_extra_observed[i]=1;formula.steps[i]=5;formula.limits[i]=12;formula.formation_seen[i]=formula.global_seen[i]=formula.policy_seen[0][i]=1;formula.formation[i]=coeff[i];formula.global_percent[i]=5;formula.policy[0][i]=125;formula.base_all[i]=4;}
+    formula.factor_seen[0]=1;formula.factor[0]=400;float prediction;assert(s14_army_white_formula(&formula,0,&prediction) && prediction==1050.0f);assert(s14_army_white_formula(&formula,4,&prediction) && prediction==601.0f);assert(!s14_army_white_formula(&formula,3,&prediction));
+    formula.leadership_seen[0]=formula.foundation_seen=1;formula.leadership[0]=93;formula.leadership_exponent=2.0;formula.sqrt_divisor=1;formula.leadership_scale=3;float soldier,commander,total;assert(s14_army_foundation(&formula,5000,&soldier,&commander,&total) && commander==279 && total>420 && total<421);
+    unsigned char *fake_image=VirtualAlloc(NULL,0x2020000,MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE);assert(fake_image);image=(uintptr_t)fake_image;unsigned char *fake_world=calloc(1,0x85200),*fake_pool=calloc(2,512),fake_basic[0x178]={0};assert(fake_world && fake_pool);
+    u64(fake_image,0x1fc91d0,(uintptr_t)fake_world);u64(fake_world,0x7df60,(uintptr_t)fake_pool);u64(fake_world,0x7df68,(uintptr_t)(fake_pool+512));unsigned char fake_person[512]={0};u16(fake_person,0x10,518);u64(fake_world,0x148+518*8,(uintptr_t)fake_person);u64(fake_pool+512,0,image+0x123e288);fake_pool[512+16]=1;u16(fake_pool+512,18,518);u64(fake_basic,0,image+0x137ebf0);
+    uintptr_t steps[]={0x18ec204,0x18ec20c,0x18ec214,0x18ec1fc,0x18ec21c},limits[]={0x18ebe30,0x18ebe44,0x18ebe70,0x18ebe14,0x18ebe78};for(int i=0;i<5;i++){u32(fake_image,(int)steps[i],5);u32(fake_image,(int)limits[i],i<2?12:10);}
+    u32(fake_image,0x18ea620+0xd8,1);u32(fake_image,0x18ebd88,5);double exponent=2.0;memcpy(fake_image+0x12a7870,&exponent,8);u32(fake_image,0x18ebd58,1);u32(fake_image,0x18ebd60,3);
+    original_ability=fake_ability;original_policy=fake_policy;original_strength=fake_strength;original_area=fake_area;original_link=fake_link;original_page=fake_page;original_baseline=fake_baseline;original_actual=fake_actual;original_factor=fake_factor;original_aggregate=fake_aggregate;original_extra=fake_extra;InterlockedExchange(&active,1);
+    buff_image=image;buff_original_attack=buff_original_defense=fake_attribute;InterlockedExchange(&buff_ready,1);s14_army_buff_configure(1);assert(s14_affix_publish((uintptr_t)fake_world,5000,1,1,0,100,s14_affix_epoch(),0));
+    assert(page_hook(fake_basic,fake_pool+512)==0x7788990011223344ull && GetLastError()==54321);assert(page_calls==1 && base_calls==1 && actual_calls==1 && factor_calls==2 && extra_calls==1 && aggregate_calls==1);assert(!context && !actual_scope && packet_scope==-1 && factor_scope==-1 && policy_scope==-1);assert(ability_calls==2 && policy_calls==2 && strength_calls==2 && area_calls==1 && link_calls==1);
+    assert(s14_army_observer_snapshot(&t) && t.actual[0]==2912 && t.actual[4]==2080 && t.baseline[4]==531 && t.factor[0]==12.25f && t.factor[1]==17.75f);assert(s14_army_percent(&t,0,&pct) && pct==45);assert(t.observed[0] && t.extra_observed[0]);assert(t.policy[0][0]==130 && t.policy[1][0]==130 && t.policy_id[0][0]==3 && t.leadership[0]==93 && t.leadership[1]==93 && t.area_factor==2.5f && t.area_units==300 && t.link_count==2 && t.link_step==5);
+    assert(attribute_calls==2 && t.buff_seen[0] && t.buff_seen[4] && t.buff_percent[0]==10 && t.buff_percent[4]==10 && t.native_attribute[0]==2647.9f && t.buffed_attribute[0]==2647.9f*1.1f);
+    unsigned int saved_serial=t.serial;InterlockedExchange(&active,0);assert(page_hook(fake_basic,fake_pool+512)==0x7788990011223344ull);assert(s14_army_observer_snapshot(&t) && t.serial==saved_serial);
+    // The modeless bar does not activate; the expanded view closes explicitly.
+    S14ArmyUI ui={.instance=GetModuleHandleW(NULL),.ready=1};assert(fonts(&ui,96));assert(create(&ui,0) && create(&ui,1));SetWindowPos(ui.bar,NULL,-20000,-20000,944,76,SWP_NOACTIVATE);SetWindowPos(ui.popup,NULL,-20000,-20000,1200,920,SWP_NOACTIVATE);
+    fixture();assert(s14_army_capture(fixture_read,NULL,base,&ui.frame));ui.frame.connected=1;ui.frame.trace=t;for(int i=0;i<5;i++){ui.frame.trace.formation_seen[i]=1;ui.frame.trace.formation[i]=coeff[i];ui.frame.trace.policy_seen[0][i]=1;ui.frame.trace.policy[0][i]=130;ui.frame.trace.policy_strength[0][i]=6;ui.frame.trace.global_seen[i]=1;ui.frame.trace.global_percent[i]=5;}wcscpy(ui.frame.policy_names[0],L"强化骑兵");wcscpy(ui.frame.area_sources,L"所在府 古城 100/100；相连府 长坂 100/100；");ui.width=944;ui.height=76;assert(SendMessageW(ui.bar,WM_MOUSEACTIVATE,0,0)==MA_NOACTIVATE);
+    if(argc>1)assert(bitmap(&ui,0,argv[1]));if(argc>2)assert(bitmap(&ui,1,argv[2]));ui.scroll=0;SendMessageW(ui.popup,WM_MOUSEWHEEL,MAKEWPARAM(0,(unsigned short)-WHEEL_DELTA),0);assert(ui.scroll==90);ui.scroll=900;if(argc>3)assert(bitmap(&ui,1,argv[3]));char logline[6144];assert(s14_army_format_trace(&ui.frame,1,logline,sizeof(logline)) && strstr(logline,"\"observed\"") && strstr(logline,"\"policy_baseline\"") && strstr(logline,"\"plugin_buff_applied\":1") && strstr(logline,"\"read_only\":false"));assert(!s14_army_format_trace(&ui.frame,1,logline,64));
+    ui.popup_shown=1;SendMessageW(ui.popup,WM_KEYDOWN,VK_ESCAPE,0);assert(!ui.popup_shown);s14_army_ui_destroy(&ui);free(fake_world);free(fake_pool);VirtualFree(fake_image,0,MEM_RELEASE);
+    puts("{\"status\":\"passed\",\"selection_and_identity_guards\":true,\"race_rejected\":true,\"unknown_not_zero\":true,\"original_calls_once\":true,\"integer_and_float_returns_preserved\":true,\"last_error_preserved\":true,\"modifier_clamp\":true,\"disabled_not_recorded\":true,\"white_formula\":true,\"source_validity_in_log\":true,\"detailed_observers\":true,\"manual_close\":true,\"buff_trace_integration\":true}");return 0;
+}

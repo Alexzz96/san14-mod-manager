@@ -47,6 +47,15 @@ int main(int argc,char **argv) {
     assert(mock_g && mock_settings && mock_armies && mock_people);
     battle_base=(uintptr_t)mock_image; battle_end=battle_base+0x300000; battle_manager=&mock_g;
     *(void**)(mock_g+0x85130)=mock_settings;
+    // Replay the live mismatch: player force 10, group slot 10 belongs to 12.
+    // Keep conversion for unit/group fields, but never convert the player twice.
+    unsigned char foreign_group[17]={0};*(uintptr_t*)foreign_group=battle_base+0x129fec8;foreign_group[0x10]=12;
+    *(void**)(mock_g+0xde40+10*8)=foreign_group;
+    InterlockedExchange(&battle_force,10);
+    BattleEvent player_event=battle_begin(B_PROGRESS,0);
+    assert(battle_actual_force((uintptr_t)mock_g,10)==12);
+    assert(player_event.force==10 && player_event.player_force_id==10);
+    InterlockedExchange(&battle_force,-1);
     for(int i=0;i<501;i++) *(void**)(mock_g+0x7df60+i*8)=mock_armies+i*512;
     for(int i=0;i<2;i++) {
         unsigned char *p=mock_people+i*0x220; *(uintptr_t*)p=battle_base+0x12a00d0;
@@ -128,6 +137,6 @@ int main(int argc,char **argv) {
     assert(battle_dropped==1 && battle_fault==1 && !s14_battle_enabled());
     s14_battle_configure(S14_MASTER,1); assert(!s14_battle_enabled());
     clear_queue(); CloseHandle(battle_file); battle_file=INVALID_HANDLE_VALUE;
-    printf("{\"status\":\"passed\",\"native_arg_return_preservation\":true,\"fifth_argument_preserved\":true,\"parent_context\":true,\"invalid_pointer_safe\":true,\"no_change_status_filtered\":true,\"noncombat_status_burst_bypassed\":6000,\"sparse_ids_no_false_overflow\":true,\"queue_overflow_stops_capture\":true,\"native_calls\":%d,\"concurrent_calls\":800,\"concurrent_batch_ms\":%llu,\"written_events\":%lld}\n",native_calls,(unsigned long long)batch,(long long)battle_events);
+    printf("{\"status\":\"passed\",\"player_force_not_group_index\":true,\"native_arg_return_preservation\":true,\"fifth_argument_preserved\":true,\"parent_context\":true,\"invalid_pointer_safe\":true,\"no_change_status_filtered\":true,\"noncombat_status_burst_bypassed\":6000,\"sparse_ids_no_false_overflow\":true,\"queue_overflow_stops_capture\":true,\"native_calls\":%d,\"concurrent_calls\":800,\"concurrent_batch_ms\":%llu,\"written_events\":%lld}\n",native_calls,(unsigned long long)batch,(long long)battle_events);
     VirtualFree(mock_image,0,MEM_RELEASE); free(mock_g); free(mock_settings); free(mock_armies); free(mock_people); return 0;
 }

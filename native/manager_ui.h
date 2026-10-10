@@ -14,11 +14,14 @@ struct S14ManagerUI {
     unsigned int requested,effective;
     unsigned int detected;
     unsigned int search_settings;
+    int search_state,search_force,search_group;
     wchar_t search_status[192],search_summary[256],search_details[4096];
     int search_scroll;
     int officers_enabled;
     int views_enabled;
     int native_stats_enabled;
+    int native_army_enabled;
+    unsigned int visual_settings;
     int battle_enabled;
     int report_requested;
     int update_busy,update_ready;
@@ -37,6 +40,7 @@ int s14_manager_hit(S14ManagerUI *ui,POINT point);
 int s14_manager_activate(S14ManagerUI *ui,int action);
 int s14_manager_mod_enabled(const S14ManagerUI *ui,int mod);
 int s14_manager_view_enabled(const S14ManagerUI *ui,int native);
+const wchar_t *s14_manager_mod_status(const S14ManagerUI *ui,int mod);
 int s14_manager_mod_index(const S14ManagerUI *ui,int position);
 int s14_manager_mod_top(const S14ManagerUI *ui,int mod);
 #define S14_MANAGER_WIDTH 860

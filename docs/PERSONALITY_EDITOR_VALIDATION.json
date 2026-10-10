@@ -1,0 +1,46 @@
+{
+  "version": "0.10.9",
+  "publication": "local_only",
+  "status": "passed",
+  "capture_records": {
+    "status": "passed",
+    "uninitialized_records_skipped": true,
+    "later_officers_preserved": true,
+    "hidden_personalities_preserved": true,
+    "named_or_effectful_zero_identity_rejected": true,
+    "wrong_identity_rejected": true,
+    "unstable_empty_rejected": true
+  },
+  "current_game_read_only": {
+    "count": 1400,
+    "read_errors": 0,
+    "unstable": 0,
+    "bytes_read": 1965514,
+    "read_only": true
+  },
+  "personality_editor": {
+    "status": "passed",
+    "nine_slots": true,
+    "empty_only_add": true,
+    "explicit_replace": true,
+    "hidden_ids_preserved": true,
+    "full_rejected": true,
+    "duplicate_rejected": true,
+    "native_setter": true,
+    "cleanup_before_replace": true,
+    "game_thread_queue": true,
+    "nested_callback_safe": true,
+    "load_epoch_rejected": true,
+    "stale_snapshot_rejected": true,
+    "execution_phase_blocked": true,
+    "disabled_queue_cancelled": true,
+    "definition_verified": true,
+    "in_game_acceptance": "pending",
+    "save_load_acceptance": "pending"
+  },
+  "installation": {
+    "status": "passed",
+    "protected_files_unchanged": 230
+  },
+  "in_game_new_dll_acceptance": "pending"
+}

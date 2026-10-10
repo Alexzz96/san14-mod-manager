@@ -34,9 +34,9 @@ jobs:
       - name: Independent native verification
         shell: pwsh
         run: python native/verify_native.py
-      - name: Package verified assets
+      - name: Package verified test assets with pending acceptance disclosed
         shell: pwsh
-        run: python native/package_release.py
+        run: python native/package_release.py --prerelease
       - name: Publish complete verified release
         shell: pwsh
         env:

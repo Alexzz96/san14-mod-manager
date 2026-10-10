@@ -3,10 +3,13 @@
 #include <windows.h>
 #include "officer_model.h"
 #include "officer_history.h"
+#include "personality_ui.h"
 typedef struct {
     HWND window,owner,query,scope,place,history,sort,direction,list,pinned,close_button,tabs[2],timeline_button;
     HINSTANCE instance;HFONT title_font,font,small_font,dense_font;HBRUSH brush;
     S14OfficerHistory timeline;
+    S14PersonalityUI personality;
+    HWND personality_button;
     HANDLE activation;
     uintptr_t base;
     S14OfficerSnapshot *snapshot,*candidate;

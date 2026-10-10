@@ -221,7 +221,14 @@ def run_cleanup_tests(package, build, legacy=None):
         root=installed();assert timeline_save(str(root))==1
         checkpoint=next((root/'SAN14ModManager/career/checkpoints').glob('*.s14timeline'));data=bytearray(checkpoint.read_bytes());data[-1]^=1;checkpoint.write_bytes(data)
         cleanup(root);assert checkpoint.read_bytes()==data
-    return {'timeline_checkpoint_cleanup':True,'timeline_corruption_preserved':True,'special_checkpoint_cleanup':True,'special_corruption_preserved':True,'temporary_folder_cases':cases,'complete_uninstall':True,'missing_receipt':True,'orphan_receipt_and_config':True,
+        troop_save=package.S14TestTroopSave;troop_save.argtypes=[C.c_wchar_p];troop_save.restype=C.c_int
+        root=folder();assert troop_save(str(root))==1
+        checkpoint=root/'SAN14ModManager/troops/test.s14troops';assert detect(str(root),source)&4
+        cleanup(root);assert not checkpoint.exists() and not (root/'SAN14ModManager').exists()
+        root=installed();assert troop_save(str(root))==1
+        checkpoint=root/'SAN14ModManager/troops/test.s14troops';data=bytearray(checkpoint.read_bytes());data[-1]^=1;checkpoint.write_bytes(data)
+        cleanup(root);assert checkpoint.read_bytes()==data
+    return {'troop_checkpoint_cleanup':True,'troop_corruption_preserved':True,'timeline_checkpoint_cleanup':True,'timeline_corruption_preserved':True,'special_checkpoint_cleanup':True,'special_corruption_preserved':True,'temporary_folder_cases':cases,'complete_uninstall':True,'missing_receipt':True,'orphan_receipt_and_config':True,
             'same_name_copy_detected':True,'legacy_copy_removed':bool(legacy),'unknown_files_preserved':True,
             'locked_files_preflight':True,'read_only_preflight':True,'junctions_not_followed':True,
             'hard_links_rejected':True,'running_self_rejected_before_changes':True,

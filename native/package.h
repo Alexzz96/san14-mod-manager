@@ -17,4 +17,6 @@ int s14_package_install(const wchar_t *root,const wchar_t *manager_source,wchar_
 int s14_package_remove(const wchar_t *root,wchar_t error[192]);
 void s14_publish_runtime(const wchar_t *root,unsigned int desired,unsigned int effective,int ready,int fault);
 int s14_read_runtime(const wchar_t *root,unsigned int *effective,int *fault);
+void s14_publish_search_runtime(const wchar_t *root,int state,int force,int group,const wchar_t *detail);
+void s14_read_search_runtime(const wchar_t *root,int *state,int *force,int *group,wchar_t detail[192]);
 #endif

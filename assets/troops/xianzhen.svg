@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="陷阵营：重甲盾牌与双戟">
+  <defs>
+    <linearGradient id="shield" x2="0" y2="1"><stop stop-color="#454f57"/><stop offset="1" stop-color="#171f26"/></linearGradient>
+    <linearGradient id="metal" x2="0" y2="1"><stop stop-color="#ffe88f"/><stop offset="1" stop-color="#ab7329"/></linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#metal)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 109 101 16l13 15-15 15M106 109 27 16 14 31l15 15"/>
+  </g>
+  <path d="m64 22 31 14v39l-31 38-31-38V36Z" fill="url(#shield)" stroke="url(#metal)" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M64 32v66M41 49l23 24 23-24" fill="none" stroke="url(#metal)" stroke-width="4" stroke-linejoin="round"/>
+</svg>

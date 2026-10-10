@@ -1,0 +1,135 @@
+{
+  "version": "0.10.7",
+  "publication": "local_only",
+  "independent_tests": "passed",
+  "python_tests": 32,
+  "runtime": {
+    "status": "passed",
+    "registry_capacity": 256,
+    "beyond_native_21": true,
+    "duplicate_rejected": true,
+    "sealed_readers": true,
+    "deep_copy": true,
+    "commander_scoped": true,
+    "explicit_selection_required": true,
+    "unlocked_required": true,
+    "extra_gold_ceiling": true,
+    "no_funds_deducted": true,
+    "plan_no_compounding": true,
+    "soldier_cap_verified": true,
+    "general_cap_compat": true,
+    "pending_effects_not_applied": true,
+    "invalid_inputs_rejected": true,
+    "gameplay_integrated": true,
+    "compiled_catalog_matches_definition": true,
+    "extra_game_hooks": 16,
+    "runtime": {
+      "status": "passed",
+      "mutable_home_identity": true,
+      "creation_scoped_attributes": true,
+      "break_abi": true,
+      "confusion_refusal": true,
+      "native_confusion_clear": true,
+      "other_status_timers_preserved": true,
+      "surround_penalty_only": true,
+      "disable_restores_native": true,
+      "deployment_soldier_cap": 1000,
+      "capacity_row_abi": true,
+      "queued_cap_guard": true,
+      "native_detail_caption": true,
+      "native_button": true,
+      "mouse_press_survives_frames": true,
+      "native_radio_selection": true,
+      "native_funds_preview": true,
+      "native_widget_restore": true,
+      "other_commanders_unchanged": true,
+      "no_per_frame_text_allocation": true,
+      "hover_only_hint": true,
+      "click_through_hint": true,
+      "preview_scoped": true,
+      "actual_attributes_only": true,
+      "mobility_abi": true,
+      "one_time_charge": true,
+      "insufficient_funds": true,
+      "cancel_or_ordinary_safe": true,
+      "unit_reuse_safe": true,
+      "save_load": true,
+      "failed_load_restores": true,
+      "ui_context_guard": true
+    },
+    "runtime_capabilities": 127,
+    "native_selection_button": true,
+    "native_troop_detail_caption": true,
+    "deployment_soldier_cap": 1000,
+    "native_icon": "carrier",
+    "hover_hint": "passive_win32",
+    "confusion_immunity_enabled": true,
+    "surround_immunity_enabled": true,
+    "in_game_acceptance": "pending",
+    "surround_native_call_verified": true,
+    "confusion_native_category_verified": true,
+    "break_native_four_parameter_call_verified": true,
+    "static_adapter_anchors_verified": 25
+  },
+  "game_evidence": {
+    "old_version": "0.10.3",
+    "officer_id": 254,
+    "army_id": 1,
+    "serial": 0,
+    "binding_home": 0,
+    "native_home_after_create": 13,
+    "preview": {
+      "attack": [
+        569,
+        1412
+      ],
+      "defense": [
+        570,
+        1498
+      ]
+    },
+    "deployed": {
+      "attack": [
+        569,
+        1153
+      ],
+      "defense": [
+        570,
+        1153
+      ]
+    }
+  },
+  "in_game_attributes": "pending",
+  "in_game_confusion": "pending",
+  "in_game_surround": "pending",
+  "strength_trials": {
+    "single_20000": {
+      "required": 5,
+      "completed": 0
+    },
+    "four_5000": {
+      "required": 5,
+      "completed": 0
+    },
+    "maximum_turns": 3,
+    "maximum_cumulative_actual_loss": 200
+  },
+  "dll_sha256": "3edd74f9392c9c89d803555c50541375b46e9db25ae99ed76fd718d7307c8fc8",
+  "manager_sha256": "a44e10531a97498700ae58d475a69102933b0f31b585cbbfe713030782159637",
+  "installation": {
+    "version": "0.10.7",
+    "installer_exit": 0,
+    "protected_unchanged": true,
+    "in_game_acceptance": "pending",
+    "publication": "local_only",
+    "protected_files_unchanged": 150
+  },
+  "icons": {
+    "design": "gold_halberds_armored_shield",
+    "backend": "D3D11_Present",
+    "native_control_clicks": "unchanged",
+    "gpu_pixels_and_pipeline_tests": "passed",
+    "native_detail_layout_guards": "passed",
+    "in_game_position": "pending"
+  }
+}

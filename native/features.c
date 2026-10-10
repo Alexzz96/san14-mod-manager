@@ -4,15 +4,21 @@ const S14Feature s14_features[]={
     {L"wall_cluster_limit",L"WallClusterLimit",L"墙体连片上限",L"同一势力领地内，相连的土垒和石墙合计最多 5 个。\n按六边格连接计算，拐弯和分叉也计入整片。",L"游戏规则",S14_WALL_LIMIT,0,1},
     {L"limit_hint",L"LimitHint",L"超限悬浮提示",L"点击超限位置时说明规则，5 秒后自动消失。\n重复点击会重新计时；需要开启墙体连片上限。",L"界面提示",S14_LIMIT_HINT,S14_WALL_LIMIT,1},
     {L"diagnostics",L"Diagnostics",L"诊断日志",L"记录规则检查和建造结果，用于定位异常。\n日常游玩可关闭，管理器的连接状态仍会显示。",L"辅助工具",S14_DIAGNOSTICS,0,1},
-    {L"auto_search",L"AutoSearch",L"回合自动搜索",L"确认进行后，按设置使用剩余政令派遣探索。\n展开 Mod 可调整派遣条件并查看回合结果。",L"人才探索",S14_AUTO_SEARCH,0,1}
+    {L"auto_search",L"AutoSearch",L"回合自动搜索",L"确认进行后，按设置使用剩余政令派遣探索。\n展开 Mod 可调整派遣条件并查看回合结果。",L"人才探索",S14_AUTO_SEARCH,0,1},
+    {L"cao_ren_attack_defense",L"CaoRenAttackDefense",L"百战精锐 · 曹仁",L"曹仁已记录斩敌达到 5000（含伤兵），获得百战精锐。\n显示神 曹仁；实际攻军、防御 +10%，回合结束后解锁。",L"战斗增幅",S14_CAO_REN_BUFF,0,1},
+    {L"plugin_troops",L"PluginTroops",L"扩展兵种 · 陷阵营",L"高顺出征可选择陷阵营；实际属性增幅与独立扣费。\n支持保存、读档；混乱免疫尚未启用。",L"扩展兵种",S14_PLUGIN_TROOPS,0,1},
+    {L"ai_random_affix",L"AiRandomAffix",L"AI 随机词条",L"各 AI 城市第 9、18、27…次成功出征必出；其余按 10% 抽取。\n仅本次部队有效；不为已有部队补抽，同类增幅取最高。",L"随机词条",S14_AI_RANDOM_AFFIX,0,1}
 };
 const int s14_feature_count=sizeof(s14_features)/sizeof(s14_features[0]);
 const S14Mod s14_mods[S14_MOD_COUNT]={
     {L"wall_cluster_limit",L"墙体连片上限",L"同势力领地内，土垒与石墙相连最多 5 格。",L"规则",10,1},
     {L"auto_search",L"回合自动搜索",L"确认进行后使用剩余政令探索，回合结束汇总结果。",L"探索",13,1},
     {L"battle_events",L"战斗数据记录与战绩",L"采集全势力战斗，为累计战绩和武将时间线提供数据。",L"统计",41,0},
-    {L"officer_views",L"武将情报",L"F 武将清单与原生详情战绩条，可分别开启。",L"界面",44,1},
-    {L"diagnostics",L"诊断日志",L"记录规则检查与建造结果，便于定位异常。",L"工具",12,0}
+    {L"officer_views",L"武将情报",L"F 武将清单、武将战绩条和曹仁部队数值解析，可分别开启。",L"界面",44,1},
+    {L"cao_ren_attack_defense",L"百战精锐 · 曹仁",L"斩敌达到 5000：神 曹仁，攻军、防御 +10%；随存档恢复。",L"战斗",14,1},
+    {L"diagnostics",L"诊断日志",L"记录规则检查与建造结果，便于定位异常。",L"工具",12,0},
+    {L"plugin_troops",L"扩展兵种 · 陷阵营",L"高顺专属；出征选兵种，额外费用 2000 + 每千兵 500。",L"兵种",15,0},
+    {L"ai_random_affix",L"AI 随机词条",L"AI 城市每 9 次出征保底；其余 10%，攻军、防御 +10%。",L"随机",16,1}
 };
 static int boolean(const wchar_t *path,const wchar_t *section,const wchar_t *key,int fallback) {
     int value=(int)GetPrivateProfileIntW(section,key,fallback,path);
@@ -27,6 +33,9 @@ unsigned int s14_config_read(const wchar_t *path) {
     if (boolean(path,L"Features",L"LimitHint",1)) flags|=S14_LIMIT_HINT;
     if (boolean(path,L"Features",L"Diagnostics",legacy==1)) flags|=S14_DIAGNOSTICS;
     if (boolean(path,L"Features",L"AutoSearch",1)) flags|=S14_AUTO_SEARCH;
+    if (boolean(path,L"Features",L"CaoRenAttackDefense",0)) flags|=S14_CAO_REN_BUFF;
+    if (boolean(path,L"Features",L"PluginTroops",1)) flags|=S14_PLUGIN_TROOPS;
+    if (boolean(path,L"Features",L"AiRandomAffix",0)) flags|=S14_AI_RANDOM_AFFIX;
     return flags;
 }
 int s14_config_set(const wchar_t *path,unsigned int flag,int enabled) {
@@ -66,6 +75,7 @@ int s14_battle_setting_read(const wchar_t *path) {
     return boolean(path,L"Observation",L"BattleEvents",1);
 }
 int s14_views_setting_read(const wchar_t *path) {return boolean(path,L"Views",L"Enabled",1);}
+unsigned int s14_visual_settings_read(const wchar_t *path){return (unsigned)boolean(path,L"Visuals",L"CaoRenHalo",1)|((unsigned)boolean(path,L"Visuals",L"CaoRenTooltip",1)<<1)|((unsigned)boolean(path,L"Visuals",L"AiAffixHalo",1)<<2)|((unsigned)boolean(path,L"Visuals",L"AiAffixTooltip",1)<<3);}
 int s14_search_setting_set(const wchar_t *path,int group,int value) {
     if (group<0 || group>2 || value<0 || value>(group==0?3:group==1?2:1)) return 0;
     wchar_t text[8]; wsprintfW(text,L"%d",value);

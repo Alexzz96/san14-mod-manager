@@ -14,6 +14,10 @@ import sys
 import time
 import tempfile
 import uuid
+import os
+
+# Child Python and native reports use UTF-8 JSON, including localized names.
+os.environ['PYTHONUTF8']='1'
 
 HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE.parent/'reference'))
@@ -59,6 +63,7 @@ if GAME:
     # The two hook targets save different first registers (RBP versus RBX).
     binary=(GAME/'SAN14PK_SC.exe').read_bytes()
     nt=struct.unpack_from('<I',binary,0x3c)[0]
+    preferred_base=struct.unpack_from('<Q',binary,nt+24+24)[0]
     sections=struct.unpack_from('<H',binary,nt+6)[0]
     section_table=nt+24+struct.unpack_from('<H',binary,nt+20)[0]
     def rva_bytes(rva,length):
@@ -90,13 +95,14 @@ if GAME:
                                    'private_trampoline':'passed'})
     search_prologue=test.S14TestSearchPrologue
     search_prologue.argtypes=[C.c_int,C.POINTER(C.c_ubyte),C.POINTER(C.c_int)];search_prologue.restype=C.c_int
-    for index in range(8):
+    search_count=test.S14TestSearchEntryCount;search_count.argtypes=[];search_count.restype=C.c_int
+    for index in range(search_count()):
         signature=(C.c_ubyte*32)();length=C.c_int()
         rva=search_prologue(index,signature,C.byref(length))
         assert bytes(signature)[:length.value]==rva_bytes(rva,length.value)
         code=(C.c_ubyte*64).from_buffer_copy(rva_bytes(rva,64))
-        assert hook_bytes(code,64)==1,f'MinHook rejected private search copy of {rva:#x}'
-        verified_prologues.append({'rva':hex(rva),'bytes':bytes(signature)[:length.value].hex(),'private_trampoline':'passed','feature':'auto_search'})
+        if index<8:assert hook_bytes(code,64)==1,f'MinHook rejected private search copy of {rva:#x}'
+        verified_prologues.append({'rva':hex(rva),'bytes':bytes(signature)[:length.value].hex(),'private_trampoline':'passed' if index<8 else 'not_hooked','feature':'auto_search'})
     vtable=struct.unpack('<16Q',rva_bytes(0x133f170,128))
     battle_prologue=test.S14TestBattlePrologue
     battle_prologue.argtypes=[C.c_int,C.POINTER(C.c_ubyte)];battle_prologue.restype=C.c_int
@@ -183,23 +189,23 @@ vtable=C.cast(interface,C.POINTER(C.POINTER(C.c_void_p))).contents
 release=C.WINFUNCTYPE(C.c_uint32,C.c_void_p)(vtable[2])
 release(interface)
 
-stress=subprocess.run([str(BUILD/'test_native.exe')],capture_output=True,text=True,check=True,
+stress=subprocess.run([str(BUILD/'test_native.exe')],capture_output=True,text=True,encoding='utf-8',check=True,
                       timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
 metrics=json.loads(stress.stdout)
-ui_test=subprocess.run([str(BUILD/'test_interaction.exe')],cwd=BUILD,capture_output=True,text=True,check=True,
+ui_test=subprocess.run([str(BUILD/'test_interaction.exe')],cwd=BUILD,capture_output=True,text=True,encoding='utf-8',check=True,
                        timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 ui_metrics=json.loads(ui_test.stdout)
-manager_test=subprocess.run([str(BUILD/'test_manager.exe')],cwd=BUILD,capture_output=True,text=True,check=True,
+manager_test=subprocess.run([str(BUILD/'test_manager.exe')],cwd=BUILD,capture_output=True,text=True,encoding='utf-8',check=True,
                             timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 manager_metrics=json.loads(manager_test.stdout)
-update_test=subprocess.run([str(BUILD/'test_update.exe')],capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+update_test=subprocess.run([str(BUILD/'test_update.exe')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 update_metrics=json.loads(update_test.stdout);assert update_metrics['update_model']=='passed'
-officer_test=subprocess.run([str(BUILD/'test_officers.exe')],cwd=BUILD,capture_output=True,text=True,check=True,
+officer_test=subprocess.run([str(BUILD/'test_officers.exe')],cwd=BUILD,capture_output=True,text=True,encoding='utf-8',check=True,
                             timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 officer_metrics=json.loads(officer_test.stdout)
 search_metrics={}
 for name in ('test_search','test_search_bridge'):
-    result=subprocess.run([str(BUILD/(name+'.exe'))],cwd=BUILD,capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+    result=subprocess.run([str(BUILD/(name+'.exe'))],cwd=BUILD,capture_output=True,text=True,encoding='utf-8',check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
     search_metrics[name]=json.loads(result.stdout)
 if GAME:
     # Execute the complete city constructor and predicate plus the unchanged
@@ -213,14 +219,14 @@ if GAME:
     with tempfile.TemporaryDirectory(prefix='SAN14-city-ABI-') as name:
         fixture=Path(name)/'city-iterator.bin'
         fixture.write_bytes(struct.pack('<III',len(constructor),len(predicate),len(target_store))+constructor+predicate+target_store)
-        result=subprocess.run([str(BUILD/'test_search_bridge.exe'),str(fixture)],cwd=BUILD,capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+        result=subprocess.run([str(BUILD/'test_search_bridge.exe'),str(fixture)],cwd=BUILD,capture_output=True,text=True,encoding='utf-8',check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
         search_metrics['private_native_city_iterator']=json.loads(result.stdout)
         assert search_metrics['private_native_city_iterator']['private_native_iterator_fixture']
         assert search_metrics['private_native_city_iterator']['private_native_target_store']
-        legacy=subprocess.run([str(BUILD/'test_search_bridge.exe'),str(fixture),'--reproduce-040'],cwd=BUILD,capture_output=True,text=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+        legacy=subprocess.run([str(BUILD/'test_search_bridge.exe'),str(fixture),'--reproduce-040'],cwd=BUILD,capture_output=True,text=True,encoding='utf-8',timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
         assert legacy.returncode==71,('Expected the recorded null RDX access violation',legacy.returncode,legacy.stdout,legacy.stderr)
         search_metrics['legacy_040_null_rdx_reproduced']=True
-        legacy=subprocess.run([str(BUILD/'test_search_bridge.exe'),str(fixture),'--reproduce-041'],cwd=BUILD,capture_output=True,text=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+        legacy=subprocess.run([str(BUILD/'test_search_bridge.exe'),str(fixture),'--reproduce-041'],cwd=BUILD,capture_output=True,text=True,encoding='utf-8',timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
         assert legacy.returncode==74,('Expected the recorded null target-table write at person 393',legacy.returncode,legacy.stdout,legacy.stderr)
         search_metrics['legacy_041_null_target_table_reproduced']=True
 package=C.CDLL(str(BUILD/'package_test.dll'))
@@ -286,6 +292,7 @@ with tempfile.TemporaryDirectory(prefix='SAN14-manager-测试-') as name:
     old_manager=app.read_bytes()+b'previous-sandbox-manager';app.write_bytes(old_manager)
     receipt=sandbox/'SAN14ModManager/installation.ini'
     metadata=configparser.ConfigParser();metadata.optionxform=str;metadata.read(receipt)
+    assert metadata['Install']['Version']==(HERE.parent/'VERSION').read_text(encoding='utf-8').strip()
     metadata.set('Install','DllSHA256',hashlib.sha256(old_dll).hexdigest())
     metadata.set('Install','ManagerSHA256',hashlib.sha256(old_manager).hexdigest())
     with receipt.open('w',encoding='ascii') as output: metadata.write(output)
@@ -322,6 +329,9 @@ legacy_tested=False
 if args.legacy_manager:
     previous=args.legacy_manager.resolve().read_bytes()
     assert hashlib.sha256(previous).hexdigest() in {
+        '155e8c42d85db39726ff30673a159b76dec226d5f45e55ba335d180f77a0f4ca',
+        '47e1aa6d5b7215fef5137790c2cd21ae8cfbda655ae2e9ff8a3790ad799e9dcc',
+        'c1a8f814b408b5a227f9aac1a3a2a8920d44346bb28656624823d9904fb5c03c',
         '4b46d2d923a65f70af7a514c4757a3dbfdea957aee433a4f9a78a5c5f8aedb94',
         '7447aac1a8b218ba0c1aa54d6a945c0140dc603ff943264c9b41bbf7fce9c5e8',
         'c96de53337ba48b1fc749857564bba0aa67431663121ee572f56c72e7e742387',
@@ -369,7 +379,7 @@ cleanup_metrics=run_cleanup_tests(package,BUILD,args.legacy_manager)
 battle_metrics={}
 for name in ('test_battle_probe','test_battle_skills','test_battle_details','test_battle_save','test_battle_special'):
     with tempfile.TemporaryDirectory(prefix='S14-battle-verify-') as root:
-        result=subprocess.run([str(BUILD/(name+'.exe')),root],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+        result=subprocess.run([str(BUILD/(name+'.exe')),root],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
         battle_fixture_metrics=json.loads(result.stdout);assert battle_fixture_metrics['status']=='passed'
         lines=[json.loads(l) for p in Path(root).rglob('*.jsonl') for l in p.read_text(encoding='utf-8').splitlines()]
         records=[e for e in lines if e['event']=='battle_observation']
@@ -388,58 +398,171 @@ for name in ('test_battle_probe','test_battle_skills','test_battle_details','tes
             troops=[e for e in records if e['kind']=='troop_change']
             assert all(e['player_force_id']==1 and e['source_force_id']==1 and e['target_force_id']==2 and e['target']['raw_force']==0 for e in troops)
         battle_metrics[name]=battle_fixture_metrics
-analysis_test=subprocess.run([sys.executable,str(HERE.parent/'tools/test_summarize_battle.py')],capture_output=True,text=True,check=True,timeout=20)
+analysis_test=subprocess.run([sys.executable,str(HERE.parent/'tools/test_summarize_battle.py')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20)
 battle_metrics['analysis_tests']=analysis_test.stderr.strip()
-round_result=subprocess.run([str(BUILD/'test_battle_report.exe')],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+round_result=subprocess.run([str(BUILD/'test_battle_report.exe')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
 battle_metrics['turn_report']=json.loads(round_result.stdout)
 assert battle_metrics['turn_report']['status']=='passed'
 report_ui_command=[str(BUILD/'test_report_ui.exe')]+([str(GAME)] if GAME else [])
-result=subprocess.run(report_ui_command,cwd=BUILD,capture_output=True,text=True,check=True,
+result=subprocess.run(report_ui_command,cwd=BUILD,capture_output=True,text=True,encoding='utf-8',check=True,
                       timeout=45,creationflags=subprocess.CREATE_NO_WINDOW)
 battle_metrics['turn_report_ui']=json.loads(result.stdout)
 assert battle_metrics['turn_report_ui']['status']=='passed'
 portrait_command=[str(BUILD/'test_portrait.exe')]+([str(GAME),str(BUILD)] if GAME else [])
-result=subprocess.run(portrait_command,cwd=BUILD,capture_output=True,text=True,check=True,
+result=subprocess.run(portrait_command,cwd=BUILD,capture_output=True,text=True,encoding='utf-8',check=True,
                       timeout=60,creationflags=subprocess.CREATE_NO_WINDOW)
 battle_metrics['portraits']=json.loads(result.stdout)
 assert battle_metrics['portraits']['status']=='passed'
 with tempfile.TemporaryDirectory(prefix='S14-stats-') as folder:
-    stats_result=subprocess.run([str(BUILD/'test_battle_stats.exe'),folder],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    stats_result=subprocess.run([str(BUILD/'test_battle_stats.exe'),folder],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
     battle_metrics['persistent_stats']=json.loads(stats_result.stdout)
-    reopen=subprocess.run([str(BUILD/'test_battle_stats.exe'),folder,'--reopen'],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    reopen=subprocess.run([str(BUILD/'test_battle_stats.exe'),folder,'--reopen'],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
     assert json.loads(reopen.stdout)['cross_process_restore']
     battle_metrics['persistent_stats']['cross_process_restore']=True
 battle_metrics['in_game_acceptance']='pending'
 with tempfile.TemporaryDirectory(prefix='S14-timeline-') as folder:
-    result=subprocess.run([str(BUILD/'test_timeline.exe'),folder],capture_output=True,text=True,check=True,timeout=25,creationflags=subprocess.CREATE_NO_WINDOW)
+    result=subprocess.run([str(BUILD/'test_timeline.exe'),folder],capture_output=True,text=True,encoding='utf-8',check=True,timeout=25,creationflags=subprocess.CREATE_NO_WINDOW)
     battle_metrics['timeline']=json.loads(result.stdout)
-    reopen=subprocess.run([str(BUILD/'test_timeline.exe'),folder,'--reopen'],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    reopen=subprocess.run([str(BUILD/'test_timeline.exe'),folder,'--reopen'],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
     assert json.loads(reopen.stdout)['cross_process_restore']
     battle_metrics['timeline']['cross_process_restore']=True
 with tempfile.TemporaryDirectory(prefix='S14-special-') as folder:
-    result=subprocess.run([str(BUILD/'test_special_stats.exe'),folder],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    result=subprocess.run([str(BUILD/'test_special_stats.exe'),folder],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
     battle_metrics['special_stats']=json.loads(result.stdout)
-    reopen=subprocess.run([str(BUILD/'test_special_stats.exe'),folder,'--reopen'],capture_output=True,text=True,check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    reopen=subprocess.run([str(BUILD/'test_special_stats.exe'),folder,'--reopen'],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
     assert json.loads(reopen.stdout)['cross_process_restore']
     battle_metrics['special_stats']['cross_process_restore']=True
     battle_metrics['special_stats']['in_game_semantics']='pending'
-detail_result=subprocess.run([str(BUILD/'test_native_detail.exe')],capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+detail_result=subprocess.run([str(BUILD/'test_native_detail.exe')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 detail_metrics=json.loads(detail_result.stdout);assert detail_metrics['status']=='passed'
-detail_ui_result=subprocess.run([str(BUILD/'test_detail_ui.exe')],capture_output=True,text=True,check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
+detail_ui_result=subprocess.run([str(BUILD/'test_detail_ui.exe')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 detail_metrics['ui']=json.loads(detail_ui_result.stdout);assert detail_metrics['ui']['status']=='passed'
 detail_metrics['game_process_touched']=False;detail_metrics['in_game_acceptance']='pending'
+buff_result=subprocess.run([str(BUILD/'test_army_buff.exe')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+buff_metrics=json.loads(buff_result.stdout);assert buff_metrics['status']=='passed'
+buff_metrics.update({'in_game_acceptance':'pending','attack_percent':10,'defense_percent':10,'scope':'Cao_Ren_commander_career_enemy_loss_5000','extra_native_calls':0,'gameplay_modified_when_enabled':True})
 if GAME:
+    for rva in (0x283ad0,0x27bd90):
+        data=rva_bytes(rva,64);code=(C.c_ubyte*64).from_buffer_copy(data)
+        assert hook_bytes(code,64)==1,f'MinHook rejected private army buff copy of {rva:#x}'
+    buff_metrics['private_native_trampolines_verified']=2
+    copied_result=subprocess.run([str(BUILD/'test_army_buff.exe'),rva_bytes(0x283ad0,64).hex(),rva_bytes(0x27bd90,64).hex()],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    assert json.loads(copied_result.stdout)['status']=='passed'
+    buff_metrics['production_install_with_copied_game_bytes']=True
+with tempfile.TemporaryDirectory(prefix='s14-affix-') as folder:
+    args_affix=[str(BUILD/'test_affix.exe'),folder]
+    if GAME:
+        for rva in (0x20c270,0x20bec0):
+            data=rva_bytes(rva,64);code=(C.c_ubyte*64).from_buffer_copy(data)
+            assert hook_bytes(code,64)==1,f'MinHook rejected private name entry {rva:#x}'
+        args_affix += [rva_bytes(0x20c270,64).hex(),rva_bytes(0x20bec0,64).hex()]
+    result=subprocess.run(args_affix,capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    affix_metrics=json.loads(result.stdout);assert affix_metrics['status']=='passed'
+    restored=subprocess.run([str(BUILD/'test_affix.exe'),folder,'--reopen'],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    assert json.loads(restored.stdout)['cross_process_restore']
+    affix_metrics.update({'cross_process_restore':True,'in_game_acceptance':'pending','name':'神 曹仁','threshold':5000,'private_native_entry_validation':bool(GAME)})
+
+result=subprocess.run([str(BUILD/'test_affix_bridge.exe')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+affix_metrics['event_bridge']=json.loads(result.stdout);assert affix_metrics['event_bridge']['status']=='passed'
+
+army_result=subprocess.run([str(BUILD/'test_army.exe'),str(BUILD/'army-bar.bmp'),str(BUILD/'army-details.bmp')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+army_metrics=json.loads(army_result.stdout);assert army_metrics['status']=='passed'
+army_metrics.update({'in_game_acceptance':'pending','scope':'Cao_Ren_only','extra_native_calls':0,'gameplay_modified':False})
+if GAME:
+    for rva in (0x8062d0,0x2ffa60,0x2ffb70,0x243e70,0x2788c0,0x27b180,0x20ce20,0x3ca600,0x3ca6c0,0x282230,0x2815d0):
+        data=rva_bytes(rva,64);code=(C.c_ubyte*64).from_buffer_copy(data)
+        assert hook_bytes(code,64)==1,f'MinHook rejected private army calculation copy of {rva:#x}'
+    army_metrics['private_native_trampolines_verified']=11
     for rva,hexcode in ((0x58bae9,'488b87e002000048899840010000'),(0x80a264,'48899168010000'),(0xf4d4,'488d05b56e9d01')):
         assert rva_bytes(rva,len(bytes.fromhex(hexcode)))==bytes.fromhex(hexcode)
     detail_metrics['static_adapter_anchors_verified']=3
-report={'status':'passed','game_version_check':False,'game_sha256_check':False,'hook_entry_validation':entry_metrics,'verified_game_prologues':verified_prologues,
+map_result=subprocess.run([str(BUILD/'test_map_effects.exe'),str(BUILD/'map-effects-preview.bmp')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+map_metrics=json.loads(map_result.stdout);assert map_metrics['status']=='passed'
+map_render_result=subprocess.run([str(BUILD/'test_map_render.exe')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=25,creationflags=subprocess.CREATE_NO_WINDOW)
+map_metrics['frame_renderer']=json.loads(map_render_result.stdout);assert map_metrics['frame_renderer']['status']=='passed'
+map_metrics.update({'extra_graphics_hooks':1,'extra_game_hooks':0,'extra_native_calls':0,'in_game_acceptance':'pending','game_data_read_only':True,'halo_backend':'D3D11_Present'})
+troop_result=subprocess.run([str(BUILD/'test_troop_registry.exe')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+troop_metrics=json.loads(troop_result.stdout);assert troop_metrics['status']=='passed'
+catalog_result=subprocess.run([str(BUILD/'troop_catalog.exe'),'--list'],capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+compiled_catalog=json.loads(catalog_result.stdout)
+source_catalog=json.loads((HERE.parent/'data/troops.json').read_text(encoding='utf-8'))
+assert len(compiled_catalog['troops'])==len(source_catalog['troops'])
+for compiled,source in zip(compiled_catalog['troops'],source_catalog['troops']):
+    for key in ('id','name','revision','native_carrier','max_soldiers','icon','unlock_key','commander_scope','commanders','attribute_bonus_bp','extra_gold'):
+        assert compiled[key]==source[key],('troop catalog mismatch',key)
+    assert compiled['effects']==[dict(effect,applied=False) for effect in source['effects']]
+    assert compiled['missing_capabilities']>0
+assert compiled_catalog['gameplay_integrated'] is False
+runtime_result=subprocess.run([str(BUILD/'test_troop_runtime.exe')],cwd=BUILD,capture_output=True,text=True,encoding='utf-8',check=True,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+runtime_metrics=json.loads(runtime_result.stdout);assert runtime_metrics['status']=='passed'
+troop_metrics.update({'compiled_catalog_matches_definition':True,'extra_game_hooks':16,'gameplay_integrated':True,'runtime':runtime_metrics,'runtime_capabilities':127,'native_selection_button':True,'native_troop_detail_caption':True,'deployment_soldier_cap':1000,'native_icon':'private_d3d11_shield_halberds','icon_in_game_acceptance':'pending','hover_hint':'passive_win32','confusion_immunity_enabled':True,'surround_immunity_enabled':True,'in_game_acceptance':'pending'})
+if GAME:
+    import re
+    adapter=(HERE/'troop_runtime.c').read_text(encoding='utf8')
+    rvas=[int(x,16) for x in re.search(r'static const uintptr_t rva\[\]=\{([^}]+)\};',adapter)[1].split(',')]
+    table=re.search(r'static const unsigned char signatures\[\]\[12\]=\{(.*?)\};',adapter,re.S)[1]
+    signatures=[bytes(int(x,16) for x in re.findall(r'0x[0-9a-f]+',row)) for row in re.findall(r'\{([^}]+)\}',table)]
+    assert len(rvas)==len(signatures)==25
+    for index,(rva,signature) in enumerate(zip(rvas,signatures)):
+        assert signature==rva_bytes(rva,12),(hex(rva),'troop adapter entry mismatch')
+        if index<16:
+            code=(C.c_ubyte*64).from_buffer_copy(rva_bytes(rva,64))
+            assert hook_bytes(code,64)==1,hex(rva)
+        verified_prologues.append({'rva':hex(rva),'bytes':signature.hex(),'feature':'plugin_troops','private_trampoline':'passed' if index<16 else 'not_a_hook'})
+    # A user-supplied EXE may replace the direct combat call. Keep all other
+    # adapters strict; record this path separately, since its optimization was
+    # explicitly deferred and it cannot be claimed verified on that EXE.
+    damage_call=rva_bytes(0x16685c,5)
+    assert damage_call[0]==0xe8
+    damage_target=0x166861+struct.unpack('<i',damage_call[1:])[0]
+    troop_metrics['direct_damage_native_call_verified']=damage_target==0x16a920
+    troop_metrics['direct_damage_current_target']=hex(damage_target)
+    if damage_target!=0x16a920:
+        troop_metrics['direct_damage_current_exe_acceptance']='deferred_by_user'
+    for ret,target in ((0x1d1586,0x2a20c0),(0x719437,0x6ed740),(0x721ac9,0x6ed740),
+                       (0x15c084,0x27b180),(0x15c062,0x293c60),(0x2bc03f,0x293bf0),(0x2ffaf6,0x27c220)):
+        call=rva_bytes(ret-5,5);assert call[0]==0xe8 and ret+struct.unpack('<i',call[1:])[0]==target
+    assert rva_bytes(0x15c058,5)==bytes.fromhex('ba37000000') # Native surround personality category 55.
+    assert rva_bytes(0x2bc030,5)==bytes.fromhex('be16000000') # Native confusion refusal category 22.
+    assert rva_bytes(0x2ffade,12)==bytes.fromhex('448bcb41b801000000488bd7') # Four-register break ABI.
+    troop_metrics['surround_native_call_verified']=True
+    troop_metrics['confusion_native_category_verified']=True
+    troop_metrics['break_native_four_parameter_call_verified']=True
+    assert struct.unpack('<6Q',rva_bytes(0x133f438,48))[5]==preferred_base+0x7078b0
+    for vtable,offset,method in ((0x133ff30,0xc0,0x789820),(0x12fc420,0xc0,0x789820),(0x12fc420,0xc8,0x125f0),(0x12fc420,0x208,0x7718f0)):
+        assert struct.unpack('<Q',rva_bytes(vtable+offset,8))[0]==preferred_base+method
+    assert rva_bytes(0x80743e,4)==bytes.fromhex('4c8d4310')
+    assert rva_bytes(0x807442,5)==bytes.fromhex('ba29000000')
+    troop_metrics['static_adapter_anchors_verified']=25
+
+if GAME:
+    for rva,hexcode in ((0x194870,'488991e0010000'),(0x82e1e3,'8b80f0000000'),
+                        (0xf5f4,'488d05356d9d01'),(0x509bed,'488b5010488b4820')):
+        assert rva_bytes(rva,len(bytes.fromhex(hexcode)))==bytes.fromhex(hexcode)
+    for vtable,method in ((0x12cc498,0x3f8ef0),(0x12cc760,0x3f8200)):
+        assert struct.unpack('<Q',rva_bytes(vtable+40,8))[0]==preferred_base+method
+    map_metrics['static_adapter_anchors_verified']=6
+personality_metrics=json.loads(subprocess.check_output([str(BUILD/'test_personality_edit.exe')],text=True,encoding='utf-8'))
+officer_metrics['capture_records']=json.loads(subprocess.check_output([str(BUILD/'test_officer_capture.exe')],text=True,encoding='utf-8'))
+assert officer_metrics['capture_records']['status']=='passed'
+if GAME:
+    assert rva_bytes(0x21d5f0,8)==bytes.fromhex('83fa08774f4c63ca')
+    assert rva_bytes(0x2748b0,9)==bytes.fromhex('40565741564883ec30')
+personality_metrics['in_game_acceptance']='pending'
+personality_metrics['save_load_acceptance']='pending'
+ai_metrics=json.loads(subprocess.check_output([str(BUILD/'test_ai_affix.exe')],text=True,encoding='utf-8'))
+assert ai_metrics['status']=='passed' and ai_metrics['separate_process_restore']
+assert runtime_metrics['ai_shared_creation_bridge']
+assert ai_metrics['city_periodic_ninth'] and ai_metrics['city_counts_independent'] and ai_metrics['v1_sidecar_migration']
+ai_metrics.update({'in_game_acceptance':'pending','ai_create_path_acceptance':'pending','multi_halo_in_game_acceptance':'pending','first_map_values_acceptance':'pending','publication':'local_only'})
+report={'ai_random_affix':ai_metrics,'personality_editor':personality_metrics,'status':'passed','game_version_check':False,'game_sha256_check':False,'hook_entry_validation':entry_metrics,'verified_game_prologues':verified_prologues,
         'territory_adapter_cases':512,'creation_correlation':'passed',
         'random_reference_cases':random_cases,'private_snapshots_required':False,
         'tls_thread_count':8,'tls_calls':8000,'full_queue_dropped':dropped,
         'queue_test_ms':round(elapsed*1000,3),'directinput_proxy_hresult':hr,
         'synthetic_hook_and_rule':metrics,
         'interaction':ui_metrics,'verified_phase_call_sites':len(wrapper_returns)+2 if GAME else 0,
-        'manager':manager_metrics,'github_update':update_metrics,'officers':officer_metrics,'native_officer_detail':detail_metrics,'auto_search':search_metrics,'battle_observation':battle_metrics,'installer':installer_metrics,'cleanup':cleanup_metrics,
+        'manager':manager_metrics,'github_update':update_metrics,'officers':officer_metrics,'native_officer_detail':detail_metrics,'native_army_values':army_metrics,'cao_ren_buff':buff_metrics,'career_affix':affix_metrics,'map_effects':map_metrics,'plugin_troop_registry':troop_metrics,'auto_search':search_metrics,'battle_observation':battle_metrics,'installer':installer_metrics,'cleanup':cleanup_metrics,
         'private_actual_check_off_on':list(switch_results),
         'manager_exe_sha256':hashlib.sha256((BUILD/'SAN14ModManager.exe').read_bytes()).hexdigest(),
         'production_dll_sha256':hashlib.sha256((BUILD/'dinput8.dll').read_bytes()).hexdigest(),
