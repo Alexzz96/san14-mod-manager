@@ -1,10 +1,17 @@
 // Exercise the actual native dispatcher with isolated mock game callbacks.
 // This executable never opens a game process or loads a game executable.
 #include <assert.h>
+#include <stdint.h>
 #ifdef NDEBUG
 #error "Native verification requires assertions enabled"
 #endif
+static int domestic_callbacks;
+void s14_domestic_service(void *state){(void)state;domestic_callbacks++;}
+static uintptr_t update_without_search(void *state,void *arg){(void)state;(void)arg;return 314;}
 #include "auto_search.c"
+static int auto_callbacks,auto_blocks,reserved_person,expect_domestic_first,auto_dispatch_seen,target_delegated;
+int s14_domestic_auto_turn(void *s,uintptr_t w,int d,int f){assert(s&&w&&d>=0&&f>0);auto_callbacks++;auto_dispatch_seen=1;return !auto_blocks;}
+int s14_domestic_search_allowed(int p){return p!=reserved_person;}
 static unsigned char *mock_image,*mock_world,*mock_settings;
 static unsigned char mock_force[32],mock_data[0x80],mock_people[3][0x220],mock_cities[52][0x60],mock_area[0x60];
 static void *mock_city_list[52],*mock_nodes[3][2],*mock_heads[8];
@@ -74,7 +81,7 @@ static void* iterator_start(void *data,CityIterator *it) {
     while (it->current!=it->end && !iterator_valid(it,it->current)) it->current++;
     return it;
 }
-static void* city_owner(void *city) { return city; }
+static void* city_owner(void *city) { return city==mock_cities[51]?mock_second_group:mock_force; }
 static int city_force(unsigned char *city) { return city[0x20]; }
 static int data_force(void *data) { assert(data==mock_data); return mock_settings[0x3a]; }
 static int distance(void *a,void *b) { assert(a!=b); return 4; }
@@ -100,13 +107,14 @@ static void publish_c(unsigned char *person,void **record) {
     targets[*(unsigned short*)(person+0x10)]=record[2];
 }
 static void candidates(void *state,void **list,int executor,int days,int priority) {
+    if(expect_domestic_first)assert(auto_dispatch_seen);
     assert(*(void**)((unsigned char*)state+0x470)==mock_force && list[1]==&mock_handle);
     seen_settings=executor|(days<<4)|(priority<<8);
     RouteMap *maps=*(RouteMap**)((unsigned char*)state+0x478);
     for (int i=0;i<2;i++) { assert(maps[i].size==1); unsigned char *node=*(unsigned char**)((unsigned char*)maps[i].head+8); assert(*(int*)(node+0x28)==3); }
     mock_counts[mock_handle]=mock_candidates; mock_heads[mock_handle]=mock_candidates?mock_nodes[0]:NULL;
     for (int i=0;i<3;i++) {
-        void *record[]={mock_people[i],NULL,mock_cities[1]}; publish_target(mock_people[i],record);
+        void *record[]={mock_people[i],NULL,mock_cities[target_delegated?51:1]}; publish_target(mock_people[i],record);
         *(unsigned short*)(mock_people[i]+0x196)|=0x40;
         *(int*)(mock_people[i]+0x1f4)=100+i;
     }
@@ -152,30 +160,33 @@ int main(int argc,char **argv) {
     mock_image=VirtualAlloc(NULL,0x2020000,MEM_RESERVE|MEM_COMMIT,PAGE_EXECUTE_READWRITE); assert(mock_image);
     mock_world=calloc(1,0x85200); mock_settings=calloc(1,0x1800); assert(mock_world && mock_settings);
     base_address=(uintptr_t)mock_image; end_address=base_address+0x2020000; manager_address=&mock_world; ready=1;
+    unsigned char manual_state[0x474]={0};*(int*)(manual_state+0x470)=3;
+    search_flags=0;original_update=update_without_search;SetLastError(314);
+    assert(hooked_update(manual_state,NULL)==314&&domestic_callbacks==1&&GetLastError()==314);
     *(void**)(mock_world+0x85130)=mock_settings; mock_settings[0x3a]=1;
     *(void**)(mock_image+0x1fc91d0)=mock_world;
-    ((void**)(mock_world+0xde40))[1]=mock_force; ((void**)(mock_world+0xdca0))[1]=mock_data; mock_force[0x10]=1; mock_force[0x14]=5;
+    ((void**)(mock_world+0xde40))[1]=mock_force; ((void**)(mock_world+0xdca0))[1]=mock_data; mock_force[0x10]=1;mock_force[0x11]=1; mock_force[0x14]=5;
     *(uintptr_t*)mock_force=base_address+0x129fec8;
     *(uintptr_t*)mock_foreign_group=*(uintptr_t*)mock_second_group=base_address+0x129fec8;
-    mock_foreign_group[0x10]=2;mock_second_group[0x10]=1;
+    mock_foreign_group[0x10]=2;mock_second_group[0x10]=1;mock_second_group[0x11]=2;
     *(void***)(mock_image+0x201c360)=mock_heads; *(uintptr_t**)(mock_image+0x201c378)=mock_counts; *(unsigned int*)(mock_image+0x201c390)=8;
     mock_city_vt[16]=(uintptr_t)city_owner; mock_iterator_vt[1]=(uintptr_t)iterator_valid;
     // These mock virtual methods must lie in the bounded synthetic image, too.
-    jump_to(0x1000,city_owner); mock_city_vt[16]=base_address+0x1000;
+    jump_to(0x1000,city_owner); mock_city_vt[16]=base_address+0x1000;memcpy(mock_image+0x129fd10,mock_city_vt,sizeof(mock_city_vt));
     jump_to(0x1020,iterator_valid); mock_iterator_vt[1]=base_address+0x1020;
-    jump_to(0x1100,city_force); mock_city_vt[22]=base_address+0x1100;
+    jump_to(0x1100,city_force); mock_city_vt[22]=base_address+0x1100;memcpy(mock_image+0x129fd10,mock_city_vt,sizeof(mock_city_vt));
     jump_to(0x1120,data_force); mock_data_vt[12]=base_address+0x1120; *(uintptr_t**)mock_data=mock_data_vt;
     memcpy(mock_image+0x129fe58,mock_data_vt,sizeof(mock_data_vt));*(void**)mock_data=mock_image+0x129fe58;
     jump_to(0x2f1fc0,player_group);
     for (int i=0;i<52;i++) {
-        *(uintptr_t**)mock_cities[i]=mock_city_vt; mock_cities[i][0x11]=1;
+        *(uintptr_t*)mock_cities[i]=base_address+0x129fd10;*(unsigned short*)(mock_cities[i]+0x4e)=i; mock_cities[i][0x11]=1;
         mock_cities[i][0x20]=(i==1 || i==50)?1:2; mock_city_list[i]=mock_cities[i];
         ((void**)(mock_world+0xdaa8))[i]=mock_cities[i];
     }
     mock_handle=1;
     for (int i=0;i<3;i++) {
         *(uintptr_t*)mock_people[i]=base_address+0x12a00d0;
-        *(unsigned short*)(mock_people[i]+0x10)=i+1; mock_nodes[i][0]=mock_people[i]; mock_nodes[i][1]=i==2?NULL:mock_nodes[i+1];
+        mock_people[i][0x118]=1;*(unsigned short*)(mock_people[i]+0x11a)=1;*(unsigned short*)(mock_people[i]+0x10)=i+1; mock_nodes[i][0]=mock_people[i]; mock_nodes[i][1]=i==2?NULL:mock_nodes[i+1];
         *(unsigned short*)(mock_people[i]+0x196)=i==1?0x40:0; *(int*)(mock_people[i]+0x1f4)=11*(i+1);
     }
     wcscpy((wchar_t*)(mock_people[0]+0x12),L"曹"); wcscpy((wchar_t*)(mock_people[0]+0x24),L"操");
@@ -226,6 +237,12 @@ int main(int argc,char **argv) {
     void *owned[52]; assert(cities(mock_data,owned)==2 && owned[0]==mock_cities[1] && owned[1]==mock_cities[50]);
     mock_cities[1][0x20]=mock_cities[50][0x20]=2; assert(cities(mock_data,owned)==0);
     mock_cities[1][0x20]=mock_cities[50][0x20]=1;
+    mock_cities[51][0x20]=1;RouteMap delegated_maps[52]={{0}};int initialized=0;
+    assert(build_routes(mock_data,mock_force,delegated_maps,&initialized)==3&&initialized==3);
+    assert(delegated_maps[0].size==1&&delegated_maps[1].size==1&&!delegated_maps[2].size);
+    for(int i=0;i<initialized;i++)map_destroy(&delegated_maps[i]);mock_cities[51][0x20]=2;
+    assert(direct_actor(mock_people[0],1,mock_force,mock_world));mock_people[0][0x118]=2;assert(!direct_actor(mock_people[0],1,mock_force,mock_world));mock_people[0][0x118]=1;
+    *(unsigned short*)(mock_people[0]+0x11a)=51;assert(!direct_actor(mock_people[0],1,mock_force,mock_world));*(unsigned short*)(mock_people[0]+0x11a)=1;
     SearchWorkspace workspace={0}; void ***table_slot=(void***)(mock_image+0x1fc9520);
     assert(workspace_begin(&workspace,mock_world) && *table_slot==workspace.targets && !workspace.previous);
     unsigned short old_id=*(unsigned short*)(mock_people[2]+0x10);*(unsigned short*)(mock_people[2]+0x10)=6000;
@@ -240,14 +257,14 @@ int main(int argc,char **argv) {
     DWORD protection;assert(VirtualProtect(table_slot,8,PAGE_READONLY,&protection));
     assert(!workspace_begin(&workspace,mock_world));workspace_end(&workspace);assert(VirtualProtect(table_slot,8,protection,&protection));
     s14_search_configure(S14_MASTER|S14_AUTO_SEARCH,0x123); dispatch_search();
-    assert(!search_fault && seen_settings==0x123 && native_submissions==1 && mock_force[0x14]==3);
-    assert(allocated_maps==2 && freed_maps==2 && lists_created==1 && lists_destroyed==1);
-    assert(latest_begin().dispatched==1 && !*table_slot);scratch_restored(); // native rejection and scratch restoration
-    dispatch_search(); assert(native_submissions==1 && lists_created==1); // repeated same turn
+    assert(!search_fault && seen_settings==0x123 && native_submissions==2 && mock_force[0x14]==1);
+    assert(allocated_maps==5 && freed_maps==5 && lists_created==1 && lists_destroyed==1);
+    assert(latest_begin().dispatched==2 && !*table_slot);scratch_restored(); // native rejection and scratch restoration
+    dispatch_search(); assert(native_submissions==2 && lists_created==1); // repeated same turn
     mock_day=110; mock_force[0x14]=1; dispatch_search(); assert(lists_created==1 && latest_begin().dispatched==0); // insufficient orders
-    mock_day=120; mock_force[0x14]=5; mock_candidates=0; dispatch_search(); assert(native_submissions==1 && allocated_maps==4 && freed_maps==4);
+    mock_day=120; mock_force[0x14]=5; mock_candidates=0; dispatch_search(); assert(native_submissions==2 && allocated_maps==7 && freed_maps==7);
     s14_search_configure(S14_MASTER,0); mock_day=130; dispatch_search(); assert(lists_created==2); // toggle off
-    s14_search_configure(S14_MASTER|S14_AUTO_SEARCH,0); mock_cost=0; dispatch_search(); assert(search_fault && native_submissions==1);
+    s14_search_configure(S14_MASTER|S14_AUTO_SEARCH,0); mock_cost=0; dispatch_search(); assert(search_fault && native_submissions==2);
     original_person=find_person; original_treasure=find_treasure; original_money=find_money; original_log=record_log; original_outcome=finish_outcome; original_execute=resolve_search;
     jump_to(0x1040,hooked_person); jump_to(0x1060,hooked_treasure); jump_to(0x1080,hooked_money); jump_to(0x10a0,hooked_outcome); jump_to(0x10c0,hooked_log);
     last_force=1; last_world=(uintptr_t)mock_settings; unsigned char command[0x80]={0}; command[0x28]=1;
@@ -267,8 +284,10 @@ int main(int argc,char **argv) {
     memset(&guard,0,sizeof(guard)); current_user_state=mock_area; s14_search_configure(S14_MASTER|S14_AUTO_SEARCH,0);
     ProgressFunction other=call_site(0x3f9800,0x10e0,0),accepted=call_site(0x3f9441,0x10e0,0);
     unsigned int before_lists=lists_created; other(0); assert(lists_created==before_lists);
-    accepted(0); assert(lists_created==before_lists+1); accepted(0); assert(lists_created==before_lists+1);
-    current_user_state=NULL; mock_day=150; accepted(0); assert(lists_created==before_lists+1 && progress_calls==4);
+    expect_domestic_first=1;auto_dispatch_seen=0;accepted(0); assert(lists_created==before_lists+1&&auto_callbacks==1); accepted(0); assert(lists_created==before_lists+1&&auto_callbacks==2);expect_domestic_first=0;
+    auto_blocks=1;mock_day=141;accepted(0);assert(lists_created==before_lists+1&&auto_callbacks==3);auto_blocks=0;
+    s14_search_configure(S14_MASTER,0);mock_day=142;accepted(0);assert(lists_created==before_lists+1&&auto_callbacks==4);s14_search_configure(S14_MASTER|S14_AUTO_SEARCH,0);
+    current_user_state=NULL; mock_day=150; accepted(0); assert(lists_created==before_lists+1 && progress_calls==6);
     // New campaigns may assign completely different force and group IDs.
     // The original player selector, not array-index equality, owns selection.
     unsigned char strategy[0x480]={0};
@@ -278,7 +297,7 @@ int main(int argc,char **argv) {
     ((void**)(mock_world+0xde40))[4]=mock_force;
     ((void**)(mock_world+0xde40))[5]=mock_second_group;
     ((void**)(mock_world+0xdca0))[3]=mock_data;
-    mock_force[0x10]=mock_second_group[0x10]=3;primary_group=4;
+    mock_force[0x10]=mock_second_group[0x10]=3;primary_group=4;for(int i=0;i<3;i++)mock_people[i][0x118]=4;
     mock_cities[1][0x20]=mock_cities[50][0x20]=3;
     assert(((unsigned char**)(mock_world+0xde40))[3][0x10]!=mock_settings[0x3a]);
     planning(strategy);int force_id=0,group_id=0;
@@ -293,10 +312,10 @@ int main(int argc,char **argv) {
         *(uintptr_t*)pending_commands[i]=base_address+0x129bf20;pending_commands[i][0x28]=(unsigned char)(3+i);
         pending_nodes[i][0]=pending_commands[i];pending_nodes[i][1]=i==2?NULL:pending_nodes[i+1];
     }
-    assert(pending_searches(mock_world,3)==2 && pending_searches(mock_world,2)==1);
-    // Results from our other group are included; another force is excluded.
+    assert(pending_searches(mock_world,3,4)==1 && pending_searches(mock_world,2,3)==1);
+    // Delegated group and foreign force results are excluded.
     command[0x28]=5;result_mode=3;before=queue_sequence;
-    assert(hooked_execute(command)==29 && queue_sequence==before+1);
+    assert(hooked_execute(command)==29 && queue_sequence==before);command[0x28]=4;assert(hooked_execute(command)==29&&queue_sequence==before+1);
     assert(queue[(unsigned int)queue_sequence%QSIZE].event.force==3);
     command[0x28]=3;before=queue_sequence;assert(hooked_execute(command)==29 && queue_sequence==before);
     // Same-force, same-day loads can reuse both pointers. A successful native
@@ -304,6 +323,10 @@ int main(int argc,char **argv) {
     last_session_epoch=s14_battle_session_epoch()-1;
     planning(strategy);previous_lists=lists_created;dispatch_search();assert(lists_created==previous_lists+1);
     dispatch_search();assert(lists_created==previous_lists+1);
+    mock_day=171;mock_force[0x14]=6;reserved_person=1;for(int i=0;i<3;i++)*(unsigned short*)(mock_people[i]+0x196)&=~1u;
+    unsigned submitted_before=native_submissions;dispatch_search();assert(native_submissions==submitted_before+1&&!(*(unsigned short*)(mock_people[0]+0x196)&1)&&(*(unsigned short*)(mock_people[2]+0x196)&1));
+    mock_day=172;target_delegated=1;reserved_person=0;for(int i=0;i<3;i++)*(unsigned short*)(mock_people[i]+0x196)&=~1u;
+    submitted_before=native_submissions;dispatch_search();assert(native_submissions==submitted_before);target_delegated=0;
     // Recover a context mismatch after validation, without toggling/restarting.
     primary_group=3;mock_day=170;planning(strategy);
     assert(search_fault==2 && s14_search_state(NULL,NULL)==S14_SEARCH_CONTEXT_PAUSED);
@@ -327,5 +350,5 @@ int main(int argc,char **argv) {
     assert(search_fault==1 && s14_search_state(NULL,NULL)==S14_SEARCH_STOPPED);
     assert(allocated_maps==freed_maps && lists_created==lists_destroyed && !*table_slot);scratch_restored();
     VirtualFree(mock_image,0,MEM_RELEASE); free(mock_world); free(mock_settings);
-    printf("{\"supported_force_ids_tested\":51,\"pending_search_group_mapping\":true,\"adaptive_player_force\":true,\"distinct_force_group_ids\":true,\"multi_group_result_ownership\":true,\"same_day_load_resets_guard\":true,\"context_recovers_after_validation\":true,\"fatal_fault_not_cleared\":true,\"native_dispatch_mock\":true,\"confirmed_progress_provenance\":true,\"native_route_cache\":true,\"settings_abi\":true,\"native_rejection\":true,\"remaining_orders\":true,\"no_candidate\":true,\"cleanup_balanced\":true,\"feature_off\":true,\"invalid_cost_stops_search\":true,\"four_result_callbacks\":true,\"native_log_12_arguments\":true,\"native_log_full_width_return\":true,\"original_returns_preserved\":true,\"ai_faction_excluded\":true,\"city_predicate_two_arguments\":true,\"foreign_city_filter\":true,\"empty_city_iterator\":true,\"target_table_indirection\":true,\"target_table_last_person\":true,\"existing_table_preserved\":true,\"unwritable_table_rejected\":true,\"person_scratch_restored\":true,\"private_native_iterator_fixture\":%s,\"private_native_target_store\":%s,\"game_process_touched\":false}\n",native_fixture?"true":"false",native_fixture?"true":"false"); return 0;
+    printf("{\"supported_force_ids_tested\":51,\"pending_search_group_mapping\":true,\"adaptive_player_force\":true,\"distinct_force_group_ids\":true,\"delegated_group_excluded\":true,\"domestic_before_search\":true,\"auto_domestic_search_off\":true,\"same_day_load_resets_guard\":true,\"context_recovers_after_validation\":true,\"fatal_fault_not_cleared\":true,\"native_dispatch_mock\":true,\"confirmed_progress_provenance\":true,\"native_route_cache\":true,\"settings_abi\":true,\"native_rejection\":true,\"remaining_orders\":true,\"no_candidate\":true,\"cleanup_balanced\":true,\"feature_off\":true,\"invalid_cost_stops_search\":true,\"four_result_callbacks\":true,\"native_log_12_arguments\":true,\"native_log_full_width_return\":true,\"original_returns_preserved\":true,\"ai_faction_excluded\":true,\"city_predicate_two_arguments\":true,\"foreign_city_filter\":true,\"empty_city_iterator\":true,\"target_table_indirection\":true,\"target_table_last_person\":true,\"existing_table_preserved\":true,\"unwritable_table_rejected\":true,\"person_scratch_restored\":true,\"private_native_iterator_fixture\":%s,\"private_native_target_store\":%s,\"game_process_touched\":false}\n",native_fixture?"true":"false",native_fixture?"true":"false"); return 0;
 }

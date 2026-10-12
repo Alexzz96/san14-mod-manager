@@ -75,6 +75,19 @@ def run_cleanup_tests(package, build, legacy=None):
         assert report.files==8 and report.directories==3 and report.preserved==0
         assert set(p.name for p in root.iterdir())=={'SAN14PK_SC.exe','save.sav'}
 
+        # Detect and remove a valid blink-only residual install, preserving
+        # damaged same-named files rather than claiming their ownership.
+        root=folder();state=root/'SAN14ModManager';blink=state/'blink-backstab';blink.mkdir(parents=True)
+        save_hash=hashlib.sha256(b'blink-cleanup-fixture').digest()
+        blink_state=bytes(501*36)
+        checkpoint=struct.pack('<16sII32s32s',b'S14-BLINK.v1',1,88+len(blink_state),save_hash,hashlib.sha256(blink_state).digest())+blink_state
+        (blink/(save_hash.hex()+'.s14blink')).write_bytes(checkpoint)
+        assert detect(str(root),source)&4
+        report=cleanup(root);assert report.files==1 and report.directories==2 and report.preserved==0 and not state.exists()
+        root=installed();state=root/'SAN14ModManager';blink=state/'blink-backstab';blink.mkdir()
+        invalid=blink/(save_hash.hex()+'.s14blink');invalid.write_bytes(b'corrupt-keep')
+        report=cleanup(root);assert invalid.read_bytes()==b'corrupt-keep' and report.preserved==1
+
         root=folder();state=root/'SAN14ModManager';state.mkdir()
         (state/'search-results.ini').write_text('[SearchReport]\nVersion=1\nSummary=search report\nCount=0\n',encoding='utf-16')
         assert detect(str(root),source)&4
@@ -228,7 +241,7 @@ def run_cleanup_tests(package, build, legacy=None):
         root=installed();assert troop_save(str(root))==1
         checkpoint=root/'SAN14ModManager/troops/test.s14troops';data=bytearray(checkpoint.read_bytes());data[-1]^=1;checkpoint.write_bytes(data)
         cleanup(root);assert checkpoint.read_bytes()==data
-    return {'troop_checkpoint_cleanup':True,'troop_corruption_preserved':True,'timeline_checkpoint_cleanup':True,'timeline_corruption_preserved':True,'special_checkpoint_cleanup':True,'special_corruption_preserved':True,'temporary_folder_cases':cases,'complete_uninstall':True,'missing_receipt':True,'orphan_receipt_and_config':True,
+    return {'blink_checkpoint_cleanup':True,'blink_corruption_preserved':True,'troop_checkpoint_cleanup':True,'troop_corruption_preserved':True,'timeline_checkpoint_cleanup':True,'timeline_corruption_preserved':True,'special_checkpoint_cleanup':True,'special_corruption_preserved':True,'temporary_folder_cases':cases,'complete_uninstall':True,'missing_receipt':True,'orphan_receipt_and_config':True,
             'same_name_copy_detected':True,'legacy_copy_removed':bool(legacy),'unknown_files_preserved':True,
             'locked_files_preflight':True,'read_only_preflight':True,'junctions_not_followed':True,
             'hard_links_rejected':True,'running_self_rejected_before_changes':True,

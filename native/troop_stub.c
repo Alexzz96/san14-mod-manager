@@ -1,6 +1,11 @@
 /* Existing isolated component tests have no installed troop engine. */
 #include "troop_runtime.h"
 #include "personality_edit.h"
+#include "officer_edit.h"
+int s14_edit_capability(int op){(void)op;return 0;}
+int s14_edit_capture(uintptr_t world,int officer,S14EditSnapshot *out){(void)world;(void)officer;(void)out;return 0;}
+int s14_edit_submit(const S14EditRequest *request,uint64_t *id){(void)request;if(id)*id=0;return S14_EDIT_INCOMPATIBLE;}
+int s14_edit_result(uint64_t id,S14EditResult *out){(void)id;(void)out;return 0;}
 void s14_personality_service(void *state){(void)state;}
 int s14_personality_capture(uintptr_t w,int id,unsigned short s[9]){(void)w;(void)id;(void)s;return 0;}
 int s14_personality_submit(uintptr_t w,int id,const unsigned short s[9],int a,int t){(void)w;(void)id;(void)s;(void)a;(void)t;return S14_PE_UNAVAILABLE;}

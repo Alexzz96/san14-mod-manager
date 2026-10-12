@@ -141,5 +141,6 @@ int main(void) {
     REQUIRE(GetForegroundWindow()!=toast.window && GetForegroundWindow()!=owner);
     s14_toast_destroy(&toast); DestroyWindow(owner);
     printf("{\"phase_policy\":\"passed\",\"toast_deadline_ms\":5000,\"actual_hide_ms\":%llu,\"click_through\":true,\"focus_preserved\":true,\"repeat_reuses_window\":true,\"report_all_120_lines\":true,\"report_scroll_to_end\":true,\"report_persists_until_click\":true,\"report_click_dismiss\":true,\"report_background_restore\":true,\"report_dpi192\":true,\"game_process_touched\":false}\n",(unsigned long long)elapsed);
+    REQUIRE(fflush(stdout)==0);
     return 0;
 }

@@ -234,6 +234,17 @@ int main(int argc,char **argv) {
     s14_personality_ui_show(&ui.personality,ui.snapshot,edit_officer);CHECK(IsWindowVisible(ui.personality.window));CHECK(ListView_GetItemCount(ui.personality.list)==9);
     wchar_t hidden_name[80];ListView_GetItemText(ui.personality.list,5,2,hidden_name,80);CHECK(wcsstr(hidden_name,L"#300")!=NULL);
     CHECK(!IsWindowEnabled(ui.personality.add));CHECK(!IsWindowEnabled(ui.personality.replace));CHECK(render_window(ui.personality.window,"personality-editor-preview.bmp"));
+    CHECK(SendMessageW(ui.personality.catalog,CB_GETCOUNT,0,0)==355);
+    SetWindowTextW(ui.personality.search,L"#300");CHECK(SendMessageW(ui.personality.catalog,CB_GETCOUNT,0,0)==1);
+    CHECK(SendMessageW(ui.personality.catalog,CB_GETITEMDATA,0,0)==300);
+    ui.personality.connected=1;SetWindowTextW(ui.personality.search,L"#42");
+    unsigned short staged_before[9];memcpy(staged_before,ui.personality.staged,18);int empty=-1;
+    for(int i=0;i<9;i++)if(!staged_before[i]){empty=i;break;}CHECK(empty>=0);
+    SendMessageW(ui.personality.add,BM_CLICK,0,0);CHECK(ui.personality.staged[empty]==42);
+    CHECK(!memcmp(ui.personality.officer.personalities,staged_before,18));CHECK(!memcmp(edit_officer->personalities,staged_before,18));
+    CHECK(!IsWindowEnabled(ui.personality.add));CHECK(IsWindowEnabled(ui.personality.apply));
+    SendMessageW(ui.personality.discard,BM_CLICK,0,0);CHECK(!memcmp(ui.personality.staged,staged_before,18));CHECK(!IsWindowEnabled(ui.personality.apply));
+    ui.personality.connected=0;SetWindowTextW(ui.personality.search,L"");
     SendMessageW(ui.personality.close,BM_CLICK,0,0);CHECK(!IsWindowVisible(ui.personality.window));
     S14Officer edited=*edit_officer;edited.personalities[6]=6;wcscpy(ui.snapshot->personalities[6].name,L"远矢");
     SendMessageW(ui.window,S14_PERSONALITY_CHANGED,(WPARAM)(ui.snapshot->world+1),(LPARAM)&edited);CHECK(edit_officer->personalities[6]==0);

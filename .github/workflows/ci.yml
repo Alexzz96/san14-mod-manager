@@ -29,12 +29,12 @@ jobs:
       - name: Native verification without game files
         shell: pwsh
         run: python native/verify_native.py
-      - name: Candidate installer
+      - name: Local development snapshot
         shell: pwsh
-        run: python native/package_release.py --local
+        run: python native/package_release.py --local --development
       - uses: actions/upload-artifact@v4
         with:
-          name: san14-mod-manager-candidate
+          name: san14-mod-manager-development
           path: |
             native/dist/*
             native/build/verification.json

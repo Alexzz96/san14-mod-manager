@@ -11,6 +11,7 @@
 #include "MinHook.h"
 #include "auto_search.h"
 #include "personality_edit.h"
+#include "domestic_native.h"
 #include "battle_probe.h"
 #include "turn_report.h"
 #include "search_model.h"
@@ -119,7 +120,7 @@ static int player_binding(unsigned char *g,unsigned char *s,int id,unsigned char
     // Exactly the original player's selection: settings -> force data -> its
     // ruling/primary group. A force ID is never used as a group-table index.
     unsigned char *selected=((void*(*)(void*))(base_address+0x2f1fc0))(s);
-    if (!readable(selected,0x15) || *(uintptr_t*)selected!=base_address+0x129fec8 || selected[0x10]!=id) return 0;
+    if (!readable(selected,0x15) || *(uintptr_t*)selected!=base_address+0x129fec8 || selected[0x10]!=id || selected[0x11]!=1) return 0;
     for (int i=1;i<52;i++) if (((void**)(g+0xde40))[i]==selected) {
         *group=selected; *data=owned; *group_id=i; return 1;
     }
@@ -152,7 +153,7 @@ static void* list_head(void *handle,int *count) {
     uintptr_t total=counts[id]; if (total>6001) return NULL;
     if (count) *count=(int)total; return heads[id];
 }
-static int pending_searches(unsigned char *g,int force) {
+static int pending_searches(unsigned char *g,int force,int group) {
     if (!readable(g+0x85128,sizeof(void*))) return -1;
     unsigned char *commands=*(unsigned char**)(g+0x85128);
     if (!readable(commands,0x20)) return -1;
@@ -160,7 +161,7 @@ static int pending_searches(unsigned char *g,int force) {
     for (int i=0;node && i<6001;i++) {
         if (!readable(node,16)) return -1;
         unsigned char *command=*(unsigned char**)node;
-        if (readable(command,0x41) && *(uintptr_t*)command==base_address+0x129bf20 && group_force(g,command[0x28])==force) total++;
+        if (readable(command,0x41) && *(uintptr_t*)command==base_address+0x129bf20 && command[0x28]==group && group_force(g,command[0x28])==force) total++;
         node=*((void**)node+1);
     }
     return node?-1:total;
@@ -263,19 +264,26 @@ static int insert_route(RouteMap *map,void *city,int days) {
     }
     *(int*)(hint+0x28)=days; return 1;
 }
-static int build_routes(void *force_data,RouteMap maps[52],int *initialized) {
+static int direct_city(void *city,void *primary_group) {
+    if(!readable(city,0x50)||*(uintptr_t*)city!=base_address+0x129fd10)return 0;
+    uintptr_t *vt=*(uintptr_t**)city;if(!readable(vt,0x88)||!code_address(vt[16]))return 0;
+    return ((void*(*)(void*))vt[16])(city)==primary_group;
+}
+static int direct_actor(unsigned char *person,int group,void *primary_group,unsigned char *g) {
+    if(!readable(person,0x198)||*(uintptr_t*)person!=base_address+0x12a00d0||person[0x118]!=group)return 0;
+    int home=*(unsigned short*)(person+0x11a);
+    for(int c=1;c<52;c++){void *city=((void**)(g+0xdaa8))[c];if(direct_city(city,primary_group)&&*(unsigned short*)((unsigned char*)city+0x4e)==home)return 1;}
+    return 0;
+}
+static int build_routes(void *force_data,void *primary_group,RouteMap maps[52],int *initialized) {
     void *owned[52]; int count=cities(force_data,owned); if (count<1) return count;
     for (int i=0;i<count;i++) {
         ((void*(*)(void*))(base_address+0x159880))(&maps[i]);
         if (!maps[i].head) return -1; (*initialized)++;
+        // Preserve native force-iterator indices; delegated entries stay empty.
+        if(!direct_city(owned[i],primary_group))continue;
         for (int j=0;j<count;j++) {
-            if (i==j) continue;
-            uintptr_t *a=*(uintptr_t**)owned[i],*b=*(uintptr_t**)owned[j];
-            if (!readable(a,0x88) || !readable(b,0x88) || !code_address(a[16]) || !code_address(b[16])) return -1;
-            unsigned char *left=((void*(*)(void*))a[16])(owned[i]);
-            unsigned char *right=((void*(*)(void*))b[16])(owned[j]);
-            if (!readable(left,0x12) || !readable(right,0x12)) return -1;
-            if (left[0x11]!=1 && right[0x11]!=1) continue;
+            if (i==j || !direct_city(owned[j],primary_group)) continue;
             int distance=((int(*)(void*,void*))(base_address+0x27e6d0))(owned[i],owned[j]);
             int days=((int(*)(int,void*,void*))(base_address+0x20e710))(distance,NULL,force_data);
             if (!insert_route(&maps[i],owned[j],days)) return -1;
@@ -301,9 +309,9 @@ static void dispatch_search(void) {
     SearchWorkspace workspace={0};
     unsigned char state[0x4d0]={0};
     void *list[2]={(void*)(base_address+0x123f448),NULL};
-    if (orders<cost) { event.pending=pending_searches(g,id); wcscpy(event.detail,L"剩余政令不足，未派遣新的探索。"); push(event); return; }
+    if (orders<cost) { event.pending=pending_searches(g,id,group_id); wcscpy(event.detail,L"剩余政令不足，未派遣新的探索。"); push(event); return; }
     trace_dispatch(0,day,id,started);
-    int count=build_routes(data,maps,&initialized);
+    int count=build_routes(data,force,maps,&initialized);
     if (count<0) { fail(L"探索路线数据异常，自动搜索已停止。"); goto cleanup; }
     if (!count) { wcscpy(event.detail,L"没有可探索的城市，未派遣。"); goto completed; }
     if (!workspace_begin(&workspace,g)) { fail(L"无法准备原生探索临时表，自动搜索已停止；未提交探索命令。"); goto cleanup; }
@@ -316,13 +324,15 @@ static void dispatch_search(void) {
     trace_dispatch(2,day,id,started);
     int candidates=0; void *node=list_head(list[1],&candidates);
     int budget=s14_search_budget(orders,cost,candidates);
-    for (int i=0;node && i<budget;i++) {
+    for (int i=0;node && i<candidates && event.dispatched<budget;i++) {
         if (!readable(node,16)) { fail(L"探索候选列表异常，后续派遣已停止。"); break; }
         unsigned char *person=*(unsigned char**)node; node=*((void**)node+1);
         if (!readable(person,0x198) || force[0x14]<cost || (*(unsigned short*)(person+0x196)&1)) continue;
         int person_id=*(unsigned short*)(person+0x10); if (person_id>6000) { fail(L"探索武将编号异常。"); break; }
+        if(!direct_actor(person,group_id,force,g)||!s14_domestic_search_allowed(person_id))continue;
         // The PE global contains a table pointer, not an inline array.
         void *city=workspace.targets[person_id];
+        if(!direct_city(city,force))continue;
         void *target=((void*(*)(void*,void*,void*))(base_address+0x631aa0))(force,person,city);
         if (!target || !((int(*)(void*))(base_address+0x2f29d0))(target)) continue;
         void *arguments[]={target,person};
@@ -334,7 +344,7 @@ static void dispatch_search(void) {
     else wcscpy(event.detail,L"没有满足当前设置的空闲武将，未派遣新的探索。");
     trace_dispatch(3,day,id,started);
 completed:
-    event.pending=pending_searches(g,id); event.elapsed_ms=(unsigned int)(GetTickCount64()-started); push(event);
+    event.pending=pending_searches(g,id,group_id); event.elapsed_ms=(unsigned int)(GetTickCount64()-started); push(event);
 cleanup:
     if (list[1]) ((void(*)(void*))(base_address+0x5d30f0))(list);
     for (int i=0;i<initialized;i++) ((void(*)(void*))(base_address+0x159fa0))(&maps[i]);
@@ -352,13 +362,14 @@ static void planning(void *state) {
     unsigned char *group; void *data; int group_id;
     if (!player_binding(g,s,force,&group,&data,&group_id)) { context_fail(L"等待当前玩家势力与军团匹配；不会向其他势力派遣。"); return; }
     binding_matched(force,group_id);
-    if (last_planning_day>=0 && day!=last_planning_day) push((S14SearchEvent){.kind=S14_SEARCH_END,.day=day,.force=force,.pending=pending_searches(g,force)});
-    S14SearchEvent begin={.kind=S14_SEARCH_BEGIN,.day=day,.force=force,.pending=pending_searches(g,force)};
+    if (last_planning_day>=0 && day!=last_planning_day) push((S14SearchEvent){.kind=S14_SEARCH_END,.day=day,.force=force,.pending=pending_searches(g,force,group_id)});
+    S14SearchEvent begin={.kind=S14_SEARCH_BEGIN,.day=day,.force=force,.pending=pending_searches(g,force,group_id)};
     swprintf(begin.detail,256,L"已匹配玩家势力 %d · 军团 %d；确认进行后按当前设置探索。",force,group_id); push(begin);
     last_planning_day=day; last_force=force; last_world=(uintptr_t)s;
 }
 static uintptr_t hooked_update(void *state,void *arg) {
     DWORD error=GetLastError();
+    s14_domestic_service(state);
     s14_personality_service(state);
     void *previous=current_user_state; current_user_state=state;
     if (s14_battle_enabled() && readable(state,0x474) && *(int*)((unsigned char*)state+0x470)<=2) {
@@ -372,7 +383,10 @@ static void hooked_progress(int value) {
     uintptr_t caller=(uintptr_t)__builtin_return_address(0)-base_address;
     // This call exists only in the accepted progress branch, after the native
     // confirmation flag has been consumed and before strategy phase cleanup.
-    if (!value && caller==0x3f9446 && current_user_state) { s14_battle_progress();dispatch_search(); }
+    if (!value && caller==0x3f9446 && current_user_state) {
+        s14_battle_progress();unsigned char *g,*s;int id,day;
+        if(context(&g,&s,&id,&day)&&s14_domestic_auto_turn(current_user_state,(uintptr_t)g,day,id))dispatch_search();
+    }
     SetLastError(error); original_progress(value);
 }
 static int hooked_execute(void *command) {
@@ -381,7 +395,7 @@ static int hooked_execute(void *command) {
     unsigned int flags=(unsigned int)InterlockedCompareExchange(&search_flags,0,0);
     int capture=(flags&(S14_MASTER|S14_AUTO_SEARCH))==(S14_MASTER|S14_AUTO_SEARCH) && last_force>0 && world_clock(&g,&s,&day) &&
         !s14_battle_is_loading() && (uintptr_t)g==last_manager && (uintptr_t)s==last_world &&
-        s14_battle_session_epoch()==last_session_epoch && readable(command,0x29) && group_force(g,((unsigned char*)command)[0x28])==last_force;
+        s14_battle_session_epoch()==last_session_epoch && readable(command,0x29) && ((unsigned char*)command)[0x28]==InterlockedCompareExchange(&matched_group,0,0) && group_force(g,((unsigned char*)command)[0x28])==last_force;
     if (capture) { event.kind=S14_SEARCH_RESULT; event.force=last_force; event.day=day; current_result=&event; }
     int result=original_execute(command); current_result=previous; return result;
 }
@@ -487,6 +501,7 @@ int s14_search_state(int *force,int *group) {
     return S14_SEARCH_MATCHED;
 }
 int s14_search_is_ready(void) { return s14_search_state(NULL,NULL)==S14_SEARCH_MATCHED; }
+int s14_search_bridge_available(void) { return ready; }
 static int compare_events(const void *a,const void *b) { LONG x=((const QueueSlot*)a)->sequence,y=((const QueueSlot*)b)->sequence; return (x>y)-(x<y); }
 static void log_event(HANDLE log,const S14SearchEvent *e) {
     char text[4096],json[4608]; int at=0; char utf8[1024]={0};

@@ -34,3 +34,8 @@ output/
 *.s14troops
 
 *.s14aiaffix
+*.s14blink
+native/build-*/
+native/dist-*/
+# Local acceptance records, save backups and runtime snapshots
+/native/live-domestic/

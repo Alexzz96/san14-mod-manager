@@ -5,7 +5,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode('utf-8').split('\0')
-blocked_parts = {'.mod-analysis', 'build', 'dist', 'captures', 'backups', 'output', '.tools', '__pycache__'}
+blocked_parts = {'.mod-analysis', 'build', 'dist', 'live-domestic', 'captures', 'backups', 'output', '.tools', '__pycache__'}
 blocked_suffixes = {'.exe', '.dll', '.sav', '.s14', '.s14career', '.s14special', '.s14timeline', '.s14troops', '.s14aiaffix', '.jsonl', '.bmp', '.dmp', '.bin', '.log', '.zip', '.pem', '.key'}
 patterns = [
     re.compile(rb'[A-Za-z]:[/\\]Users[/\\]', re.I),
@@ -16,7 +16,7 @@ failures = []
 total = 0
 for name in filter(None, paths):
     path = Path(name)
-    if blocked_parts.intersection(path.parts) or path.suffix.lower() in blocked_suffixes:
+    if blocked_parts.intersection(path.parts) or any(part.startswith(('build-', 'dist-')) for part in path.parts) or path.suffix.lower() in blocked_suffixes:
         failures.append(name + ': runtime/build material')
         continue
     data = (ROOT / path).read_bytes()

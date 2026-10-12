@@ -17,6 +17,15 @@ static int get(DetailReader *r,uintptr_t at,void *out,size_t n) {
 static uintptr_t ptr(const unsigned char *p) {uintptr_t n;memcpy(&n,p,8);return n;}
 static unsigned int word(const unsigned char *p) {unsigned int n;memcpy(&n,p,4);return n;}
 static unsigned short half(const unsigned char *p) {unsigned short n;memcpy(&n,p,2);return n;}
+static int technology_page(DetailReader *r,uintptr_t base,const unsigned char *tab,uintptr_t array,int *active) {
+    uintptr_t fourth=0,vt=0,methods[51],buttons=ptr(tab+0x128),selection=0;int index=-1;
+    *active=0;
+    if(!get(r,array+24,&fourth,8) || !get(r,fourth,&vt,8) || !get(r,vt,methods,sizeof(methods)) ||
+       methods[0]!=base+0x8161c0 || methods[5]!=base+0x78d9b0 || methods[49]!=base+0x54b380 ||
+       !methods[4] || methods[4]==base+0x7e7430 || !methods[48] || methods[48]==base+0x80ba40)return 0;
+    if(buttons && get(r,buttons+0x130,&selection,8) && selection && get(r,selection+0x18,&index,4)) *active=index==3;
+    return 1;
+}
 int s14_detail_validate(S14OfficerRead read,void *context,uintptr_t base) {
     // Read-only adapter anchors: native selected-data assignment, basic-page
     // person assignment, and the native UI-controller singleton getter.
@@ -32,7 +41,11 @@ static int candidate(DetailReader *r,uintptr_t base,uintptr_t object,uintptr_t w
     if(!get(r,object,dlg,sizeof(dlg)) || ptr(dlg)!=base+DETAIL_VT || (word(dlg+0x40)&3)!=3) return 0;
     uintptr_t body=ptr(dlg+0x2e0);if(!get(r,body,tab,sizeof(tab)) || ptr(tab)!=base+TAB_VT || (word(tab+0x40)&3)!=3) return 0;
     uintptr_t selected=ptr(tab+0x140),array=ptr(tab+0x130);unsigned int count=word(tab+0x138);
-    if(!selected || !array || count!=3 || !get(r,array,&page,8) || !get(r,page,basic,sizeof(basic)) || ptr(basic)!=base+0x1381700 || ptr(basic+0x168)!=selected) return 0;
+    int tech_active=0;
+    if(!selected || !array || (count!=3 && count!=4) ||
+       (count==4 && !technology_page(r,base,tab,array,&tech_active)) ||
+       !get(r,array,&page,8) || !get(r,page,basic,sizeof(basic)) || ptr(basic)!=base+0x1381700 ||
+       (!tech_active && ptr(basic+0x168)!=selected)) return 0;
     if(!get(r,selected,person,sizeof(person)) || ptr(person)!=base+PERSON_VT) return 0;
     int id=half(person+0x10);if(id<=0 || id>=S14_STATS_MAX || !get(r,world+0x148+(uintptr_t)id*8,&canonical,8) || canonical!=selected) return 0;
     memcpy(&found->panel,dlg+0x20,sizeof(RECT)); // Native x,y,width,height.
@@ -45,6 +58,7 @@ static int candidate(DetailReader *r,uintptr_t base,uintptr_t object,uintptr_t w
     // Close/switch/load races fail closed; no stale label is retained.
     unsigned char again[0x148],header[0x48];uintptr_t after_world=0;
     if(!get(r,body,again,sizeof(again)) || ptr(again)!=base+TAB_VT || ptr(again+0x140)!=selected ||
+       ptr(again+0x130)!=array || word(again+0x138)!=count || ptr(again+0x128)!=ptr(tab+0x128) ||
        !get(r,object,header,sizeof(header)) || ptr(header)!=base+DETAIL_VT || (word(header+0x40)&3)!=3 ||
        !get(r,base+WORLD_SLOT,&after_world,8) || after_world!=world) return 0;
     return 1;

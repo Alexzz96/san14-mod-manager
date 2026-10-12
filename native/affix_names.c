@@ -2,6 +2,7 @@
 #include "affix_names.h"
 #include "career_affix.h"
 #include "ai_affix.h"
+#include "blink_backstab.h"
 #include "troop_runtime.h"
 #include "MinHook.h"
 #include <string.h>
@@ -48,6 +49,7 @@ static const wchar_t *army_name_hook(void *army){
     const S14TroopDefinition *troop=s14_troop_bound(army);
     if(troop && !strcmp(troop->id,"san14.xianzhen")){wcscpy(titled_army,L"高顺 · 陷阵营");native=titled_army;}
     wchar_t random_name[24];if(s14_ai_name(army,native,random_name,24)){wcscpy(titled_army,random_name);native=titled_army;}
+    wchar_t blink_name[24];if(s14_blink_name(army,native,blink_name,24)){wcscpy(titled_army,blink_name);native=titled_army;}
     SetLastError(after);return native;
 }
 int s14_affix_names_install(uintptr_t base,uintptr_t end){

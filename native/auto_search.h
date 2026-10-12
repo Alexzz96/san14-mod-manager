@@ -7,6 +7,7 @@
 int s14_search_install(uintptr_t base,uintptr_t end,unsigned char **manager);
 void s14_search_configure(unsigned int flags,unsigned int settings);
 int s14_search_is_ready(void);
+int s14_search_bridge_available(void);
 int s14_search_state(int *force,int *group);
 void s14_search_worker(S14ManagerUI *ui,S14Toast *toast,HINSTANCE instance,HWND owner,HANDLE log);
 #ifdef S14_SELFTEST

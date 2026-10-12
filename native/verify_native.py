@@ -36,9 +36,10 @@ sys.stdout.reconfigure(encoding='utf-8')
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--game-dir', type=Path, help='Optional local game directory for static checks; never uploaded')
 parser.add_argument('--legacy-manager', type=Path, help='Optional verified previous release installer to exercise migration')
+parser.add_argument('--build-dir', type=Path, default=HERE/'build')
 args=parser.parse_args()
 GAME=args.game_dir.resolve() if args.game_dir else None
-BUILD=HERE/'build' 
+BUILD=args.build_dir.resolve()
 class Cell(C.Structure):
     _fields_=[('type',C.c_int),('owner',C.c_int)]
 class Decision(C.Structure):
@@ -562,7 +563,22 @@ assert ai_metrics['status']=='passed' and ai_metrics['separate_process_restore']
 assert runtime_metrics['ai_shared_creation_bridge']
 assert ai_metrics['city_periodic_ninth'] and ai_metrics['city_counts_independent'] and ai_metrics['v1_sidecar_migration']
 ai_metrics.update({'in_game_acceptance':'pending','ai_create_path_acceptance':'pending','multi_halo_in_game_acceptance':'pending','first_map_values_acceptance':'pending','publication':'local_only'})
-report={'ai_random_affix':ai_metrics,'personality_editor':personality_metrics,'status':'passed','game_version_check':False,'game_sha256_check':False,'hook_entry_validation':entry_metrics,'verified_game_prologues':verified_prologues,
+blink_metrics=json.loads(subprocess.check_output([str(BUILD/'test_blink_backstab.exe')],text=True,encoding='utf-8'))
+assert blink_metrics['status']=='passed' and blink_metrics['separate_process_restore']
+tech_metrics=json.loads(subprocess.check_output([str(BUILD/'test_tech_tree.exe')],text=True,encoding='utf-8'))
+assert tech_metrics['status']=='passed'
+if GAME:
+    for rva,hexcode in ((0x76a440,'40535556574154415541564157'),(0x3a54d0,'48895c2408'),
+                        (0x77a0b0,'48894c2408'),(0x82beb0,'33c0488901'),(0x7e7430,'4056574156'),
+                        (0x8309d0,'85d27872'),(0x831e70,'48895c2408'),(0x789ca0,'4883ec28')):
+        assert rva_bytes(rva,len(bytes.fromhex(hexcode)))==bytes.fromhex(hexcode)
+    assert rva_bytes(0x1304d80,24)==b'11_01_02_02_info_busho2\0'
+    for slot,method in ((0,0x8161c0),(4,0x7e7430),(5,0x78d9b0),(48,0x80ba40),(49,0x54b380)):
+        assert struct.unpack('<Q',rva_bytes(0x1304be8+slot*8,8))[0]==preferred_base+method
+    code=(C.c_ubyte*64).from_buffer_copy(rva_bytes(0x76a440,64))
+    assert hook_bytes(code,64)==1
+    tech_metrics['static_anchors_verified']=14
+report={'blink_backstab':blink_metrics,'foundation_editor':{'plan_complete':False,'candidate_ready':False,'implemented_operations':['personalities'],'missing_operations':['attributes','tactics','rank','likes','dislikes','sworn','books','items'],'six_page_editor_complete':False,'in_game_acceptance':'pending','publication':'development_local_only'},'ai_random_affix':ai_metrics,'personality_editor':personality_metrics,'status':'passed','game_version_check':False,'game_sha256_check':False,'hook_entry_validation':entry_metrics,'verified_game_prologues':verified_prologues,
         'territory_adapter_cases':512,'creation_correlation':'passed',
         'random_reference_cases':random_cases,'private_snapshots_required':False,
         'tls_thread_count':8,'tls_calls':8000,'full_queue_dropped':dropped,
@@ -574,5 +590,87 @@ report={'ai_random_affix':ai_metrics,'personality_editor':personality_metrics,'s
         'manager_exe_sha256':hashlib.sha256((BUILD/'SAN14ModManager.exe').read_bytes()).hexdigest(),
         'production_dll_sha256':hashlib.sha256((BUILD/'dinput8.dll').read_bytes()).hexdigest(),
         'game_process_touched':False}
+report['native_tech_tree']=tech_metrics
+domestic_execution=test.S14TestDomesticExecutionEnabled
+domestic_execution.argtypes=[];domestic_execution.restype=C.c_int
+assert domestic_execution()==1
+domestic_metrics={'compiled_execution_enabled':True}
+for name in ('model','bridge','capture','ui'):
+    command=[str(BUILD/f'test_domestic_{name}.exe')]
+    if name=='ui': command.append(str(BUILD/'domestic-preview.bmp'))
+    domestic_metrics[name]=json.loads(subprocess.check_output(command,text=True,encoding='utf-8',timeout=30,creationflags=subprocess.CREATE_NO_WINDOW))
+if GAME:
+    for rva,code in ((0x22480,'48894c240857'),(0x1d5ba0,'48895c2408'),(0x1d1e80,'48894c2408'),
+                     (0x62cf40,'488bc4554156'),(0x20ce20,'488bc4574154'),(0x8310,'40534883ec30'),
+                     (0x5d30f0,'40534883ec20'),(0x2f1fc0,'0fb6413a83f833'),(0x1d2ba0,'488b4128ba004001'),
+                     (0x240e80,'48895c240848896c'),(0x2449f0,'48895c240848896c'),
+                     (0x284600,'40574883ec4048c7'),(0x211870,'4889542410534883'),
+                     (0x211cd0,'4889542410534883'),(0x20f700,'48895c2418488974'),
+                     (0x20a060,'40534883ec20488b'),(0x3ca6c0,'41574883ec5048c7'),
+                     (0x2f6030,'4883ec28448b4118'),(0x2402f0,'48895c240848896c')):
+        assert rva_bytes(rva,len(bytes.fromhex(code)))==bytes.fromhex(code)
+    domestic_metrics['static_entry_guards_verified']=19
+domestic_metrics.update({'status':'passed','apply_enabled':bool(domestic_execution()),'manual_execution_acceptance_candidate':True,'in_game_acceptance':'pending',
+                         'project_labels_and_city_policy_acceptance':'pending','native_actual_lifetime_acceptance':'pending',
+                         'manual_only':False,'automatic_fill_candidate':True,'automatic_in_game_acceptance':'pending',
+                         'direct_region_writes':False,'automatic_search_off_callback':True})
+report['domestic_officers']=domestic_metrics
+maneuver_metrics=json.loads(subprocess.check_output([str(BUILD/'test_maneuver_button.exe')],text=True,encoding='utf-8'))
+assert maneuver_metrics['status']=='passed'
+if GAME:
+    # Keep the static check in sync with the production adapter's entry guards.
+    import re
+    maneuver_source=(HERE/'maneuver_button.c').read_text(encoding='utf-8')
+    checked=0
+    for entry in re.finditer(r'\{(0x[0-9a-f]+),\{([^}]+)\},(\d+)\}',maneuver_source):
+        rva=int(entry.group(1),16);code=bytes(int(v.strip(),16) for v in entry.group(2).split(','));n=int(entry.group(3))
+        assert rva_bytes(rva,n)==code[:n],hex(rva)
+        checked+=1
+    assert checked>=37
+    for vt,slot,method in ((0x12d9ef0,0,0x74d480),(0x12d9ef0,50,0x767950),(0x12d9ef0,51,0x767b00),
+                           (0x12d9ef0,5,0x7741f0),(0x12d9ef0,7,0x43bec0),(0x12d9ef0,8,0x542bb0),
+                           (0x13546b0,5,0x78d480),(0x13546b0,7,0x77c140),(0x13546b0,8,0x77ec20),
+                           (0x1357af8,0,0x536220),(0x1357af8,4,0x795de0),(0x13546b0,0,0x77b240),
+                           (0x12d9ef0,25,0x125f0),(0x12d9ef0,52,0x770d30),
+                           (0x1357af8,5,0x7a2fe0),(0x1357af8,6,0x7a2730),(0x1357af8,7,0x7a3b70),
+                           (0x1357af8,9,0x7a1ed0),(0x1357af8,10,0x7a2120),
+                           (0x1357dc8,7,0x793c90),(0x1357dc8,8,0x794a50),
+                           (0x12d9ef0,3,0x76dfb0),(0x13546b0,3,0x788310)):
+        assert struct.unpack('<Q',rva_bytes(vt+8*slot,8))[0]==preferred_base+method
+    for rva in (0x797b50,0x7a7520,0x7a6670,0x793c90,0x794a50,0x76dfb0):
+        code=(C.c_ubyte*64).from_buffer_copy(rva_bytes(rva,64));assert hook_bytes(code,64)==1
+    maneuver_metrics['static_anchors_verified']=checked+23
+    maneuver_metrics['native_draw_callbacks_verified']=True
+    # Execute only the original leaf setter in this private verification process.
+    # It has no external calls or RIP-relative data, so no game state is used.
+    kernel.VirtualAlloc.argtypes=[C.c_void_p,C.c_size_t,C.c_uint32,C.c_uint32]
+    kernel.VirtualAlloc.restype=C.c_void_p
+    kernel.VirtualProtect.argtypes=[C.c_void_p,C.c_size_t,C.c_uint32,C.POINTER(C.c_uint32)]
+    kernel.VirtualFree.argtypes=[C.c_void_p,C.c_size_t,C.c_uint32]
+    kernel.FlushInstructionCache.argtypes=[C.c_void_p,C.c_void_p,C.c_size_t]
+    setter_code=rva_bytes(0x125f0,15)
+    assert setter_code==bytes.fromhex('836140fbf7da1bc083e004094140c3')
+    allocation=kernel.VirtualAlloc(None,len(setter_code),0x3000,0x04)
+    assert allocation
+    try:
+        C.memmove(allocation,setter_code,len(setter_code))
+        previous=C.c_uint32()
+        assert kernel.VirtualProtect(allocation,len(setter_code),0x20,C.byref(previous))
+        assert kernel.FlushInstructionCache(kernel.GetCurrentProcess(),allocation,len(setter_code))
+        native_enable=C.WINFUNCTYPE(None,C.c_void_p,C.c_int)(allocation)
+        for flags in (7,0x187,0x307):
+            for enabled in (0,1,2):
+                widget=C.create_string_buffer(0x190)
+                C.c_uint32.from_buffer(widget,0x40).value=flags
+                native_enable(widget,enabled)
+                assert C.c_uint32.from_buffer(widget,0x40).value==(flags&~4)|(4 if enabled else 0)
+    finally:
+        assert kernel.VirtualFree(allocation,0,0x8000)
+    maneuver_metrics['original_enable_setter_private_cases']=9
+    for palette in range(25,30):
+        assert all(color&0xff==0xff for color in struct.unpack('<4I',rva_bytes(0x18cf3b0+palette*16,16)))
+    assert rva_bytes(0x1357b78,24)==b'00_02_00_mein_offset_21\0'
+    maneuver_metrics['native_command_skin_and_palettes_verified']=True
+report['native_maneuver_button']=maneuver_metrics
 (BUILD/'verification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 print(json.dumps(report,indent=2))

@@ -1,0 +1,4033 @@
+{
+  "schema_version": 2,
+  "exe_sha256": "604f5fe9bdd6dc2b813b93333aabeadefbad50afd2b4f71a11718b7363bca8ef",
+  "image_base": "0x140000000",
+  "method": "MSVC PE64 RTTI / COL / executable-section pointer classification",
+  "limitations": "RTTI establishes table starts, not method counts. Contiguous executable pointers may belong to adjacent callback tables. No semantics or safe callable signatures are inferred.",
+  "entries": [
+    {
+      "type": "CAIManager",
+      "typename_rva": "0x192f4d8",
+      "type_descriptor_rva": "0x192f4c8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167e550",
+          "vtable": "0x124f5d8",
+          "first_virtual_entry": "0x8cc40",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x8cc40"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CArmyAI",
+      "typename_rva": "0x192f4b8",
+      "type_descriptor_rva": "0x192f4a8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167e4d0",
+          "vtable": "0x124f5c8",
+          "first_virtual_entry": "0x8cc80",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x8cc80"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CBaseAI",
+      "typename_rva": "0x192f430",
+      "type_descriptor_rva": "0x192f420",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167e2d8",
+          "vtable": "0x124f588",
+          "first_virtual_entry": "0x8cc80",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x8cc80"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandAreaOccupyDepatureNode",
+      "typename_rva": "0x192bc08",
+      "type_descriptor_rva": "0x192bbf8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1674798",
+          "vtable": "0x1241ae0",
+          "first_virtual_entry": "0x234d0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x234d0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x3e410"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a1f0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x265d0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x3e490"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandAreaTryGetDepartureNode",
+      "typename_rva": "0x192bc40",
+      "type_descriptor_rva": "0x192bc30",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1674830",
+          "vtable": "0x1241b98",
+          "first_virtual_entry": "0x23540",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x23540"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a200"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x275c0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandAutoPaintDefenseDepartureNode",
+      "typename_rva": "0x192bc78",
+      "type_descriptor_rva": "0x192bc68",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16748c8",
+          "vtable": "0x1241c50",
+          "first_virtual_entry": "0x235a0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x235a0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a210"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x29070"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x3e5f0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandExecutionGovernmentAutoNode",
+      "typename_rva": "0x192c878",
+      "type_descriptor_rva": "0x192c868",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1676738",
+          "vtable": "0x12442b0",
+          "first_virtual_entry": "0x49eb0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x49eb0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x50850"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x4bb80"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x3e5f0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandExecutionGovernmentNode",
+      "typename_rva": "0x192bcf0",
+      "type_descriptor_rva": "0x192bce0",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16749f8",
+          "vtable": "0x1241dc8",
+          "first_virtual_entry": "0x23660",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x23660"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a230"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x296d0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88860"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandExecutionItemNode",
+      "typename_rva": "0x192c940",
+      "type_descriptor_rva": "0x192c930",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1676948",
+          "vtable": "0x12444a0",
+          "first_virtual_entry": "0x49f70",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x49f70"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x50870"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x4c230"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandExecutionLearnNode",
+      "typename_rva": "0x192c970",
+      "type_descriptor_rva": "0x192c960",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16769e0",
+          "vtable": "0x1244558",
+          "first_virtual_entry": "0x49fd0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x49fd0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x50880"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x4c310"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandExecutionPostAutoNode",
+      "typename_rva": "0x192ca20",
+      "type_descriptor_rva": "0x192ca10",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1676ba8",
+          "vtable": "0x1244788",
+          "first_virtual_entry": "0x4a090",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x4a090"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x508a0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x4c6d0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x3e5f0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandExecutionSearchNode",
+      "typename_rva": "0x192ca78",
+      "type_descriptor_rva": "0x192ca68",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1676cb8",
+          "vtable": "0x1244850",
+          "first_virtual_entry": "0x4a150",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x4a150"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x508c0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x4ca80"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandFootholdAttackDepatureNode",
+      "typename_rva": "0x192bdc8",
+      "type_descriptor_rva": "0x192bdb8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1674c58",
+          "vtable": "0x12420a8",
+          "first_virtual_entry": "0x237e0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x237e0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x3e440"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a270"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x2a5c0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x3e4f0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandFrontFootholdTransportDepatureNode",
+      "typename_rva": "0x192be10",
+      "type_descriptor_rva": "0x192be00",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1674cf0",
+          "vtable": "0x1242168",
+          "first_virtual_entry": "0x23870",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x23870"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a280"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x2b710"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x4e1480"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CCommandTransportDepatureNode",
+      "typename_rva": "0x192be58",
+      "type_descriptor_rva": "0x192be48",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1674d88",
+          "vtable": "0x1242230",
+          "first_virtual_entry": "0x238d0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x238d0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a290"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x2d570"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88800"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CDepartureNode",
+      "typename_rva": "0x192bef8",
+      "type_descriptor_rva": "0x192bee8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1674f50",
+          "vtable": "0x1242458",
+          "first_virtual_entry": "0x239f0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x239f0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a2c0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x301d0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x3e520"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CDepartureTransportNode",
+      "typename_rva": "0x192bf20",
+      "type_descriptor_rva": "0x192bf10",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1674fe8",
+          "vtable": "0x1242500",
+          "first_virtual_entry": "0x23a50",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x23a50"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a2d0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x309e0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x3e570"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CDepartureTroopsCreateNode",
+      "typename_rva": "0x192bf50",
+      "type_descriptor_rva": "0x192bf40",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1675080",
+          "vtable": "0x12425b0",
+          "first_virtual_entry": "0x23ab0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x23ab0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a2e0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x30cb0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x3e5a0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CDistrictAI",
+      "typename_rva": "0x192f470",
+      "type_descriptor_rva": "0x192f460",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167e3d0",
+          "vtable": "0x124f5a8",
+          "first_virtual_entry": "0x8cc80",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x8cc80"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CDomesticOfficerRemoveNode",
+      "typename_rva": "0x192bfb8",
+      "type_descriptor_rva": "0x192bfa8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16751b0",
+          "vtable": "0x1242718",
+          "first_virtual_entry": "0x23bd0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x23bd0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a310"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x31480"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CDomesticOfficerSetNode",
+      "typename_rva": "0x192bff0",
+      "type_descriptor_rva": "0x192bfe0",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1675248",
+          "vtable": "0x12427d0",
+          "first_virtual_entry": "0x23c30",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x23c30"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a320"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x31590"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88740"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CDomesticPriorityDevelopmentSelectNode",
+      "typename_rva": "0x192d7f8",
+      "type_descriptor_rva": "0x192d7e8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1678f60",
+          "vtable": "0x1247970",
+          "first_virtual_entry": "0x6d9b0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x6d9b0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x877d0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x71270"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88760"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CEditEventCTkEffCmd_AddLike",
+      "typename_rva": "0x195a3d8",
+      "type_descriptor_rva": "0x195a3c8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16bf810",
+          "vtable": "0x12b00f8",
+          "first_virtual_entry": "0x34a790",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x34a790"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CEditEventCTkEffCmd_ChangeIllness",
+      "typename_rva": "0x195a358",
+      "type_descriptor_rva": "0x195a348",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16bf718",
+          "vtable": "0x12b0068",
+          "first_virtual_entry": "0x34a400",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x34a400"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CEditEventCTkEffCmd_ChangePersonLoyalty",
+      "typename_rva": "0x195a1c0",
+      "type_descriptor_rva": "0x195a1b0",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16bf430",
+          "vtable": "0x12afb18",
+          "first_virtual_entry": "0x3498d0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x3498d0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x349a30"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x349a70"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x349ab0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x349af0"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x349b30"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0x349ba0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x349be0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0x349c50"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0x349c90"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x349d00"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x349d40"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x349d80"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x349dc0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x349e30"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x349e70"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x349eb0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x349f50"
+            },
+            {
+              "pointer_index": 18,
+              "rva": "0x349f90"
+            },
+            {
+              "pointer_index": 19,
+              "rva": "0x349fd0"
+            },
+            {
+              "pointer_index": 20,
+              "rva": "0x34a040"
+            },
+            {
+              "pointer_index": 21,
+              "rva": "0x34a080"
+            },
+            {
+              "pointer_index": 22,
+              "rva": "0x34a0c0"
+            },
+            {
+              "pointer_index": 23,
+              "rva": "0x34a130"
+            },
+            {
+              "pointer_index": 24,
+              "rva": "0x34a170"
+            },
+            {
+              "pointer_index": 25,
+              "rva": "0x34a1b0"
+            },
+            {
+              "pointer_index": 26,
+              "rva": "0x34a1f0"
+            },
+            {
+              "pointer_index": 27,
+              "rva": "0x34a260"
+            },
+            {
+              "pointer_index": 28,
+              "rva": "0x34a2a0"
+            },
+            {
+              "pointer_index": 29,
+              "rva": "0x34a2e0"
+            },
+            {
+              "pointer_index": 30,
+              "rva": "0x34a350"
+            },
+            {
+              "pointer_index": 31,
+              "rva": "0x34a3c0"
+            },
+            {
+              "pointer_index": 32,
+              "rva": "0x34a430"
+            },
+            {
+              "pointer_index": 33,
+              "rva": "0x34a470"
+            },
+            {
+              "pointer_index": 34,
+              "rva": "0x34a4e0"
+            },
+            {
+              "pointer_index": 35,
+              "rva": "0x34a550"
+            },
+            {
+              "pointer_index": 36,
+              "rva": "0x34a590"
+            },
+            {
+              "pointer_index": 37,
+              "rva": "0x34a600"
+            },
+            {
+              "pointer_index": 38,
+              "rva": "0x34a640"
+            },
+            {
+              "pointer_index": 39,
+              "rva": "0x34a6b0"
+            },
+            {
+              "pointer_index": 40,
+              "rva": "0x34a720"
+            },
+            {
+              "pointer_index": 41,
+              "rva": "0x34a910"
+            },
+            {
+              "pointer_index": 42,
+              "rva": "0x34a950"
+            },
+            {
+              "pointer_index": 43,
+              "rva": "0x34a9c0"
+            },
+            {
+              "pointer_index": 44,
+              "rva": "0x34aa30"
+            },
+            {
+              "pointer_index": 45,
+              "rva": "0x34aa70"
+            },
+            {
+              "pointer_index": 46,
+              "rva": "0x34aae0"
+            },
+            {
+              "pointer_index": 47,
+              "rva": "0x34ab20"
+            },
+            {
+              "pointer_index": 48,
+              "rva": "0x34ab60"
+            },
+            {
+              "pointer_index": 49,
+              "rva": "0x34abd0"
+            },
+            {
+              "pointer_index": 50,
+              "rva": "0x34ac10"
+            },
+            {
+              "pointer_index": 51,
+              "rva": "0x34ac50"
+            },
+            {
+              "pointer_index": 52,
+              "rva": "0x348640"
+            },
+            {
+              "pointer_index": 53,
+              "rva": "0x3486b0"
+            },
+            {
+              "pointer_index": 54,
+              "rva": "0x3486f0"
+            },
+            {
+              "pointer_index": 55,
+              "rva": "0x348730"
+            },
+            {
+              "pointer_index": 56,
+              "rva": "0x348770"
+            },
+            {
+              "pointer_index": 57,
+              "rva": "0x3487e0"
+            },
+            {
+              "pointer_index": 58,
+              "rva": "0x348820"
+            },
+            {
+              "pointer_index": 59,
+              "rva": "0x348890"
+            },
+            {
+              "pointer_index": 60,
+              "rva": "0x348900"
+            },
+            {
+              "pointer_index": 61,
+              "rva": "0x348940"
+            },
+            {
+              "pointer_index": 62,
+              "rva": "0x348980"
+            },
+            {
+              "pointer_index": 63,
+              "rva": "0x3489f0"
+            },
+            {
+              "pointer_index": 64,
+              "rva": "0x348a30"
+            },
+            {
+              "pointer_index": 65,
+              "rva": "0x348aa0"
+            },
+            {
+              "pointer_index": 66,
+              "rva": "0x348ae0"
+            },
+            {
+              "pointer_index": 67,
+              "rva": "0x348b20"
+            },
+            {
+              "pointer_index": 68,
+              "rva": "0x348b60"
+            },
+            {
+              "pointer_index": 69,
+              "rva": "0x348ba0"
+            },
+            {
+              "pointer_index": 70,
+              "rva": "0x348be0"
+            },
+            {
+              "pointer_index": 71,
+              "rva": "0x348c50"
+            },
+            {
+              "pointer_index": 72,
+              "rva": "0x348cc0"
+            },
+            {
+              "pointer_index": 73,
+              "rva": "0x348d00"
+            },
+            {
+              "pointer_index": 74,
+              "rva": "0x348d70"
+            },
+            {
+              "pointer_index": 75,
+              "rva": "0x348db0"
+            },
+            {
+              "pointer_index": 76,
+              "rva": "0x348df0"
+            },
+            {
+              "pointer_index": 77,
+              "rva": "0x348e30"
+            },
+            {
+              "pointer_index": 78,
+              "rva": "0x348ea0"
+            },
+            {
+              "pointer_index": 79,
+              "rva": "0x348f10"
+            },
+            {
+              "pointer_index": 80,
+              "rva": "0x348f50"
+            },
+            {
+              "pointer_index": 81,
+              "rva": "0x348fc0"
+            },
+            {
+              "pointer_index": 82,
+              "rva": "0x349000"
+            },
+            {
+              "pointer_index": 83,
+              "rva": "0x349070"
+            },
+            {
+              "pointer_index": 84,
+              "rva": "0x3490b0"
+            },
+            {
+              "pointer_index": 85,
+              "rva": "0x349120"
+            },
+            {
+              "pointer_index": 86,
+              "rva": "0x349160"
+            },
+            {
+              "pointer_index": 87,
+              "rva": "0x3491a0"
+            },
+            {
+              "pointer_index": 88,
+              "rva": "0x349210"
+            },
+            {
+              "pointer_index": 89,
+              "rva": "0x349250"
+            },
+            {
+              "pointer_index": 90,
+              "rva": "0x3492c0"
+            },
+            {
+              "pointer_index": 91,
+              "rva": "0x349300"
+            },
+            {
+              "pointer_index": 92,
+              "rva": "0x3493a0"
+            },
+            {
+              "pointer_index": 93,
+              "rva": "0x3493e0"
+            },
+            {
+              "pointer_index": 94,
+              "rva": "0x349420"
+            },
+            {
+              "pointer_index": 95,
+              "rva": "0x349490"
+            },
+            {
+              "pointer_index": 96,
+              "rva": "0x3494d0"
+            },
+            {
+              "pointer_index": 97,
+              "rva": "0x349510"
+            },
+            {
+              "pointer_index": 98,
+              "rva": "0x349580"
+            },
+            {
+              "pointer_index": 99,
+              "rva": "0x3495f0"
+            },
+            {
+              "pointer_index": 100,
+              "rva": "0x349630"
+            },
+            {
+              "pointer_index": 101,
+              "rva": "0x349670"
+            },
+            {
+              "pointer_index": 102,
+              "rva": "0x3496b0"
+            },
+            {
+              "pointer_index": 103,
+              "rva": "0x3496f0"
+            },
+            {
+              "pointer_index": 104,
+              "rva": "0x349730"
+            },
+            {
+              "pointer_index": 105,
+              "rva": "0x349770"
+            },
+            {
+              "pointer_index": 106,
+              "rva": "0x3497e0"
+            },
+            {
+              "pointer_index": 107,
+              "rva": "0x349820"
+            },
+            {
+              "pointer_index": 108,
+              "rva": "0x349860"
+            },
+            {
+              "pointer_index": 109,
+              "rva": "0x349900"
+            },
+            {
+              "pointer_index": 110,
+              "rva": "0x349940"
+            },
+            {
+              "pointer_index": 111,
+              "rva": "0x3499b0"
+            },
+            {
+              "pointer_index": 112,
+              "rva": "0x3499f0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CEditEventCTkEffCmd_ChangePersonParam",
+      "typename_rva": "0x195a130",
+      "type_descriptor_rva": "0x195a120",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16bf338",
+          "vtable": "0x12afab8",
+          "first_virtual_entry": "0x3497b0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x3497b0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CEditEventCTkEffCmd_SetPartner",
+      "typename_rva": "0x195a2d8",
+      "type_descriptor_rva": "0x195a2c8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16bf620",
+          "vtable": "0x12affc8",
+          "first_virtual_entry": "0x34a100",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x34a100"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CEditEventCTkEffCmd_Set_TreatyBrother",
+      "typename_rva": "0x195a450",
+      "type_descriptor_rva": "0x195a440",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16bf908",
+          "vtable": "0x12b0178",
+          "first_virtual_entry": "0x34a820",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x34a820"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CForceAI",
+      "typename_rva": "0x192f450",
+      "type_descriptor_rva": "0x192f440",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167e350",
+          "vtable": "0x124f598",
+          "first_virtual_entry": "0x8cc80",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x8cc80"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CGetAttackTargetArmyListNode",
+      "typename_rva": "0x192b2f0",
+      "type_descriptor_rva": "0x192b2e0",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16733d0",
+          "vtable": "0x123fbb0",
+          "first_virtual_entry": "0x1cc20",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x1cc20"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x1e3c0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x1d700"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CGetAttackTargetFootholdNode",
+      "typename_rva": "0x192b328",
+      "type_descriptor_rva": "0x192b318",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1673468",
+          "vtable": "0x123fc68",
+          "first_virtual_entry": "0x1cc80",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x1cc80"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x1e3d0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x1d9e0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CItemData",
+      "typename_rva": "0x1954530",
+      "type_descriptor_rva": "0x1954520",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16b7a80",
+          "vtable": "0x12a0588",
+          "first_virtual_entry": "0x2e4a00",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x2e4a00"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x2074d0"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x20f1f0"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x2113a0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x215300"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0x21a980"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xc000"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xbfa0"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0xc030"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0xbfd0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CListSortEvaluationNode",
+      "typename_rva": "0x192e4f8",
+      "type_descriptor_rva": "0x192e4e8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167b728",
+          "vtable": "0x124a890",
+          "first_virtual_entry": "0x6f5d0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x6f5d0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x87c80"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x7ad70"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88860"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CMiscSetAreaEvaluationNode",
+      "typename_rva": "0x192e5a0",
+      "type_descriptor_rva": "0x192e590",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167b988",
+          "vtable": "0x124ab38",
+          "first_virtual_entry": "0x6f750",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x6f750"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x87cc0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x383e0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CMiscSetFootholdEvaluationNode",
+      "typename_rva": "0x192e5d8",
+      "type_descriptor_rva": "0x192e5c8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167ba20",
+          "vtable": "0x124abf0",
+          "first_virtual_entry": "0x6f7b0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x6f7b0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x87cd0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x7c0b0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CMiscSetHexEvaluationNode",
+      "typename_rva": "0x192e610",
+      "type_descriptor_rva": "0x192e600",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167bab8",
+          "vtable": "0x124aca8",
+          "first_virtual_entry": "0x6f810",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x6f810"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x87ce0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x383e0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CMiscSetPersonEvaluationNode",
+      "typename_rva": "0x192e640",
+      "type_descriptor_rva": "0x192e630",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167bb50",
+          "vtable": "0x124ad60",
+          "first_virtual_entry": "0x6f870",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x6f870"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x87cf0"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x7c0b0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CPersonData",
+      "typename_rva": "0x19544b8",
+      "type_descriptor_rva": "0x19544a8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16b7900",
+          "vtable": "0x12a00d0",
+          "first_virtual_entry": "0x2e4d60",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x2e4d60"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x207500"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x20f220"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x211460"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x215d30"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0x217760"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x204250"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xc000"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xbfa0"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0xc030"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0xbfd0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CPersonalityData",
+      "typename_rva": "0x1954670",
+      "type_descriptor_rva": "0x1954660",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16b7f00",
+          "vtable": "0x12a0658",
+          "first_virtual_entry": "0x2e4df0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x2e4df0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x207530"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x20f230"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x2114a0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x2174f0"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0x21adc0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x204ee0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xc000"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xbfa0"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0xc030"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0xbfd0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CRankData",
+      "typename_rva": "0x1954578",
+      "type_descriptor_rva": "0x1954568",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16b7b80",
+          "vtable": "0x12a0790",
+          "first_virtual_entry": "0x2e50c0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x2e50c0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x20f270"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x2115f0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x217760"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0x21b9b0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xc000"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xbfa0"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0xc030"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0xbfd0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CSetCautionTroopsEvaluationNode",
+      "typename_rva": "0x192c358",
+      "type_descriptor_rva": "0x192c348",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1675c60",
+          "vtable": "0x1243438",
+          "first_virtual_entry": "0x24290",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x24290"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a430"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x7c0b0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CSetDistrictEvaluationNode",
+      "typename_rva": "0x192c390",
+      "type_descriptor_rva": "0x192c380",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1675cf8",
+          "vtable": "0x12434f0",
+          "first_virtual_entry": "0x242f0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x242f0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x3a440"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x383e0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CSetForceEvaluationNode",
+      "typename_rva": "0x192cb20",
+      "type_descriptor_rva": "0x192cb10",
+      "vtables": [
+        {
+          "complete_object_locator": "0x1676e80",
+          "vtable": "0x1244a78",
+          "first_virtual_entry": "0x4a490",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x4a490"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x50940"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x383e0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CSetFormationEvaluationNode",
+      "typename_rva": "0x192e7d8",
+      "type_descriptor_rva": "0x192e7c8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167bf78",
+          "vtable": "0x124b278",
+          "first_virtual_entry": "0x6fae0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x6fae0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x87d50"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x7c0b0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CSetTacticsBookEvaluationNode",
+      "typename_rva": "0x192f378",
+      "type_descriptor_rva": "0x192f368",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167e0b8",
+          "vtable": "0x124dab8",
+          "first_virtual_entry": "0x6fba0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x6fba0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x87d70"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x7c0b0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CSetTroopsEvaluationNode",
+      "typename_rva": "0x192d4d8",
+      "type_descriptor_rva": "0x192d4c8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16788c8",
+          "vtable": "0x1246e90",
+          "first_virtual_entry": "0x562a0",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x562a0"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x88180"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x12e380"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0xa295a0"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x1462d0"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xf09310"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 12,
+              "rva": "0x1e470"
+            },
+            {
+              "pointer_index": 13,
+              "rva": "0x67770"
+            },
+            {
+              "pointer_index": 14,
+              "rva": "0x87770"
+            },
+            {
+              "pointer_index": 15,
+              "rva": "0x1e310"
+            },
+            {
+              "pointer_index": 16,
+              "rva": "0x7c0b0"
+            },
+            {
+              "pointer_index": 17,
+              "rva": "0x88880"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CTacticsData",
+      "typename_rva": "0x1954508",
+      "type_descriptor_rva": "0x19544f8",
+      "vtables": [
+        {
+          "complete_object_locator": "0x16b7a00",
+          "vtable": "0x12a0298",
+          "first_virtual_entry": "0x2e5270",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x2e5270"
+            },
+            {
+              "pointer_index": 1,
+              "rva": "0x207680"
+            },
+            {
+              "pointer_index": 2,
+              "rva": "0x1d24c0"
+            },
+            {
+              "pointer_index": 3,
+              "rva": "0x2116b0"
+            },
+            {
+              "pointer_index": 4,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 5,
+              "rva": "0x217760"
+            },
+            {
+              "pointer_index": 6,
+              "rva": "0x21bc20"
+            },
+            {
+              "pointer_index": 7,
+              "rva": "0x4e1480"
+            },
+            {
+              "pointer_index": 8,
+              "rva": "0xc000"
+            },
+            {
+              "pointer_index": 9,
+              "rva": "0xbfa0"
+            },
+            {
+              "pointer_index": 10,
+              "rva": "0xc030"
+            },
+            {
+              "pointer_index": 11,
+              "rva": "0xbfd0"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    },
+    {
+      "type": "CTroopsAI",
+      "typename_rva": "0x192f498",
+      "type_descriptor_rva": "0x192f488",
+      "vtables": [
+        {
+          "complete_object_locator": "0x167e450",
+          "vtable": "0x124f5b8",
+          "first_virtual_entry": "0x8cc80",
+          "method_count": null,
+          "boundary_verified": false,
+          "contiguous_code_pointer_candidates": [
+            {
+              "pointer_index": 0,
+              "rva": "0x8cc80"
+            }
+          ]
+        }
+      ],
+      "evidence": "type_name_only",
+      "signature": null,
+      "call_relationships": null,
+      "read_range": null,
+      "write_range": null,
+      "runtime_observed": false
+    }
+  ]
+}

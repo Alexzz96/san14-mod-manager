@@ -8,6 +8,7 @@
 #include "package.h"
 #include "troop_store.h"
 #include "ai_affix.h"
+#include "blink_backstab.h"
 #include "battle_stats.h"
 #include "special_stats.h"
 #include "battle_timeline.h"
@@ -81,6 +82,7 @@ static int fail(wchar_t error[192],const wchar_t *text) { wcsncpy(error,text,191
 
 static int known_previous_manager(const char *hash) {
     static const char *known[]={
+        "99efb175f0a2d19edf8eb5c12db97f64397e8f98e8831e88a9b6e8fa77399365", // local 0.11.0-dev.1
         "155e8c42d85db39726ff30673a159b76dec226d5f45e55ba335d180f77a0f4ca", // local 0.9.8
         "47e1aa6d5b7215fef5137790c2cd21ae8cfbda655ae2e9ff8a3790ad799e9dcc", // local 0.9.7
         "c1a8f814b408b5a227f9aac1a3a2a8920d44346bb28656624823d9904fb5c03c", // local 0.9.6
@@ -124,6 +126,7 @@ static int known_previous_manager(const char *hash) {
 }
 static int known_previous_dll(const char *hash) {
     static const char *known[]={
+        "c87861a5d594f5b90abd93a699c8baecf4021d5753136fff3f5558cff5bc59eb", // local 0.11.0-dev.1
         "8e1a2f1a0e321d65727d88065b97bf24d8ba7da410fe55888d318596960c8baa", // local 0.9.8
         "d05d6aa4b8810f3656fea873546e0846ff57fb1c6a5be52cbd29011620a45c4c", // local 0.9.7
         "d6a31eb8b9cc757fade080febe9fad5df3751a4b75ba9e359c7c8cd6eee11386", // local 0.9.6
@@ -222,6 +225,10 @@ unsigned int s14_package_detect(const wchar_t *root,const wchar_t *source) {
     if(s14_join(folder,root,L"SAN14ModManager\\ai-affixes") && ordinary_directory(folder) && s14_join(pattern,folder,L"*")) {
         WIN32_FIND_DATAW data;HANDLE find=FindFirstFileW(pattern,&data);int examined=0;
         if(find!=INVALID_HANDLE_VALUE){do{if(++examined>2048)break;if(s14_join(path,folder,data.cFileName) && s14_ai_checkpoint_owned(path)){found|=S14_FOUND_DATA;break;}}while(FindNextFileW(find,&data));FindClose(find);}
+    }
+    if(s14_join(folder,root,L"SAN14ModManager\\blink-backstab") && ordinary_directory(folder) && s14_join(pattern,folder,L"*")) {
+        WIN32_FIND_DATAW data;HANDLE find=FindFirstFileW(pattern,&data);int examined=0;
+        if(find!=INVALID_HANDLE_VALUE){do{if(++examined>2048)break;if(s14_join(path,folder,data.cFileName) && s14_blink_checkpoint_owned(path)){found|=S14_FOUND_DATA;break;}}while(FindNextFileW(find,&data));FindClose(find);}
     }
     return found;
 }

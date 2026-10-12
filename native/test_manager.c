@@ -35,6 +35,12 @@ int main(void) {
     REQUIRE(WritePrivateProfileStringW(L"AutoSearch",L"Executors",NULL,ini));
     REQUIRE(!(s14_config_read(ini)&S14_CAO_REN_BUFF));
     REQUIRE(s14_config_read(ini)&S14_PLUGIN_TROOPS);
+    REQUIRE(!(s14_config_read(ini)&S14_HUANG_ZHONG_BLINK));
+    REQUIRE(!(s14_config_read(ini)&S14_AUTO_DOMESTIC));
+    REQUIRE(s14_config_set(ini,S14_AUTO_DOMESTIC,1)&&(s14_config_read(ini)&S14_AUTO_DOMESTIC));
+    REQUIRE(s14_config_set(ini,S14_AUTO_DOMESTIC,0));
+    REQUIRE(s14_config_set(ini,S14_HUANG_ZHONG_BLINK,1) && (s14_effective_flags(s14_config_read(ini))&S14_HUANG_ZHONG_BLINK));
+    REQUIRE(s14_config_set(ini,S14_HUANG_ZHONG_BLINK,0));
     REQUIRE(s14_config_set(ini,S14_PLUGIN_TROOPS,0) && !(s14_config_read(ini)&S14_PLUGIN_TROOPS));
     REQUIRE(s14_config_set(ini,S14_PLUGIN_TROOPS,1));
     REQUIRE(s14_config_set(ini,S14_CAO_REN_BUFF,1) && (s14_effective_flags(s14_config_read(ini))&S14_CAO_REN_BUFF));
@@ -104,10 +110,15 @@ int main(void) {
     REQUIRE(s14_join(runtime_file,runtime_folder,L"runtime.ini") && DeleteFileW(runtime_file) && RemoveDirectoryW(runtime_folder));
     REQUIRE(GetForegroundWindow()==foreground && !IsWindowVisible(ui.window));
     REQUIRE(s14_views_setting_read(ini) && ui.views_enabled);
+    REQUIRE(s14_manager_mod_count(&ui)==4 && s14_manager_mod_top(&ui,S14_MOD_WALL)==-1);
+    REQUIRE(s14_manager_mod_index(&ui,4)==-1);
+    REQUIRE(s14_manager_hit(&ui,(POINT){320,120})==101);
+    REQUIRE(s14_manager_hit(&ui,(POINT){400,120})==102);
+    REQUIRE(s14_manager_activate(&ui,101) && ui.tab==S14_PAGE_TESTING);
+    REQUIRE(s14_manager_mod_count(&ui)==6 && s14_manager_mod_top(&ui,S14_MOD_SEARCH)==-1);
     REQUIRE(s14_manager_hit(&ui,(POINT){776,250})==10);
     REQUIRE(s14_manager_hit(&ui,(POINT){60,250})==80);
-    REQUIRE(s14_manager_hit(&ui,(POINT){320,120})==0); // Only Mod and settings tabs.
-    REQUIRE(!s14_manager_activate(&ui,102));
+    REQUIRE(!s14_manager_activate(&ui,103));
     REQUIRE(s14_manager_activate(&ui,10));REQUIRE(!(ui.requested&S14_WALL_LIMIT));
     REQUIRE(s14_manager_activate(&ui,10));REQUIRE(ui.effective&S14_WALL_LIMIT);
     REQUIRE(callback_count==2);
@@ -121,6 +132,7 @@ int main(void) {
     REQUIRE(s14_manager_activate(&ui,1));REQUIRE(ui.effective==0);
     REQUIRE(s14_manager_activate(&ui,1));REQUIRE(ui.effective&S14_LIMIT_HINT);
     REQUIRE(ui.scroll==0);preview(&ui,"manager-preview.bmp");
+    REQUIRE(s14_manager_activate(&ui,100));
     REQUIRE(s14_manager_activate(&ui,83));int y=s14_manager_mod_top(&ui,S14_MOD_VIEWS);
     REQUIRE(s14_manager_hit(&ui,(POINT){776,y+100})==40);
     REQUIRE(s14_manager_activate(&ui,40) && !ui.officers_enabled);REQUIRE(GetPrivateProfileIntW(L"Views",L"Officers",1,ini)==0);
@@ -146,6 +158,7 @@ int main(void) {
     REQUIRE(s14_manager_activate(&ui,47) && ui.visual_settings==13 && !(ui.effective&S14_CAO_REN_BUFF));
     REQUIRE(s14_manager_activate(&ui,14) && (ui.effective&S14_CAO_REN_BUFF) && ui.visual_settings==13);
     REQUIRE(s14_manager_activate(&ui,48) && ui.visual_settings==15);
+    REQUIRE(s14_manager_activate(&ui,101));
     REQUIRE(s14_manager_activate(&ui,84));ui.scroll=9999;s14_manager_refresh(&ui);
     y=s14_manager_mod_top(&ui,S14_MOD_CAO_REN_BUFF);
     REQUIRE(s14_manager_hit(&ui,(POINT){776,y+100})==47 && s14_manager_hit(&ui,(POINT){776,y+170})==48);
@@ -156,12 +169,12 @@ int main(void) {
     REQUIRE(s14_manager_activate(&ui,14) && !s14_manager_mod_enabled(&ui,S14_MOD_CAO_REN_BUFF));
     REQUIRE(s14_manager_activate(&ui,41) && !ui.battle_enabled && !s14_battle_setting_read(ini));
     REQUIRE(s14_manager_activate(&ui,41) && ui.battle_enabled && s14_battle_setting_read(ini));
-    preview(&ui,"manager-mod-views.bmp");
+    REQUIRE(s14_manager_activate(&ui,100));preview(&ui,"manager-mod-views.bmp");
     REQUIRE(s14_manager_activate(&ui,61) && ui.mod_sort==1);
-    for(int i=1;i<S14_MOD_COUNT;i++)REQUIRE(wcscmp(s14_mods[s14_manager_mod_index(&ui,i-1)].name,s14_mods[s14_manager_mod_index(&ui,i)].name)<=0);
+    for(int i=1;i<s14_manager_mod_count(&ui);i++)REQUIRE(wcscmp(s14_mods[s14_manager_mod_index(&ui,i-1)].name,s14_mods[s14_manager_mod_index(&ui,i)].name)<=0);
     REQUIRE(ui.expanded&(1u<<S14_MOD_VIEWS));
     REQUIRE(s14_manager_activate(&ui,61) && ui.mod_sort==2);
-    for(int i=1;i<S14_MOD_COUNT;i++)REQUIRE(s14_manager_mod_enabled(&ui,s14_manager_mod_index(&ui,i-1))>=s14_manager_mod_enabled(&ui,s14_manager_mod_index(&ui,i)));
+    for(int i=1;i<s14_manager_mod_count(&ui);i++)REQUIRE(s14_manager_mod_enabled(&ui,s14_manager_mod_index(&ui,i-1))>=s14_manager_mod_enabled(&ui,s14_manager_mod_index(&ui,i)));
     REQUIRE(s14_manager_activate(&ui,61) && ui.mod_sort==0);
     REQUIRE(s14_manager_activate(&ui,83)); // collapse views
     REQUIRE(s14_manager_activate(&ui,81)); // expand search
@@ -181,10 +194,11 @@ int main(void) {
     wcscpy(ui.search_status,L"已按原生探索规则派遣 14 名武将。");
     wcscpy(ui.search_summary,L"派遣 14 人 · 完成 12 次 · 武将 1 · 名品 2 · 战法书 1 · 金钱 300\n未发现 8 次 · 在途 / 返回中 2 人");
     preview(&ui,"manager-auto-search.bmp");
-    ui.focus=10;SendMessageW(ui.window,WM_KEYDOWN,VK_TAB,0);REQUIRE(ui.focus==81);
-    REQUIRE(s14_manager_mod_top(&ui,S14_MOD_SEARCH)>=S14_MOD_LIST_TOP); // Keyboard focus reveals scrolled row.
+    ui.focus=13;SendMessageW(ui.window,WM_KEYDOWN,VK_TAB,0);REQUIRE(ui.focus==200);
+    REQUIRE(s14_manager_mod_top(&ui,S14_MOD_SEARCH)+103>=S14_MOD_LIST_TOP); // Focused child is revealed.
     REQUIRE(s14_manager_activate(&ui,81));ui.scroll=9999;s14_manager_refresh(&ui);
-    REQUIRE(ui.scroll>0 && (GetWindowLongPtrW(ui.mod_scrollbar,GWL_STYLE)&WS_VISIBLE));
+    REQUIRE(s14_manager_activate(&ui,101));REQUIRE(s14_manager_activate(&ui,80));ui.scroll=9999;s14_manager_refresh(&ui);
+    REQUIRE(ui.scroll>=0);
     REQUIRE(s14_manager_mod_top(&ui,S14_MOD_TROOPS)+76<=S14_MOD_LIST_BOTTOM);
     REQUIRE(s14_manager_activate(&ui,15) && !s14_manager_mod_enabled(&ui,S14_MOD_TROOPS));
     REQUIRE(s14_manager_activate(&ui,15) && s14_manager_mod_enabled(&ui,S14_MOD_TROOPS));
@@ -194,11 +208,25 @@ int main(void) {
     SendMessageW(ui.window,WM_KEYDOWN,VK_TAB,0);REQUIRE(ui.focus==50);
     REQUIRE(s14_manager_activate(&ui,49) && !(ui.visual_settings&4) && (ui.visual_settings&8));
     REQUIRE(s14_manager_activate(&ui,16) && !s14_manager_mod_enabled(&ui,S14_MOD_AI_AFFIX));
+    REQUIRE(s14_manager_activate(&ui,17) && s14_manager_mod_enabled(&ui,S14_MOD_BLINK));
+    REQUIRE(s14_manager_activate(&ui,88));ui.scroll=9999;s14_manager_refresh(&ui);
+    y=s14_manager_mod_top(&ui,S14_MOD_BLINK);
+    REQUIRE(y>=S14_MOD_LIST_TOP && y+164<=S14_MOD_LIST_BOTTOM);
+    REQUIRE(s14_manager_hit(&ui,(POINT){776,y+30})==17);
+    REQUIRE(!wcscmp(s14_mod_maturity(S14_MOD_BLINK),L"待实机验证"));
+    preview(&ui,"manager-huang-zhong-blink.bmp");
+    REQUIRE(s14_manager_activate(&ui,17) && !s14_manager_mod_enabled(&ui,S14_MOD_BLINK));
     REQUIRE(s14_manager_activate(&ui,16) && !(ui.visual_settings&4));
     REQUIRE(s14_manager_activate(&ui,49) && (ui.visual_settings&12)==12);
     preview(&ui,"manager-ai-affix.bmp");
     REQUIRE(s14_manager_activate(&ui,16) && !s14_manager_mod_enabled(&ui,S14_MOD_AI_AFFIX));
-    REQUIRE(s14_manager_activate(&ui,101) && ui.tab==1);
+    REQUIRE(s14_manager_activate(&ui,102) && ui.tab==S14_PAGE_SETTINGS);
+    REQUIRE(s14_manager_activate(&ui,101)&&s14_manager_activate(&ui,89));ui.scroll=9999;s14_manager_refresh(&ui);
+    y=s14_manager_mod_top(&ui,S14_MOD_DOMESTIC);REQUIRE(s14_manager_hit(&ui,(POINT){776,y+76+78})==18);
+    REQUIRE(s14_manager_activate(&ui,18)&&s14_manager_mod_enabled(&ui,S14_MOD_DOMESTIC));
+    ui.focus=64;SendMessageW(ui.window,WM_KEYDOWN,VK_TAB,0);REQUIRE(ui.focus==18);
+    REQUIRE(s14_manager_activate(&ui,18)&&!s14_manager_mod_enabled(&ui,S14_MOD_DOMESTIC));
+    preview(&ui,"manager-domestic-auto.bmp");REQUIRE(s14_manager_activate(&ui,102));
     REQUIRE(!s14_manager_activate(&ui,31) && !s14_manager_activate(&ui,32) && !s14_manager_activate(&ui,34));
     REQUIRE(s14_manager_hit(&ui,(POINT){100,512})==35 && s14_manager_activate(&ui,35) && check_count==1);
     REQUIRE(!s14_manager_activate(&ui,36));ui.update_busy=1;REQUIRE(!s14_manager_activate(&ui,35));ui.update_busy=0;
@@ -216,10 +244,10 @@ int main(void) {
     ui.scale=192;HFONT *fonts[]={&ui.title_font,&ui.body_font,&ui.small_font};
     for(int i=0;i<3;i++){LOGFONTW font;REQUIRE(GetObjectW(*fonts[i],sizeof(font),&font));font.lfHeight*=2;DeleteObject(*fonts[i]);*fonts[i]=CreateFontIndirectW(&font);REQUIRE(*fonts[i]);}
     REQUIRE(s14_manager_hit(&ui,(POINT){200,910})==34);preview(&ui,"manager-install-2x.bmp");
-    ui.tab=0;ui.expanded=1;ui.scroll=0;REQUIRE(s14_manager_hit(&ui,(POINT){1552,630})==11);preview(&ui,"manager-mods-2x.bmp");
+    ui.tab=S14_PAGE_TESTING;ui.expanded=1;ui.scroll=0;REQUIRE(s14_manager_hit(&ui,(POINT){1552,630})==11);preview(&ui,"manager-mods-2x.bmp");
     GetPrivateProfileStringW(L"Future",L"UnknownFeature",L"",value,32,ini);REQUIRE(!wcscmp(value,L"keep-me"));
     s14_manager_destroy(&ui); REQUIRE(GetForegroundWindow()==foreground);
     REQUIRE(DeleteFileW(ini)); REQUIRE(RemoveDirectoryW(root));
-    printf("{\"config_roundtrip\":true,\"search_settings\":true,\"search_controls\":true,\"unknown_keys_preserved\":true,\"master_off_on\":true,\"dependency_preserves_preference\":true,\"all_flag_combinations\":256,\"ui_live_callbacks\":%d,\"cleanup_callback\":%d,\"rendered_views\":7,\"manager_tabs\":[\"mods\",\"settings\"],\"expandable_mod_list\":true,\"stable_mod_sort\":true,\"child_preferences_preserved\":true,\"views_parent_runtime_gate\":true,\"scroll_and_keyboard_reveal\":true,\"dpi_scales\":[96,192],\"game_process_touched\":false}\n",callback_count,clean_count);
+    printf("{\"config_roundtrip\":true,\"search_settings\":true,\"search_controls\":true,\"unknown_keys_preserved\":true,\"master_off_on\":true,\"dependency_preserves_preference\":true,\"all_flag_combinations\":1024,\"ui_live_callbacks\":%d,\"cleanup_callback\":%d,\"rendered_views\":8,\"manager_tabs\":[\"foundation\",\"testing\",\"settings\"],\"expandable_mod_list\":true,\"stable_mod_sort\":true,\"child_preferences_preserved\":true,\"views_parent_runtime_gate\":true,\"scroll_and_keyboard_reveal\":true,\"dpi_scales\":[96,192],\"game_process_touched\":false}\n",callback_count,clean_count);
     return 0;
 }

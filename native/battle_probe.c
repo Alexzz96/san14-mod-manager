@@ -22,6 +22,7 @@
 #include "career_affix.h"
 #include "troop_runtime.h"
 #include "ai_affix.h"
+#include "blink_backstab.h"
 
 #define BATTLE_QSIZE 2048
 #define BATTLE_JSON_SIZE 16384
@@ -359,13 +360,14 @@ static uintptr_t hooked_battle_fire(void *hex,int value) {
 }
 static uintptr_t hooked_battle_troops(int type,int id,int amount,int source_type,int source_id) {
     DWORD troop_error=GetLastError();int native_amount=amount;
+    S14BlinkHit blink_hit;amount=s14_blink_hit_begin(type,id,amount,source_type,source_id,(uintptr_t)__builtin_return_address(0),&blink_hit);
     /* Positive amount removes soldiers at this verified direct combat call.
        Transfers, healing, fire and unknown callers retain native behavior. */
     if(type==27 && source_type==27 && amount>0 && id!=source_id &&
        (uintptr_t)__builtin_return_address(0)==battle_base+0x166861)
         amount=s14_troop_damage(battle_army_at(battle_world(),id),amount);
     SetLastError(troop_error);
-    if (!s14_battle_enabled()) return original_troops(type,id,amount,source_type,source_id);
+    if (!s14_battle_enabled()) {uintptr_t value=original_troops(type,id,amount,source_type,source_id);DWORD after=GetLastError();s14_blink_hit_end(&blink_hit);SetLastError(after);return value;}
     DWORD error=GetLastError(); BattleEvent e=battle_begin(B_TROOPS,(uintptr_t)__builtin_return_address(0)-battle_base);
     e.args[0]=(uintptr_t)(intptr_t)type; e.args[1]=(uintptr_t)(intptr_t)id; e.args[2]=(uintptr_t)(intptr_t)amount;
     e.args[3]=(uintptr_t)(intptr_t)source_type; e.args[4]=(uintptr_t)(intptr_t)source_id;
@@ -378,13 +380,14 @@ static uintptr_t hooked_battle_troops(int type,int id,int amount,int source_type
     }
     LONG64 previous=battle_parent;BattleEvent *old_damage=battle_damage;battle_damage=&e;battle_parent=e.id; SetLastError(error);
     uintptr_t result=original_troops(type,id,amount,source_type,source_id); error=GetLastError(); battle_parent=previous;battle_damage=old_damage;
+    s14_blink_hit_end(&blink_hit);
     e.native_return=result; e.target_after=battle_object(e.world,target); e.source_after=battle_object(e.world,source);
     e.fire_after=battle_fire_value(hex);
     e.post_identity_matches=same_object(&e.target,&e.target_after); e.elapsed=GetTickCount64()-e.tick;
     battle_enqueue(&e); SetLastError(error); return result;
 }
 static uintptr_t hooked_battle_remove(void *target,void *source,void *other,int reason,int option) {
-    if (!s14_battle_enabled()){uintptr_t result=original_remove(target,source,other,reason,option);DWORD error=GetLastError();s14_troop_forget(target);s14_ai_forget(target);SetLastError(error);return result;}
+    if (!s14_battle_enabled()){uintptr_t result=original_remove(target,source,other,reason,option);DWORD error=GetLastError();s14_troop_forget(target);s14_ai_forget(target);s14_blink_forget(target);SetLastError(error);return result;}
     DWORD error=GetLastError(); BattleEvent e=battle_begin(B_REMOVE,(uintptr_t)__builtin_return_address(0)-battle_base);
     e.args[0]=(uintptr_t)target; e.args[1]=(uintptr_t)source; e.args[2]=(uintptr_t)other;
     e.args[3]=(uintptr_t)(intptr_t)reason; e.args[4]=(uintptr_t)(intptr_t)option;
@@ -393,6 +396,7 @@ static uintptr_t hooked_battle_remove(void *target,void *source,void *other,int 
     LONG64 previous=battle_parent; battle_parent=e.id; SetLastError(error);
     uintptr_t result=original_remove(target,source,other,reason,option); error=GetLastError(); battle_parent=previous;
     s14_troop_forget(target);s14_ai_forget(target);
+    s14_blink_forget(target);
     e.native_return=result; e.target_after=battle_object(e.world,target); e.source_after=battle_object(e.world,source);
     e.post_identity_matches=same_object(&e.target,&e.target_after); e.elapsed=GetTickCount64()-e.tick;
     battle_enqueue(&e); SetLastError(error); return result;

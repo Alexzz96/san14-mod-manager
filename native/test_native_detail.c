@@ -9,7 +9,8 @@
 #include <wchar.h>
 typedef struct {uintptr_t at;size_t n;unsigned char *p;} Segment;
 static Segment segments[32];static int segment_count,mutate;
-static unsigned char registry[128],controller[404],world[50000],dialog[832],tab[328],basic[368],person[64],other[64],table[8],handle[4],node[16],nodes[32784],pages[24];
+static unsigned char registry[128],controller[404],world[50000],dialog[832],tab[328],basic[368],person[64],other[64],table[8],handle[4],node[16],nodes[32784],pages[32];
+static uintptr_t tech_vtable[51],tech_header;static unsigned char buttons[0x138],selection[0x20];
 static const uintptr_t base=0x140000000,world_addr=0x1000000,dlg_addr=0x2000000,body_addr=0x3000000,basic_addr=0x4000000,person_addr=0x5000000;
 static void add(uintptr_t at,void *p,size_t n) {segments[segment_count++]=(Segment){at,n,p};}
 static void put64(unsigned char *p,size_t at,uintptr_t v) {memcpy(p+at,&v,8);}
@@ -36,6 +37,17 @@ static void fixture(void) {
 }
 int main(void) {
     S14DetailFrame f;fixture();assert(s14_detail_capture(reader,NULL,base,&f));assert(f.officer_id==518 && !wcscmp(f.name,L"曹仁") && f.world==world_addr && f.bytes<262144);
+    put32(tab,0x138,4);put64(pages,24,0x6400000);tech_header=0x6500000;
+    memset(tech_vtable,0,sizeof(tech_vtable));tech_vtable[0]=base+0x8161c0;tech_vtable[4]=0x6600000;
+    tech_vtable[5]=base+0x78d9b0;tech_vtable[48]=0x6600100;tech_vtable[49]=base+0x54b380;
+    add(0x6400000,&tech_header,8);add(0x6500000,tech_vtable,sizeof(tech_vtable));
+    assert(s14_detail_capture(reader,NULL,base,&f));
+    tech_vtable[49]=0;assert(!s14_detail_capture(reader,NULL,base,&f));tech_vtable[49]=base+0x54b380;
+    put64(tab,0x128,0x6700000);put64(buttons,0x130,0x6800000);put32(selection,0x18,3);
+    add(0x6700000,buttons,sizeof(buttons));add(0x6800000,selection,sizeof(selection));
+    put64(basic,0x168,person_addr+0x1000);assert(s14_detail_capture(reader,NULL,base,&f) && f.officer_id==518);
+    put32(selection,0x18,0);assert(!s14_detail_capture(reader,NULL,base,&f));
+    fixture();
     put32(dialog,0x40,46);assert(!s14_detail_capture(reader,NULL,base,&f));put32(dialog,0x40,47);
     put64(tab,0x140,0);assert(!s14_detail_capture(reader,NULL,base,&f));put64(tab,0x140,person_addr);
     put64(basic,0x168,person_addr+0x1000);assert(!s14_detail_capture(reader,NULL,base,&f));put64(basic,0x168,person_addr);

@@ -4,7 +4,7 @@
 #include "features.h"
 typedef struct S14ManagerUI S14ManagerUI;
 typedef void (*S14ManagerAction)(S14ManagerUI*,int,void*);
-enum { S14_ACTION_CONFIG=1,S14_ACTION_CHOOSE,S14_ACTION_INSTALL,S14_ACTION_REMOVE,S14_ACTION_LOGS,S14_ACTION_CLEAN,S14_ACTION_CHECK_UPDATE,S14_ACTION_DOWNLOAD_UPDATE };
+enum { S14_ACTION_CONFIG=1,S14_ACTION_CHOOSE,S14_ACTION_INSTALL,S14_ACTION_REMOVE,S14_ACTION_LOGS,S14_ACTION_CLEAN,S14_ACTION_CHECK_UPDATE,S14_ACTION_DOWNLOAD_UPDATE,S14_ACTION_DOMESTIC_FILL,S14_ACTION_DOMESTIC_OPTIMIZE };
 struct S14ManagerUI {
     HWND window,owner,directory_edit,mod_scrollbar;
     HINSTANCE instance;
@@ -16,6 +16,7 @@ struct S14ManagerUI {
     unsigned int search_settings;
     int search_state,search_force,search_group;
     wchar_t search_status[192],search_summary[256],search_details[4096];
+    wchar_t domestic_status[192];
     int search_scroll;
     int officers_enabled;
     int views_enabled;
@@ -42,6 +43,7 @@ int s14_manager_mod_enabled(const S14ManagerUI *ui,int mod);
 int s14_manager_view_enabled(const S14ManagerUI *ui,int native);
 const wchar_t *s14_manager_mod_status(const S14ManagerUI *ui,int mod);
 int s14_manager_mod_index(const S14ManagerUI *ui,int position);
+int s14_manager_mod_count(const S14ManagerUI *ui);
 int s14_manager_mod_top(const S14ManagerUI *ui,int mod);
 #define S14_MANAGER_WIDTH 860
 #define S14_MANAGER_HEIGHT 790

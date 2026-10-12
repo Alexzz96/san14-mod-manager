@@ -7,7 +7,9 @@ const S14Feature s14_features[]={
     {L"auto_search",L"AutoSearch",L"回合自动搜索",L"确认进行后，按设置使用剩余政令派遣探索。\n展开 Mod 可调整派遣条件并查看回合结果。",L"人才探索",S14_AUTO_SEARCH,0,1},
     {L"cao_ren_attack_defense",L"CaoRenAttackDefense",L"百战精锐 · 曹仁",L"曹仁已记录斩敌达到 5000（含伤兵），获得百战精锐。\n显示神 曹仁；实际攻军、防御 +10%，回合结束后解锁。",L"战斗增幅",S14_CAO_REN_BUFF,0,1},
     {L"plugin_troops",L"PluginTroops",L"扩展兵种 · 陷阵营",L"高顺出征可选择陷阵营；实际属性增幅与独立扣费。\n支持保存、读档；混乱免疫尚未启用。",L"扩展兵种",S14_PLUGIN_TROOPS,0,1},
-    {L"ai_random_affix",L"AiRandomAffix",L"AI 随机词条",L"各 AI 城市第 9、18、27…次成功出征必出；其余按 10% 抽取。\n仅本次部队有效；不为已有部队补抽，同类增幅取最高。",L"随机词条",S14_AI_RANDOM_AFFIX,0,1}
+    {L"ai_random_affix",L"AiRandomAffix",L"AI 随机词条",L"各 AI 城市第 9、18、27…次成功出征必出；其余按 10% 抽取。\n仅本次部队有效；不为已有部队补抽，同类增幅取最高。",L"随机词条",S14_AI_RANDOM_AFFIX,0,1},
+    {L"huang_zhong_blink",L"HuangZhongBlink",L"闪袭背刺 · 黄忠",L"仅黄忠主将部队：直击后闪到敌军背后最近合法空格。\n搜索后方 1、2、3 格；一次直击背刺 +30%，冷却 5 游戏日。",L"位移词条",S14_HUANG_ZHONG_BLINK,0,1},
+    {L"auto_domestic_fill",L"AutoDomesticFill",L"回合自动补齐内政",L"确认进行后先补齐自势力直辖区域，再派遣探索。\n保留现职、锁定与排除；命令书不足按优先级部分补齐。",L"内政",S14_AUTO_DOMESTIC,0,1}
 };
 const int s14_feature_count=sizeof(s14_features)/sizeof(s14_features[0]);
 const S14Mod s14_mods[S14_MOD_COUNT]={
@@ -18,8 +20,18 @@ const S14Mod s14_mods[S14_MOD_COUNT]={
     {L"cao_ren_attack_defense",L"百战精锐 · 曹仁",L"斩敌达到 5000：神 曹仁，攻军、防御 +10%；随存档恢复。",L"战斗",14,1},
     {L"diagnostics",L"诊断日志",L"记录规则检查与建造结果，便于定位异常。",L"工具",12,0},
     {L"plugin_troops",L"扩展兵种 · 陷阵营",L"高顺专属；出征选兵种，额外费用 2000 + 每千兵 500。",L"兵种",15,0},
-    {L"ai_random_affix",L"AI 随机词条",L"AI 城市每 9 次出征保底；其余 10%，攻军、防御 +10%。",L"随机",16,1}
+    {L"ai_random_affix",L"AI 随机词条",L"AI 城市每 9 次出征保底；其余 10%，攻军、防御 +10%。",L"随机",16,1},
+    {L"huang_zhong_blink",L"闪袭背刺 · 黄忠",L"仅黄忠主将：后方 1→2→3 格找落点，一次直击背刺 +30%。",L"位移",17,1},
+    {L"domestic_officers",L"区域官员配置",L"Ctrl+G 规划；支持每回合先补齐直辖内政，再派遣探索。",L"内政",62,1}
 };
+int s14_mod_page(int mod){
+    return mod==S14_MOD_SEARCH || mod==S14_MOD_BATTLE || mod==S14_MOD_VIEWS || mod==S14_MOD_DIAGNOSTICS?S14_PAGE_FOUNDATION:S14_PAGE_TESTING;
+}
+const wchar_t *s14_mod_maturity(int mod){
+    if(mod==S14_MOD_DOMESTIC)return L"手动已核对 / 自动待验";
+    if(mod==S14_MOD_BLINK)return L"待实机验证";
+    return mod==S14_MOD_SEARCH || mod==S14_MOD_BATTLE?L"稳定":mod==S14_MOD_VIEWS?L"查询稳定 / 编辑待验":mod==S14_MOD_DIAGNOSTICS?L"基础工具":L"测试";
+}
 static int boolean(const wchar_t *path,const wchar_t *section,const wchar_t *key,int fallback) {
     int value=(int)GetPrivateProfileIntW(section,key,fallback,path);
     return value==0?0:(value==1?1:fallback);
@@ -36,6 +48,8 @@ unsigned int s14_config_read(const wchar_t *path) {
     if (boolean(path,L"Features",L"CaoRenAttackDefense",0)) flags|=S14_CAO_REN_BUFF;
     if (boolean(path,L"Features",L"PluginTroops",1)) flags|=S14_PLUGIN_TROOPS;
     if (boolean(path,L"Features",L"AiRandomAffix",0)) flags|=S14_AI_RANDOM_AFFIX;
+    if (boolean(path,L"Features",L"HuangZhongBlink",0)) flags|=S14_HUANG_ZHONG_BLINK;
+    if (boolean(path,L"Features",L"AutoDomesticFill",0)) flags|=S14_AUTO_DOMESTIC;
     return flags;
 }
 int s14_config_set(const wchar_t *path,unsigned int flag,int enabled) {

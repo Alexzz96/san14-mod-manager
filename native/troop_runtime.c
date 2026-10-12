@@ -3,6 +3,7 @@
 #include "MinHook.h"
 #include "troop_store.h"
 #include "ai_affix.h"
+#include "blink_backstab.h"
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
@@ -401,7 +402,7 @@ static uintptr_t create_hook(void *packet){
     int previous_leader=creating_leader;const S14TroopDefinition *previous_definition=creating_definition;uintptr_t previous_world=creating_world;
     creating_leader=packet_read((uintptr_t)packet,p)?p[0]:0;creating_definition=special?spec:NULL;creating_world=world;
     S14AiDraw ai;s14_ai_prepare(creating_leader,(uintptr_t)__builtin_return_address(0),&ai);s14_ai_creation_begin(&ai);
-    SetLastError(error);uintptr_t result=original_create(packet);error=GetLastError();s14_ai_creation_end();s14_ai_created((void*)result,&ai);creating_leader=previous_leader;creating_definition=previous_definition;creating_world=previous_world;int id;Binding key;
+    SetLastError(error);uintptr_t result=original_create(packet);error=GetLastError();s14_ai_creation_end();s14_ai_created((void*)result,&ai);s14_blink_created((void*)result);creating_leader=previous_leader;creating_definition=previous_definition;creating_world=previous_world;int id;Binding key;
     if(unit_identity((void*)result,&id,&key)){
         AcquireSRWLockExclusive(&guard);if(live.world && live.world!=world)memset(&live,0,sizeof(live));live.world=world;memset(&live.units[id],0,sizeof(Binding));ReleaseSRWLockExclusive(&guard);
         if(special && key.leader==p[0] && key.carrier==p[3]){

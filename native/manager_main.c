@@ -160,7 +160,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE previous,LPWSTR command,int sho
     LocalFree(args); set_root(&ui,root);
     if (!s14_manager_create(&ui,instance,NULL,0)) { CoUninitialize(); return 1; }
     refresh(&ui,1); s14_manager_toggle(&ui);
-    if(updates || apply_update){ui.tab=1;s14_manager_refresh(&ui);}
+    if(updates || apply_update){ui.tab=S14_PAGE_SETTINGS;s14_manager_refresh(&ui);}
     if(updates)start_update(&ui,0);
     if(apply_update){Sleep(600);action(&ui,S14_ACTION_INSTALL,NULL);}
     ULONGLONG last_refresh=0; MSG message;

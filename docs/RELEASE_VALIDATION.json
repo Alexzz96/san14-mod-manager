@@ -1,8 +1,8 @@
 {
-  "version": "0.10.12",
-  "distribution": "github_test_release",
+  "version": "0.11.0-dev.14",
+  "distribution": "github_source_pull_request",
   "native_independent_tests": "passed",
-  "python_tests": 32,
+  "python_tests": 35,
   "public_package_gate": "explicit_prerelease_required",
   "ai_random_affix": {
     "status": "passed",
@@ -45,5 +45,21 @@
   "modified_exe_damage_adapter": "pending",
   "private_runtime_files_uploaded": false,
   "cloud_validation": "pending",
-  "localized_status_ipc": "UTF8_hex_with_legacy_fallback"
+  "localized_status_ipc": "UTF8_hex_with_legacy_fallback",
+  "domestic_officers": {
+    "independent_tests": "passed",
+    "source_hashes_verified": 149,
+    "maximum_weight_cases": 600,
+    "manual_real_assignment": "passed_four_regions",
+    "manual_exact_debit": "passed_four_regions",
+    "native_ui_display": "passed_four_regions",
+    "automatic_actual_acceptance": "pending",
+    "save_load_acceptance": "pending",
+    "budget_limited_global_optimality": false,
+    "manual_result_preserved_after_automatic_request": true,
+    "busy_refresh_retries": true,
+    "delegated_groups_excluded": true,
+    "direct_region_writes": false,
+    "default_auto_fill": false
+  }
 }

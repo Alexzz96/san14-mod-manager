@@ -9,6 +9,7 @@ HERE=Path(__file__).resolve().parent
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--build-dir', type=Path, default=HERE/'build')
 parser.add_argument('--dist-dir', type=Path, default=HERE/'dist')
+parser.add_argument('--development', action='store_true', help='Local incomplete development snapshot; never a first-version candidate')
 publication=parser.add_mutually_exclusive_group()
 publication.add_argument('--local', action='store_true', help='Package local observations without publishing')
 publication.add_argument('--prerelease', action='store_true', help='Explicitly package a public test release with acceptance still pending')
@@ -19,6 +20,10 @@ version=(HERE.parent/'VERSION').read_text(encoding='utf-8').strip()
 verification=json.loads((BUILD/'verification.json').read_text(encoding='utf-8'))
 if verification.get('status') != 'passed':
     raise SystemExit('Native verification must pass before packaging')
+if args.development and not args.local:
+    raise SystemExit('--development requires --local')
+if not verification.get('foundation_editor',{}).get('plan_complete',False) and not args.development:
+    raise SystemExit('Foundation editor plan is incomplete; no candidate package. Use --local --development for a development snapshot')
 payloads={}
 for name,key in [('SAN14ModManager.exe','manager_exe_sha256'),('dinput8.dll','production_dll_sha256')]:
     data=(BUILD/name).read_bytes()
@@ -32,7 +37,7 @@ config=b'[Rule]\nMode=0\n[Manager]\nEnabled=1\n[Features]\nWallClusterLimit=0\nL
 config+=b'[Views]\nEnabled=1\nOfficers=1\nNativeOfficerStats=1\nNativeArmyValues=1\n'
 config+=b'[Observation]\nBattleEvents=1\n'
 config+=b'[Visuals]\nCaoRenHalo=1\nCaoRenTooltip=1\nAiAffixHalo=1\nAiAffixTooltip=1\n'
-config=config.replace(b'PluginTroops=1\n',b'PluginTroops=1\nAiRandomAffix=0\n')
+config=config.replace(b'PluginTroops=1\n',b'PluginTroops=1\nAiRandomAffix=0\nHuangZhongBlink=0\nAutoDomesticFill=0\n')
 manifest={'turn_report_player_force_unified':True,'turn_report_force_fix_in_game_acceptance':'pending','adaptive_player_force_matching':True,'force_group_identity_separated':True,'successful_load_session_reset':True,'adaptive_search_in_game_acceptance':'pending','version':version,'release_status':'prerelease','platform':'windows-x64',
           'target_executable':'SAN14PK_SC.exe','game_version_check':False,
           'game_sha256_check':False,'runtime_hook_validation':True,
@@ -47,16 +52,16 @@ manifest.update({'ai_random_affix':True,'ai_random_affix_default_enabled':False,
 manifest.update({'career_affix':'veteran_elite','career_affix_officer':518,'career_affix_threshold':5000,'career_affix_name':'神 曹仁','career_affix_unlock':'end_of_turn','career_affix_in_game_acceptance':'pending','native_person_name_fields_modified':False})
 manifest.update({'ui_theme':'warm-paper-terracotta','complete_uninstall':True,
                  'uninstall_from_external_manager':True,'unknown_files_preserved':True})
-assert verification['manager']['manager_tabs']==['mods','settings']
+assert verification['manager']['manager_tabs']==['foundation','testing','settings']
 assert all(verification['manager'][key] for key in ('expandable_mod_list','stable_mod_sort',
     'child_preferences_preserved','views_parent_runtime_gate','scroll_and_keyboard_reveal'))
-manifest.update({'manager_tabs':['mods','settings'],'manager_mod_list':True,
-                 'manager_mod_count':8,'manager_mod_expandable_children':True,
+manifest.update({'manager_tabs':['foundation','testing','settings'],'manager_mod_list':True,
+                 'manager_mod_count':10,'manager_mod_expandable_children':True,
                  'manager_mod_sort':['default','name','enabled_first'],
                  'manager_child_preferences_preserved':True,'manager_views_parent_default_enabled':True,
                  'manager_expanded_group_border':True,'manager_parent_child_divider':True,
                  'manager_install_and_update_tab':'settings',
-                 'manager_report_entry':'mods / auto_search / expand / previous_turn_report'})
+                 'manager_report_entry':'foundation / auto_search / expand / previous_turn_report'})
 manifest.update({'auto_search':True,'auto_search_start_toast_ms':2000,
                  'auto_search_result_types':['person','item','tactic_book','money'],
                  'auto_search_native_settings':True,'auto_search_in_game_acceptance':'pending',
@@ -69,7 +74,8 @@ assert verification['officers']['status']=='passed'
 assert verification['personality_editor']['status']=='passed'
 manifest.update({'personality_editor':True,'personality_editor_entry':'F / selected_officer / personality_editor',
                  'personality_editor_physical_slots':9,'personality_editor_native_visible_max':5,
-                 'personality_editor_preset':'远矢','personality_editor_preset_id':6,
+                 'personality_editor_catalog_size':356,'personality_editor_delete':True,
+                 'personality_editor_staged_apply':True,'personality_editor_request_ids':True,
                  'personality_editor_add':'first_empty_slot','personality_editor_replace':'explicit_selected_slot',
                  'personality_editor_hidden_slots_preserved':True,'personality_editor_execution':'native_game_thread_planning_callback',
                  'personality_editor_in_game_acceptance':'pending','personality_editor_save_load_acceptance':'pending'})
@@ -91,7 +97,7 @@ manifest.update({'end_of_turn_report':True,'end_of_turn_report_tabs':[],
                  'end_of_turn_report_portraits':'asynchronous_local_game_resources',
                  'bundled_game_artwork':False,
                  'battle_report_scope':'player_force','battle_report_in_game_acceptance':'pending',
-                 'battle_report_reopen':'F10 mods / auto search / expand / previous turn report',
+                 'battle_report_reopen':'F10 foundation / auto search / expand / previous turn report',
                  'battle_report_permanent_career_totals':False})
 assert verification['battle_observation']['persistent_stats']['status']=='passed'
 manifest.update({'officer_battle_stats':True,'officer_battle_stats_sortable':True,
@@ -198,8 +204,38 @@ manifest.update({'special_events_observation':True,'special_events':['duel_settl
                  'special_events_semantics':'ordinary_duel_and_report_matched_capture_verified_other_paths_pending','ordinary_duel_cumulative':True,'ordinary_duel_history_backfill':False,'special_events_candidates_credited':False,
                  'special_events_sidecar':'.s14special','special_events_history_capacity':4096,
                  'special_events_officer_columns':['wins','losses','captures','captured']})
+manifest.update({'foundation_editor':verification.get('foundation_editor',{}),
+                 'release_status':'development_incomplete' if args.development else 'prerelease',
+                 'first_version_candidate':False if args.development else True})
+files['FOUNDATION_IMPLEMENTATION.md']=(HERE.parent/'docs/FOUNDATION_IMPLEMENTATION.md').read_bytes()
+files['NATIVE_EDIT_RESEARCH.md']=(HERE.parent/'docs/NATIVE_EDIT_RESEARCH.md').read_bytes()
+files['verification.json']=(BUILD/'verification.json').read_bytes()
+files['build-provenance.json']=(BUILD/'build-provenance.json').read_bytes()
+files['RELEASE_NOTES_0.11.0-dev.14.md']=(HERE.parent/'docs/RELEASE_NOTES_0.11.0-dev.14.md').read_bytes()
+files['AI_INTERFACES.md']=(HERE.parent/'docs/AI_INTERFACES.md').read_bytes()
+files['AI_INTERFACE_INVENTORY.json']=(HERE.parent/'docs/AI_INTERFACE_INVENTORY.json').read_bytes()
 files['PERSONALITY_EDITOR.md']=(HERE.parent/'docs/PERSONALITY_EDITOR.md').read_bytes()
 files['AI_RANDOM_AFFIX.md']=(HERE.parent/'docs/AI_RANDOM_AFFIX.md').read_bytes()
+for name in ('SPECIAL_EFFECT_DESIGN.md','LONG_SPEAR_KNOCKBACK.md','BLINK_BACKSTAB_DESIGN.md'):
+    files[name]=(HERE.parent/'docs'/name).read_bytes()
+manifest['plugin_knockback_implemented']=False
+assert verification['blink_backstab']['status']=='passed'
+manifest['plugin_blink_backstab_implemented']=True
+manifest['huang_zhong_blink']={'officer_id':271,'default_enabled':False,'rear_search':3,'direct_hit_bonus_percent':30,'cooldown_game_days':5,'opportunity_game_days':5,'sidecar':'.s14blink','in_game_acceptance':'pending'}
+files['HUANG_ZHONG_BLINK_TEST.md']=(HERE.parent/'docs/HUANG_ZHONG_BLINK_TEST.md').read_bytes()
+blink_static=BUILD/'blink-static-verification.json'
+if blink_static.exists():
+    evidence=json.loads(blink_static.read_text(encoding='utf8'))
+    assert evidence['status']=='passed' and evidence['anchors']==18 and evidence['private_trampolines']=='passed'
+    files['blink-static-verification.json']=blink_static.read_bytes()
+    manifest['huang_zhong_blink']['static_validation']=evidence
+files['NATIVE_TECH_TREE.md']=(HERE.parent/'docs/NATIVE_TECH_TREE.md').read_bytes()
+assert verification['domestic_officers']['status']=='passed'
+manifest['domestic_officers']=verification['domestic_officers']
+files['DOMESTIC_OFFICERS.md']=(HERE.parent/'docs/DOMESTIC_OFFICERS.md').read_bytes()
+manifest['native_tech_tree']=verification['native_tech_tree']
+files['NATIVE_MANEUVER_BUTTON.md']=(HERE.parent/'docs/NATIVE_MANEUVER_BUTTON.md').read_bytes()
+manifest['native_maneuver_button']=verification['native_maneuver_button']
 manifest['plugin_troops_current_exe_damage_call_verified']=verification['plugin_troop_registry'].get('direct_damage_native_call_verified',False)
 manifest['plugin_troops_current_exe_damage_acceptance']=verification['plugin_troop_registry'].get('direct_damage_current_exe_acceptance','pending_in_game')
 files['release.json']=(json.dumps(manifest,indent=2)+'\n').encode()

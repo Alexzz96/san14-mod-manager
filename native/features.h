@@ -1,7 +1,7 @@
 #ifndef S14_FEATURES_H
 #define S14_FEATURES_H
 #include <windows.h>
-#define S14_MANAGER_VERSION L"0.10.12"
+#define S14_MANAGER_VERSION L"0.11.0-dev.14"
 enum { S14_SEARCH_WAITING=0,S14_SEARCH_MATCHED,S14_SEARCH_CONTEXT_PAUSED,S14_SEARCH_STOPPED,S14_SEARCH_UNAVAILABLE };
 #define S14_MASTER 1u
 #define S14_WALL_LIMIT 2u
@@ -11,7 +11,9 @@ enum { S14_SEARCH_WAITING=0,S14_SEARCH_MATCHED,S14_SEARCH_CONTEXT_PAUSED,S14_SEA
 #define S14_CAO_REN_BUFF 32u
 #define S14_PLUGIN_TROOPS 64u
 #define S14_AI_RANDOM_AFFIX 128u
-#define S14_KNOWN_FLAGS 255u
+#define S14_HUANG_ZHONG_BLINK 256u
+#define S14_AUTO_DOMESTIC 512u
+#define S14_KNOWN_FLAGS 1023u
 typedef struct {
     const wchar_t *id,*key,*name,*description,*category;
     unsigned int flag, dependency;
@@ -20,8 +22,11 @@ typedef struct {
 extern const S14Feature s14_features[];
 extern const int s14_feature_count;
 typedef struct { const wchar_t *id,*name,*description,*category; int action,children; } S14Mod;
-enum { S14_MOD_WALL,S14_MOD_SEARCH,S14_MOD_BATTLE,S14_MOD_VIEWS,S14_MOD_CAO_REN_BUFF,S14_MOD_DIAGNOSTICS,S14_MOD_TROOPS,S14_MOD_AI_AFFIX,S14_MOD_COUNT };
+enum { S14_MOD_WALL,S14_MOD_SEARCH,S14_MOD_BATTLE,S14_MOD_VIEWS,S14_MOD_CAO_REN_BUFF,S14_MOD_DIAGNOSTICS,S14_MOD_TROOPS,S14_MOD_AI_AFFIX,S14_MOD_BLINK,S14_MOD_DOMESTIC,S14_MOD_COUNT };
 extern const S14Mod s14_mods[S14_MOD_COUNT];
+enum {S14_PAGE_FOUNDATION=0,S14_PAGE_TESTING=1,S14_PAGE_SETTINGS=2};
+int s14_mod_page(int mod);
+const wchar_t *s14_mod_maturity(int mod);
 unsigned int s14_config_read(const wchar_t *path);
 int s14_config_set(const wchar_t *path,unsigned int flag,int enabled);
 unsigned int s14_effective_flags(unsigned int requested);
