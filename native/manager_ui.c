@@ -98,6 +98,9 @@ int s14_manager_hit(S14ManagerUI *ui,POINT point){int x=MulDiv(point.x,96,ui->sc
 int s14_manager_activate(S14ManagerUI *ui,int id) {
     if(id>=62&&id<=65){if(!ui->in_game)return 0;if(ui->action)ui->action(ui,id==65?S14_ACTION_DOMESTIC_QUICK:id==64?S14_ACTION_DOMESTIC_OPTIMIZE:S14_ACTION_DOMESTIC_FILL,ui->context);return 1;}
     if(id==61){ui->mod_sort=(ui->mod_sort+1)%3;ui->scroll=0;s14_manager_refresh(ui);return 1;}
+    /* 90 is the stable close/Escape action. Keep it outside the expandable
+       mod-range even when the catalogue grows to the same numeric ID. */
+    if(id==90){if(ui->in_game)s14_manager_toggle(ui);else DestroyWindow(ui->window);return 1;}
     if(id>=80 && id<80+S14_MOD_COUNT){int mod=id-80;if(!s14_mods[mod].children)return 0;ui->expanded^=1u<<mod;s14_manager_refresh(ui);return 1;}
     if(id==44){
         if(!ui->in_game && !ui->game_found)return 0;
@@ -142,7 +145,6 @@ int s14_manager_activate(S14ManagerUI *ui,int id) {
         ui->notice_error=0;wcscpy(ui->notice,L"战斗记录设置已保存。F 查看累计战绩；新战绩需保存游戏。由总开关控制。");
         s14_manager_refresh(ui);return 1;
     }
-    if (id==90) { if (ui->in_game) s14_manager_toggle(ui); else DestroyWindow(ui->window); return 1; }
     if (id>=100 && id<=102) { ui->tab=id-100; ui->scroll=0; ui->focus=id; s14_manager_refresh(ui); return 1; }
     if (id==40) {
         if (!ui->in_game && !ui->game_found) return 0;

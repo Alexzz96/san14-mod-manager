@@ -55,7 +55,7 @@ manifest.update({'ui_theme':'warm-paper-terracotta','complete_uninstall':True,
                  'uninstall_from_external_manager':True,'unknown_files_preserved':True})
 assert verification['manager']['manager_tabs']==['foundation','testing','settings']
 assert all(verification['manager'][key] for key in ('archer_technology_toggle',
-    'archer_technology_default_off','legacy_tech_preference_preserved'))
+    'archer_technology_default_off','legacy_tech_preference_preserved','close_id_reserved'))
 assert all(verification['manager'][key] for key in ('expandable_mod_list','stable_mod_sort',
     'child_preferences_preserved','views_parent_runtime_gate','scroll_and_keyboard_reveal'))
 manifest.update({'manager_tabs':['foundation','testing','settings'],'manager_mod_list':True,

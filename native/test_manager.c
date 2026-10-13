@@ -272,8 +272,10 @@ int main(void) {
     REQUIRE(s14_manager_hit(&ui,(POINT){200,910})==34);preview(&ui,"manager-install-2x.bmp");
     ui.tab=S14_PAGE_TESTING;ui.expanded=1;ui.scroll=0;REQUIRE(s14_manager_hit(&ui,(POINT){1552,630})==11);preview(&ui,"manager-mods-2x.bmp");
     GetPrivateProfileStringW(L"Future",L"UnknownFeature",L"",value,32,ini);REQUIRE(!wcscmp(value,L"keep-me"));
+    /* The expanded mod-ID range reaches 90; Escape/close keeps its reserved ID. */
+    ui.in_game=0;REQUIRE(s14_manager_activate(&ui,90));REQUIRE(!IsWindow(ui.window));ui.window=NULL;
     s14_manager_destroy(&ui); REQUIRE(GetForegroundWindow()==foreground);
     REQUIRE(DeleteFileW(ini)); REQUIRE(RemoveDirectoryW(root));
-    printf("{\"config_roundtrip\":true,\"search_settings\":true,\"search_controls\":true,\"unknown_keys_preserved\":true,\"master_off_on\":true,\"dependency_preserves_preference\":true,\"all_flag_combinations\":2048,\"archer_technology_toggle\":true,\"archer_technology_default_off\":true,\"legacy_tech_preference_preserved\":true,\"ui_live_callbacks\":%d,\"cleanup_callback\":%d,\"rendered_views\":8,\"manager_tabs\":[\"foundation\",\"testing\",\"settings\"],\"expandable_mod_list\":true,\"stable_mod_sort\":true,\"child_preferences_preserved\":true,\"views_parent_runtime_gate\":true,\"scroll_and_keyboard_reveal\":true,\"dpi_scales\":[96,192],\"game_process_touched\":false}\n",callback_count,clean_count);
+    printf("{\"config_roundtrip\":true,\"search_settings\":true,\"search_controls\":true,\"unknown_keys_preserved\":true,\"master_off_on\":true,\"dependency_preserves_preference\":true,\"all_flag_combinations\":2048,\"archer_technology_toggle\":true,\"archer_technology_default_off\":true,\"legacy_tech_preference_preserved\":true,\"close_id_reserved\":true,\"ui_live_callbacks\":%d,\"cleanup_callback\":%d,\"rendered_views\":8,\"manager_tabs\":[\"foundation\",\"testing\",\"settings\"],\"expandable_mod_list\":true,\"stable_mod_sort\":true,\"child_preferences_preserved\":true,\"views_parent_runtime_gate\":true,\"scroll_and_keyboard_reveal\":true,\"dpi_scales\":[96,192],\"game_process_touched\":false}\n",callback_count,clean_count);
     return 0;
 }

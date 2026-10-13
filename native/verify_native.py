@@ -215,7 +215,7 @@ manager_test=subprocess.run([str(BUILD/'test_manager.exe')],cwd=BUILD,capture_ou
                             timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 manager_metrics=json.loads(manager_test.stdout)
 assert all(manager_metrics[key] for key in ('archer_technology_toggle',
-    'archer_technology_default_off','legacy_tech_preference_preserved'))
+    'archer_technology_default_off','legacy_tech_preference_preserved','close_id_reserved'))
 update_test=subprocess.run([str(BUILD/'test_update.exe')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 update_metrics=json.loads(update_test.stdout);assert update_metrics['update_model']=='passed'
 officer_test=subprocess.run([str(BUILD/'test_officers.exe')],cwd=BUILD,capture_output=True,text=True,encoding='utf-8',check=True,
