@@ -214,6 +214,8 @@ ui_metrics=json.loads(ui_test.stdout)
 manager_test=subprocess.run([str(BUILD/'test_manager.exe')],cwd=BUILD,capture_output=True,text=True,encoding='utf-8',check=True,
                             timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 manager_metrics=json.loads(manager_test.stdout)
+assert all(manager_metrics[key] for key in ('archer_technology_toggle',
+    'archer_technology_default_off','legacy_tech_preference_preserved'))
 update_test=subprocess.run([str(BUILD/'test_update.exe')],capture_output=True,text=True,encoding='utf-8',check=True,timeout=15,creationflags=subprocess.CREATE_NO_WINDOW)
 update_metrics=json.loads(update_test.stdout);assert update_metrics['update_model']=='passed'
 officer_test=subprocess.run([str(BUILD/'test_officers.exe')],cwd=BUILD,capture_output=True,text=True,encoding='utf-8',check=True,
@@ -583,6 +585,8 @@ assert tech_metrics['status']=='passed'
 tech_metrics['model']=json.loads(subprocess.check_output([str(BUILD/'test_tech_tree_model.exe')],text=True,encoding='utf-8'))
 tech_metrics['lifecycle']=json.loads(subprocess.check_output([str(BUILD/'test_tech_tree_ui.exe')],text=True,encoding='utf-8'))
 assert tech_metrics['model']['status']=='passed' and tech_metrics['lifecycle']['status']=='passed'
+assert tech_metrics['disabled_tab_not_added']
+assert tech_metrics['lifecycle']['live_toggle_cancels_confirmation'] and tech_metrics['lifecycle']['disabled_values_and_learning']
 if GAME:
     for rva,hexcode in ((0x76a440,'40535556574154415541564157'),(0x3a54d0,'48895c2408'),
                         (0x77a0b0,'48894c2408'),(0x82beb0,'33c0488901'),(0x7e7430,'4056574156'),

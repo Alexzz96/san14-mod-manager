@@ -96,6 +96,14 @@ int main(int argc,char **argv){
  for(int i=0;i<p->button_count;i++){Button *b=&p->buttons[i];if(b->action>=30+p->model.count&&b->action<=34){assert(!(*(unsigned*)((char*)b->label+0x40)&1));assert(!(*(unsigned*)((char*)b->skin+0x40)&1));assert(!(*(unsigned*)((char*)b->icon+0x40)&1));}}
  for(int i=p->modal_first;i<p->used;i++)assert(!(*(unsigned*)((char*)p->widgets[i].object+0x40)&1));
  click(p,11);assert(p->model.record->node==1);if(argc>2)export_svg(p,argv[2]);click(p,3);assert(p->model.record->learned==3);click(p,3);assert(p->model.record->learned==3);
+ /* A pending confirmation cannot survive an off/on configuration change. */
+ click(p,12);assert(p->modal);p->pending=3;
+ s14_archer_tech_configure(0);s14_tech_ui_update(&page);
+ assert(!p->modal&&!p->pending&&s14_archer_tech_mask(254)==3);
+ assert(!wcscmp(mock(p->metrics[0])->caption,L"+0.0%"));
+ click(p,12);click(p,3);assert(s14_archer_tech_mask(254)==3);
+ s14_archer_tech_configure(1);s14_tech_ui_update(&page);assert(!p->modal);
+ assert(!wcscmp(mock(p->metrics[0])->caption,L"+5.0%"));
  click(p,13);assert(p->model.record->node==3);click(p,3);assert(p->model.record->learned==3); /* locked remains inspectable */
  click(p,5);click(p,30);assert(p->model.selected==0&&p->model.record->learned==1);click(p,11);click(p,3);assert(p->model.record->learned==1);click(p,5);click(p,32);assert(p->model.selected==2&&p->model.record->learned==3);
  s14_tech_ui_display(&page,0);assert(registers==unregisters);click(p,11);assert(!p->pending&&!p->modal);
@@ -106,5 +114,5 @@ int main(int argc,char **argv){
  for(int fail=1;fail<=complete_allocations;fail++){fixture();fail_at=fail;assert(!s14_tech_ui_create(&page));assert(!live&&!quad_total&&!pane(&page)&&!registers);}
  for(int fail=1;fail<=complete_quads;fail++){fixture();quad_fail=fail;assert(!s14_tech_ui_create(&page));assert(!live&&!quad_total&&!pane(&page)&&!registers);}
  for(int i=0;i<30;i++){fixture();assert(s14_tech_ui_create(&page));s14_tech_ui_person(&page,254,1u<<1);s14_tech_ui_display(&page,1);click(pane(&page),11);click(pane(&page),3);s14_tech_ui_release(&page,&resource);assert(!live&&!quad_total&&registers==unregisters);}
- puts("{\"status\":\"passed\",\"native_controls\":true,\"unit_scale_text_layout\":true,\"native_scene_cleanup\":true,\"native_vector_badges\":true,\"hidden_click_ignored\":true,\"deferred_click_processing\":true,\"partial_allocation_cleanup\":true,\"unregister_before_free\":true,\"repeated_window_release\":true,\"manual_visual_acceptance\":\"pending\"}");
+ puts("{\"status\":\"passed\",\"native_controls\":true,\"live_toggle_cancels_confirmation\":true,\"disabled_values_and_learning\":true,\"unit_scale_text_layout\":true,\"native_scene_cleanup\":true,\"native_vector_badges\":true,\"hidden_click_ignored\":true,\"deferred_click_processing\":true,\"partial_allocation_cleanup\":true,\"unregister_before_free\":true,\"repeated_window_release\":true,\"manual_visual_acceptance\":\"pending\"}");
 }

@@ -7,6 +7,7 @@
 #include "package.h"
 #include "theme.h"
 #include "career_affix.h"
+#include "archer_tech.h"
 
 static const wchar_t manager_class[]=L"S14ModManager.Panel.v3";
 static int px(S14ManagerUI *ui,int v){return MulDiv(v,ui->scale,96);}
@@ -25,7 +26,7 @@ static void label(S14ManagerUI *ui,HDC dc,const wchar_t *s,RECT r,HFONT f,COLORR
 static void focus(S14ManagerUI *ui,HDC dc,RECT r,int id){if(ui->focus==id){HBRUSH b=CreateSolidBrush(S14_ACCENT);FrameRect(dc,&r,b);DeleteObject(b);}}
 static void button(S14ManagerUI *ui,HDC dc,const wchar_t *s,int x,int y,int w,int id,int enabled){RECT r=box(ui,x,y,w,40);int primary=id==31;rounded(dc,r,enabled?(primary?S14_ACCENT:S14_CARD):RGB(238,236,230));focus(ui,dc,r,id);label(ui,dc,s,r,ui->body_font,enabled?(primary?RGB(255,252,248):id==34?S14_ERROR:S14_INK):RGB(137,133,124),DT_CENTER|DT_VCENTER|DT_SINGLELINE);}
 static void toggle(S14ManagerUI *ui,HDC dc,int y,int enabled,int active,int id){rounded(dc,box(ui,744,y,64,30),enabled&&active?S14_ACCENT:RGB(193,189,179));rounded(dc,box(ui,enabled?779:748,y+4,22,22),RGB(255,254,251));focus(ui,dc,box(ui,739,y-5,74,40),id);}
-int s14_manager_mod_enabled(const S14ManagerUI *ui,int mod){switch(mod){case S14_MOD_WALL:return !!(ui->requested&S14_WALL_LIMIT);case S14_MOD_SEARCH:return !!(ui->requested&S14_AUTO_SEARCH);case S14_MOD_BATTLE:return ui->battle_enabled;case S14_MOD_VIEWS:return ui->views_enabled;case S14_MOD_CAO_REN_BUFF:return !!(ui->requested&S14_CAO_REN_BUFF);case S14_MOD_DIAGNOSTICS:return !!(ui->requested&S14_DIAGNOSTICS);case S14_MOD_AI_AFFIX:return !!(ui->requested&S14_AI_RANDOM_AFFIX);case S14_MOD_TROOPS:return !!(ui->requested&S14_PLUGIN_TROOPS);case S14_MOD_DOMESTIC:return !!(ui->requested&S14_AUTO_DOMESTIC);case S14_MOD_BLINK:return !!(ui->requested&S14_HUANG_ZHONG_BLINK);default:return 0;}}
+int s14_manager_mod_enabled(const S14ManagerUI *ui,int mod){switch(mod){case S14_MOD_WALL:return !!(ui->requested&S14_WALL_LIMIT);case S14_MOD_SEARCH:return !!(ui->requested&S14_AUTO_SEARCH);case S14_MOD_BATTLE:return ui->battle_enabled;case S14_MOD_VIEWS:return ui->views_enabled;case S14_MOD_CAO_REN_BUFF:return !!(ui->requested&S14_CAO_REN_BUFF);case S14_MOD_DIAGNOSTICS:return !!(ui->requested&S14_DIAGNOSTICS);case S14_MOD_AI_AFFIX:return !!(ui->requested&S14_AI_RANDOM_AFFIX);case S14_MOD_TROOPS:return !!(ui->requested&S14_PLUGIN_TROOPS);case S14_MOD_DOMESTIC:return !!(ui->requested&S14_AUTO_DOMESTIC);case S14_MOD_ARCHER_TECH:return !!(ui->requested&S14_ARCHER_TECH);case S14_MOD_BLINK:return !!(ui->requested&S14_HUANG_ZHONG_BLINK);default:return 0;}}
 int s14_manager_view_enabled(const S14ManagerUI *ui,int native){return ui->views_enabled && (native==2?ui->native_army_enabled:native?ui->native_stats_enabled:ui->officers_enabled);}
 int s14_manager_mod_count(const S14ManagerUI *ui){int count=0;for(int i=0;i<S14_MOD_COUNT;i++)if(s14_mod_page(i)==ui->tab)count++;return count;}
 int s14_manager_mod_index(const S14ManagerUI *ui,int position){int indices[S14_MOD_COUNT],count=0;for(int i=0;i<S14_MOD_COUNT;i++)if(s14_mod_page(i)==ui->tab)indices[count++]=i;if(position<0 || position>=count)return -1;for(int i=1;i<count;i++){int v=indices[i],j=i;while(j>0){int a=indices[j-1],cmp=0;if(ui->mod_sort==1)cmp=wcscmp(s14_mods[a].name,s14_mods[v].name);if(ui->mod_sort==2)cmp=s14_manager_mod_enabled(ui,v)-s14_manager_mod_enabled(ui,a);if(cmp<=0)break;indices[j]=a;j--;}indices[j]=v;}return indices[position];}
@@ -33,11 +34,12 @@ static int mod_height(const S14ManagerUI *ui,int mod){if(!(ui->expanded&(1u<<mod
 int s14_manager_mod_top(const S14ManagerUI *ui,int mod){int y=S14_MOD_LIST_TOP-ui->scroll;for(int i=0;i<s14_manager_mod_count(ui);i++){int at=s14_manager_mod_index(ui,i);if(at==mod)return y;y+=mod_height(ui,at);}return -1;}
 static int content_height(const S14ManagerUI *ui){int height=0;for(int i=0;i<s14_manager_mod_count(ui);i++)height+=mod_height(ui,s14_manager_mod_index(ui,i));return height;}
 static int max_scroll(const S14ManagerUI *ui){int n=content_height(ui)-(S14_MOD_LIST_BOTTOM-S14_MOD_LIST_TOP);return n>0?n:0;}
-static int mod_active(const S14ManagerUI *ui,int mod){if(!s14_manager_mod_enabled(ui,mod))return 0;if(mod==S14_MOD_VIEWS)return ui->officers_enabled || ui->native_stats_enabled || ui->native_army_enabled;if(mod==S14_MOD_BATTLE)return !!(ui->effective&S14_MASTER);unsigned int flags[]={S14_WALL_LIMIT,S14_AUTO_SEARCH,0,0,S14_CAO_REN_BUFF,S14_DIAGNOSTICS,S14_PLUGIN_TROOPS,S14_AI_RANDOM_AFFIX,S14_HUANG_ZHONG_BLINK,S14_AUTO_DOMESTIC};return !!(ui->effective&flags[mod]);}
+static int mod_active(const S14ManagerUI *ui,int mod){if(!s14_manager_mod_enabled(ui,mod))return 0;if(mod==S14_MOD_VIEWS)return ui->officers_enabled || ui->native_stats_enabled || ui->native_army_enabled;if(mod==S14_MOD_BATTLE)return !!(ui->effective&S14_MASTER);unsigned int flags[]={S14_WALL_LIMIT,S14_AUTO_SEARCH,0,0,S14_CAO_REN_BUFF,S14_DIAGNOSTICS,S14_PLUGIN_TROOPS,S14_AI_RANDOM_AFFIX,S14_HUANG_ZHONG_BLINK,S14_AUTO_DOMESTIC,S14_ARCHER_TECH};return !!(ui->effective&flags[mod]);}
 const wchar_t *s14_manager_mod_status(const S14ManagerUI *ui,int mod) {
  if(mod==S14_MOD_DOMESTIC){if(!(ui->requested&S14_MASTER))return L"总开关关闭";if(!(ui->requested&S14_AUTO_DOMESTIC))return L"手动配置";return ui->effective&S14_AUTO_DOMESTIC?L"自动补齐":L"等待接入";}
  if(!s14_manager_mod_enabled(ui,mod))return L"已关闭";
  if(mod!=S14_MOD_VIEWS && !(ui->requested&S14_MASTER))return L"总开关关闭";
+ if(mod==S14_MOD_ARCHER_TECH && ui->in_game && !s14_archer_tech_ready())return L"入口不兼容";
  if(mod==S14_MOD_BLINK && ui->in_game && !s14_blink_ready())return L"入口不兼容";
  if(mod==S14_MOD_BLINK && s14_blink_faulted())return L"异常停用";
  if(mod==S14_MOD_AI_AFFIX && s14_ai_faulted())return L"异常停用";

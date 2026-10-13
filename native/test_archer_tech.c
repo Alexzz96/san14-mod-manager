@@ -23,7 +23,7 @@ int main(void){
  s14_archer_tech_load_end((uintptr_t)world,0,NULL,0);assert(s14_archer_tech_mask(260)!=(saved));
  s14_archer_tech_load_begin();s14_archer_tech_load_end((uintptr_t)world,1,hash,1);assert(s14_archer_tech_mask(260)==saved);
  assert(s14_archer_tech_learn(260,2));assert(s14_archer_tech_learn(260,3));assert(s14_archer_tech_learn(260,4));assert(s14_tech_points(s14_archer_tech_mask(260))==8);assert(!s14_archer_tech_learn(260,6));
- s14_archer_tech_configure(0);assert(s14_archer_tech_attribute(pool+512,0,1,100)==100);s14_archer_tech_ammo(260,40,2,&cap,&rate);assert(cap==40&&rate==200);s14_archer_tech_configure(1);
+ s14_archer_tech_configure(0);assert(!s14_archer_tech_enabled()&&s14_archer_tech_ready());assert(!s14_archer_tech_can_learn(260)&&!s14_archer_tech_learn(260,6));assert(s14_tech_points(s14_archer_tech_mask(260))==8);assert(s14_archer_tech_attribute(pool+512,0,1,100)==100);s14_archer_tech_ammo(260,40,2,&cap,&rate);assert(cap==40&&rate==200);s14_archer_tech_configure(1);assert(s14_archer_tech_enabled()&&s14_tech_points(s14_archer_tech_mask(260))==8);
  wchar_t path[MAX_PATH];assert(checkpoint_path(hash,path,0));TechCheckpoint c;assert(checkpoint_read(path,hash,&c));c.masks[260]=65535;assert(checksum(c.masks,sizeof(c.masks),c.digest));assert(!checkpoint_valid(&c,hash));
  unsigned char missing[32]={20};s14_archer_tech_load_begin();s14_archer_tech_load_end((uintptr_t)world,1,missing,1);assert(s14_archer_tech_mask(260)==1);
  s14_archer_tech_new_game((uintptr_t)world);assert(s14_archer_tech_mask(260)==1);

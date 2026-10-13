@@ -7,7 +7,8 @@
 static unsigned char parent[0x330],tab[0x148],pages_raw[3][0x180];
 static unsigned char buttons[0x140],selector[0x20];
 static void *bound_pages[4];
-static int selects;
+static int selects,test_enabled;
+int s14_archer_tech_enabled(void){return test_enabled;}
 static unsigned char *allocated;
 static int allocations,inits,visible_calls,text_calls,tab_calls,fail_allocate;
 static int visible[99];static wchar_t caption[32];
@@ -42,6 +43,7 @@ static uintptr_t tab_mock(void *p,int x,int y,void *owner,const wchar_t *const *
     SetLastError(197);return 31;
 }
 static void fixture(void){
+    test_enabled=1;
     memset(parent,0,sizeof(parent));memset(tab,0,sizeof(tab));image=0x140000000;
     putp(parent,image+0x13812f8);putp(parent+0x2e0,(uintptr_t)tab);putp(tab,image+0x1351680);
     putp(pages[0],image+0x1381700);putp(pages[1],image+0x1304a30);putp(pages[2],image+0x1304be8);
@@ -50,7 +52,11 @@ static void fixture(void){
     layout_visible=visible_mock;layout_text=text_mock;move=move_mock;original_tab=tab_mock;native_select=select_mock;
 }
 int main(void){
-    fixture();assert(tab_hook(tab,44,0,parent,labels,pages,3)==31 && GetLastError()==197);
+    fixture();test_enabled=0;expected_count=3;
+    assert(tab_hook(tab,44,0,parent,labels,pages,3)==31 && !allocations && !inits);
+    assert(!s14_tech_tree_select_fourth(parent)&&!selects);
+    test_enabled=1;expected_count=4;
+    assert(tab_hook(tab,44,0,parent,labels,pages,3)==31 && GetLastError()==197);
     assert(allocations==1 && inits==1 && visible_calls==80 && text_calls==0&&ui_creates==1);
     for(int i=19;i<99;i++)assert(visible[i]==0);
     const wchar_t *four_labels[]={labels[0],labels[1],labels[2],L"科技树"};
@@ -58,6 +64,8 @@ int main(void){
     assert(tab_hook(tab,44,0,parent,four_labels,four_pages,4)==31 && allocations==1 && inits==1);
     assert(!selects&&integer((uintptr_t)selector+0x18)==0); /* ordinary init defaults stay native */
     SetLastError(229);assert(s14_tech_tree_select_fourth(parent)&&selects==1&&integer((uintptr_t)selector+0x18)==3&&GetLastError()==229);
+    test_enabled=0;assert(!s14_tech_tree_select_fourth(parent)&&selects==1);
+    test_enabled=1;
     *(int*)(tab+0x138)=3;assert(!s14_tech_tree_select_fourth(parent)&&selects==1);*(int*)(tab+0x138)=4;
     putp(allocated,image+0x1304be8);assert(!s14_tech_tree_select_fourth(parent)&&selects==1);putp(allocated,(uintptr_t)page_vtable);
     putp(buttons+0x130,0);assert(!s14_tech_tree_select_fourth(parent)&&selects==1);putp(buttons+0x130,(uintptr_t)selector);
@@ -73,5 +81,5 @@ int main(void){
     fixture();putp(pages[1],0);assert(tab_hook(tab,44,0,parent,labels,pages,3)==31 && allocations==1);
     fixture();putp(parent+0x2e0,0);assert(tab_hook(tab,44,0,parent,labels,pages,3)==31 && allocations==1);
     fixture();fail_allocate=1;assert(tab_hook(tab,44,0,parent,labels,pages,3)==31 && allocations==2 && inits==1);
-    puts("{\"status\":\"passed\",\"native_tab_count\":4,\"original_pages_preserved\":true,\"native_portrait_refresh\":true,\"owned_page_lifecycle\":true,\"officer_screen_only\":true,\"allocation_failure_fallback\":true,\"refresh_without_allocation\":true,\"native_fourth_tab_selection\":true,\"ordinary_tab_init_keeps_native_default\":true,\"absent_or_unexpected_page_not_selected\":true,\"in_game_acceptance\":\"pending\"}");return 0;
+    puts("{\"status\":\"passed\",\"native_tab_count\":4,\"disabled_tab_not_added\":true,\"original_pages_preserved\":true,\"native_portrait_refresh\":true,\"owned_page_lifecycle\":true,\"officer_screen_only\":true,\"allocation_failure_fallback\":true,\"refresh_without_allocation\":true,\"native_fourth_tab_selection\":true,\"ordinary_tab_init_keeps_native_default\":true,\"absent_or_unexpected_page_not_selected\":true,\"in_game_acceptance\":\"pending\"}");return 0;
 }

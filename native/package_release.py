@@ -35,7 +35,7 @@ package=DIST/f'SAN14ModManager-{version}-windows-x64.zip'
 guide=(HERE.parent/'docs/USER_GUIDE.md').read_bytes()
 config=b'[Rule]\nMode=0\n[Manager]\nEnabled=1\n[Features]\nWallClusterLimit=0\nLimitHint=1\nDiagnostics=0\nAutoSearch=1\nCaoRenAttackDefense=0\nPluginTroops=0\n[AutoSearch]\nExecutors=1\nReturnDays=0\nPriority=0\n'
 config+=b'[Views]\nEnabled=1\nOfficers=1\nNativeOfficerStats=1\nNativeArmyValues=1\n'
-config+=b'[Troops]\nArcherAmmunition=1\nArcherAmmoCapacity=25\nArcherAmmoRecovery=2\nArcherTechnology=1\n'
+config+=b'[Troops]\nArcherAmmunition=1\nArcherAmmoCapacity=25\nArcherAmmoRecovery=2\nArcherTechnology=0\n'
 config+=b'[Observation]\nBattleEvents=1\n'
 config+=b'[Visuals]\nCaoRenHalo=1\nCaoRenTooltip=1\nAiAffixHalo=1\nAiAffixTooltip=1\n'
 config=config.replace(b'PluginTroops=0\n',b'PluginTroops=0\nAiRandomAffix=0\nHuangZhongBlink=0\nAutoDomesticFill=0\n')
@@ -54,10 +54,14 @@ manifest.update({'career_affix':'veteran_elite','career_affix_officer':518,'care
 manifest.update({'ui_theme':'warm-paper-terracotta','complete_uninstall':True,
                  'uninstall_from_external_manager':True,'unknown_files_preserved':True})
 assert verification['manager']['manager_tabs']==['foundation','testing','settings']
+assert all(verification['manager'][key] for key in ('archer_technology_toggle',
+    'archer_technology_default_off','legacy_tech_preference_preserved'))
 assert all(verification['manager'][key] for key in ('expandable_mod_list','stable_mod_sort',
     'child_preferences_preserved','views_parent_runtime_gate','scroll_and_keyboard_reveal'))
 manifest.update({'manager_tabs':['foundation','testing','settings'],'manager_mod_list':True,
-                 'manager_mod_count':10,'manager_mod_expandable_children':True,
+                 'manager_mod_count':11,'manager_mod_expandable_children':True,
+                 'archer_technology_manager_page':'testing','archer_technology_default_enabled':False,
+                 'archer_technology_live_toggle':True,'archer_technology_off_preserves_learning':True,
                  'manager_mod_sort':['default','name','enabled_first'],
                  'manager_child_preferences_preserved':True,'manager_views_parent_default_enabled':True,
                  'manager_expanded_group_border':True,'manager_parent_child_divider':True,

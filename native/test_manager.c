@@ -37,6 +37,16 @@ int main(void) {
     REQUIRE(!(s14_config_read(ini)&S14_PLUGIN_TROOPS));
     REQUIRE(!(s14_config_read(ini)&S14_HUANG_ZHONG_BLINK));
     REQUIRE(!(s14_config_read(ini)&S14_AUTO_DOMESTIC));
+    REQUIRE(!(s14_config_read(ini)&S14_ARCHER_TECH));
+    REQUIRE(WritePrivateProfileStringW(L"Troops",L"ArcherAmmoCapacity",L"25",ini));
+    REQUIRE(WritePrivateProfileStringW(L"Troops",L"ArcherTechnology",L"1",ini));
+    REQUIRE(s14_config_read(ini)&S14_ARCHER_TECH); /* legacy explicit preference */
+    REQUIRE(s14_config_set(ini,S14_ARCHER_TECH,0) && !(s14_config_read(ini)&S14_ARCHER_TECH));
+    REQUIRE(GetPrivateProfileIntW(L"Troops",L"ArcherAmmoCapacity",0,ini)==25);
+    REQUIRE(GetPrivateProfileIntW(L"Features",L"ArcherTechnology",99,ini)==99);
+    REQUIRE(WritePrivateProfileStringW(L"Troops",L"ArcherTechnology",L"2",ini));
+    REQUIRE(!(s14_config_read(ini)&S14_ARCHER_TECH));
+    REQUIRE(s14_config_set(ini,S14_ARCHER_TECH,0));
     REQUIRE(s14_config_set(ini,S14_AUTO_DOMESTIC,1)&&(s14_config_read(ini)&S14_AUTO_DOMESTIC));
     REQUIRE(s14_config_set(ini,S14_AUTO_DOMESTIC,0));
     REQUIRE(s14_config_set(ini,S14_HUANG_ZHONG_BLINK,1) && (s14_effective_flags(s14_config_read(ini))&S14_HUANG_ZHONG_BLINK));
@@ -115,7 +125,7 @@ int main(void) {
     REQUIRE(s14_manager_hit(&ui,(POINT){320,120})==101);
     REQUIRE(s14_manager_hit(&ui,(POINT){400,120})==102);
     REQUIRE(s14_manager_activate(&ui,101) && ui.tab==S14_PAGE_TESTING);
-    REQUIRE(s14_manager_mod_count(&ui)==5 && s14_manager_mod_top(&ui,S14_MOD_SEARCH)==-1);
+    REQUIRE(s14_manager_mod_count(&ui)==6 && s14_manager_mod_top(&ui,S14_MOD_SEARCH)==-1);
     REQUIRE(s14_manager_hit(&ui,(POINT){776,250})==10);
     REQUIRE(s14_manager_hit(&ui,(POINT){60,250})==80);
     REQUIRE(!s14_manager_activate(&ui,103));
@@ -132,6 +142,21 @@ int main(void) {
     REQUIRE(s14_manager_activate(&ui,1));REQUIRE(ui.effective==0);
     REQUIRE(s14_manager_activate(&ui,1));REQUIRE(ui.effective&S14_LIMIT_HINT);
     REQUIRE(ui.scroll==0);preview(&ui,"manager-preview.bmp");
+    REQUIRE(s14_mod_page(S14_MOD_ARCHER_TECH)==S14_PAGE_TESTING);
+    REQUIRE(s14_manager_activate(&ui,19) && s14_manager_mod_enabled(&ui,S14_MOD_ARCHER_TECH));
+    REQUIRE(ui.effective&S14_ARCHER_TECH);
+    REQUIRE(s14_manager_activate(&ui,1) && !(ui.effective&S14_ARCHER_TECH));
+    REQUIRE(ui.requested&S14_ARCHER_TECH);
+    REQUIRE(s14_manager_activate(&ui,1) && (ui.effective&S14_ARCHER_TECH));
+    int tech_y=s14_manager_mod_top(&ui,S14_MOD_ARCHER_TECH);
+    ui.scroll=tech_y-S14_MOD_LIST_TOP;s14_manager_refresh(&ui);
+    tech_y=s14_manager_mod_top(&ui,S14_MOD_ARCHER_TECH);
+    REQUIRE(s14_manager_hit(&ui,(POINT){776,tech_y+30})==19);
+    preview(&ui,"manager-technology.bmp");
+    ui.focus=17;SendMessageW(ui.window,WM_KEYDOWN,VK_TAB,0);REQUIRE(ui.focus==19);
+    REQUIRE(s14_manager_activate(&ui,19) && !(ui.requested&S14_ARCHER_TECH));
+    REQUIRE(GetPrivateProfileIntW(L"Troops",L"ArcherTechnology",99,ini)==0);
+    ui.scroll=0;s14_manager_refresh(&ui);
     REQUIRE(s14_manager_activate(&ui,100));
     REQUIRE(s14_manager_activate(&ui,83));int y=s14_manager_mod_top(&ui,S14_MOD_VIEWS);
     REQUIRE(s14_manager_hit(&ui,(POINT){776,y+100})==40);
@@ -249,6 +274,6 @@ int main(void) {
     GetPrivateProfileStringW(L"Future",L"UnknownFeature",L"",value,32,ini);REQUIRE(!wcscmp(value,L"keep-me"));
     s14_manager_destroy(&ui); REQUIRE(GetForegroundWindow()==foreground);
     REQUIRE(DeleteFileW(ini)); REQUIRE(RemoveDirectoryW(root));
-    printf("{\"config_roundtrip\":true,\"search_settings\":true,\"search_controls\":true,\"unknown_keys_preserved\":true,\"master_off_on\":true,\"dependency_preserves_preference\":true,\"all_flag_combinations\":1024,\"ui_live_callbacks\":%d,\"cleanup_callback\":%d,\"rendered_views\":8,\"manager_tabs\":[\"foundation\",\"testing\",\"settings\"],\"expandable_mod_list\":true,\"stable_mod_sort\":true,\"child_preferences_preserved\":true,\"views_parent_runtime_gate\":true,\"scroll_and_keyboard_reveal\":true,\"dpi_scales\":[96,192],\"game_process_touched\":false}\n",callback_count,clean_count);
+    printf("{\"config_roundtrip\":true,\"search_settings\":true,\"search_controls\":true,\"unknown_keys_preserved\":true,\"master_off_on\":true,\"dependency_preserves_preference\":true,\"all_flag_combinations\":2048,\"archer_technology_toggle\":true,\"archer_technology_default_off\":true,\"legacy_tech_preference_preserved\":true,\"ui_live_callbacks\":%d,\"cleanup_callback\":%d,\"rendered_views\":8,\"manager_tabs\":[\"foundation\",\"testing\",\"settings\"],\"expandable_mod_list\":true,\"stable_mod_sort\":true,\"child_preferences_preserved\":true,\"views_parent_runtime_gate\":true,\"scroll_and_keyboard_reveal\":true,\"dpi_scales\":[96,192],\"game_process_touched\":false}\n",callback_count,clean_count);
     return 0;
 }

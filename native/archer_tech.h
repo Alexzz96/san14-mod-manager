@@ -6,6 +6,8 @@
 #include "tech_tree_model.h"
 void s14_archer_tech_attach(uintptr_t base,const wchar_t *root,int ready);
 void s14_archer_tech_configure(int enabled);
+int s14_archer_tech_ready(void);
+int s14_archer_tech_enabled(void);
 int s14_archer_tech_can_learn(int officer);
 unsigned short s14_archer_tech_mask(int officer);
 int s14_archer_tech_learn(int officer,int node);

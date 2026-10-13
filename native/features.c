@@ -9,7 +9,8 @@ const S14Feature s14_features[]={
     {L"plugin_troops",L"PluginTroops",L"扩展兵种 · 陷阵营",L"高顺出征可选择陷阵营；实际属性增幅与独立扣费。\n支持保存、读档；混乱免疫尚未启用。",L"扩展兵种",S14_PLUGIN_TROOPS,0,1},
     {L"ai_random_affix",L"AiRandomAffix",L"AI 随机词条",L"各 AI 城市第 9、18、27…次成功出征必出；其余按 10% 抽取。\n仅本次部队有效；不为已有部队补抽，同类增幅取最高。",L"随机词条",S14_AI_RANDOM_AFFIX,0,1},
     {L"huang_zhong_blink",L"HuangZhongBlink",L"闪袭背刺 · 黄忠",L"仅黄忠主将部队：直击后闪到敌军背后最近合法空格。\n搜索后方 1、2、3 格；一次直击背刺 +30%，冷却 5 游戏日。",L"位移词条",S14_HUANG_ZHONG_BLINK,0,1},
-    {L"auto_domestic_fill",L"AutoDomesticFill",L"回合自动补齐内政",L"确认进行后先补齐自势力直辖区域，再派遣探索。\n保留现职、锁定与排除；命令书不足按优先级部分补齐。",L"内政",S14_AUTO_DOMESTIC,0,1}
+    {L"auto_domestic_fill",L"AutoDomesticFill",L"回合自动补齐内政",L"确认进行后先补齐自势力直辖区域，再派遣探索。\n保留现职、锁定与排除；命令书不足按优先级部分补齐。",L"内政",S14_AUTO_DOMESTIC,0,1},
+    {L"archer_technology",L"ArcherTechnology",L"弓兵科技树",L"原生第四页学习弓弩五类基础强化，最多 8 点；进阶未接入。\n关闭暂停强化和学习，保留进度；开启同时启用弓弩弹药。",L"兵种培养",S14_ARCHER_TECH,0,1}
 };
 const int s14_feature_count=sizeof(s14_features)/sizeof(s14_features[0]);
 const S14Mod s14_mods[S14_MOD_COUNT]={
@@ -22,7 +23,8 @@ const S14Mod s14_mods[S14_MOD_COUNT]={
     {L"plugin_troops",L"扩展兵种 · 陷阵营",L"高顺专属；出征选兵种，额外费用 2000 + 每千兵 500。",L"兵种",15,0},
     {L"ai_random_affix",L"AI 随机词条",L"AI 城市每 9 次出征保底；其余 10%，攻军、防御 +10%。",L"随机",16,1},
     {L"huang_zhong_blink",L"闪袭背刺 · 黄忠",L"仅黄忠主将：后方 1→2→3 格找落点，一次直击背刺 +30%。",L"位移",17,1},
-    {L"domestic_officers",L"区域官员配置",L"Ctrl+G 规划；支持每回合先补齐直辖内政，再派遣探索。",L"内政",62,1}
+    {L"domestic_officers",L"区域官员配置",L"Ctrl+G 规划；支持每回合先补齐直辖内政，再派遣探索。",L"内政",62,1},
+    {L"archer_technology",L"弓兵科技树",L"五类基础强化，最多 8 点；关闭暂停加成，保留学习进度。",L"兵种培养",19,0}
 };
 int s14_mod_page(int mod){
     return mod==S14_MOD_SEARCH || mod==S14_MOD_BATTLE || mod==S14_MOD_VIEWS || mod==S14_MOD_DIAGNOSTICS || mod==S14_MOD_DOMESTIC?S14_PAGE_FOUNDATION:S14_PAGE_TESTING;
@@ -50,12 +52,15 @@ unsigned int s14_config_read(const wchar_t *path) {
     if (boolean(path,L"Features",L"AiRandomAffix",0)) flags|=S14_AI_RANDOM_AFFIX;
     if (boolean(path,L"Features",L"HuangZhongBlink",0)) flags|=S14_HUANG_ZHONG_BLINK;
     if (boolean(path,L"Features",L"AutoDomesticFill",0)) flags|=S14_AUTO_DOMESTIC;
+    /* Keep the existing INI key so an upgrade preserves explicit preferences. */
+    if (boolean(path,L"Troops",L"ArcherTechnology",0)) flags|=S14_ARCHER_TECH;
     return flags;
 }
 int s14_config_set(const wchar_t *path,unsigned int flag,int enabled) {
     const wchar_t *section=L"Features",*key=NULL;
     if (flag==S14_MASTER) { section=L"Manager"; key=L"Enabled"; }
     for (int i=0;i<s14_feature_count;i++) if (s14_features[i].flag==flag) key=s14_features[i].key;
+    if (flag==S14_ARCHER_TECH) section=L"Troops";
     if (!key || (enabled!=0 && enabled!=1)) return 0;
     // Change only this setting. Preserve future keys and another manager's
     // unrelated changes instead of rewriting a cached configuration file.

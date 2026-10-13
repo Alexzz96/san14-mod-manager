@@ -5,6 +5,7 @@
 #include "tech_tree.h"
 #include "tech_tree_ui.h"
 #include "tech_tree_abi.h"
+#include "archer_tech.h"
 
 typedef uintptr_t (*TabInit)(void*,int,int,void*,const wchar_t*const*,void*const*,int);
 typedef void *(*Allocate)(size_t);
@@ -78,7 +79,7 @@ static uintptr_t tab_hook(void *tab,int x,int y,void *parent,const wchar_t *cons
     DWORD error=GetLastError();
     /* CCmnTab is shared by many game screens. Exact parent, container and
        original page types keep the extension confined to officer details. */
-    if(count!=3 || !labels || !pages || pointer((uintptr_t)parent)!=image+0x13812f8 ||
+    if(!s14_archer_tech_enabled() || count!=3 || !labels || !pages || pointer((uintptr_t)parent)!=image+0x13812f8 ||
        pointer((uintptr_t)tab)!=image+0x1351680 || pointer((uintptr_t)parent+0x2e0)!=(uintptr_t)tab ||
        pointer((uintptr_t)pages[0])!=image+0x1381700 || pointer((uintptr_t)pages[1])!=image+0x1304a30 ||
        pointer((uintptr_t)pages[2])!=image+0x1304be8){
@@ -96,7 +97,7 @@ int s14_tech_tree_select_fourth(void *dialog){
     DWORD error=GetLastError();int selected=0;
     uintptr_t tab=pointer((uintptr_t)dialog+0x2e0);
     uintptr_t pages=pointer(tab+0x130),buttons=pointer(tab+0x128),selector=pointer(buttons+0x130);
-    if(native_select && pointer((uintptr_t)dialog)==image+0x13812f8 && pointer(tab)==image+0x1351680 &&
+    if(s14_archer_tech_enabled() && native_select && pointer((uintptr_t)dialog)==image+0x13812f8 && pointer(tab)==image+0x1351680 &&
        integer(tab+0x138)==4 && pages && pointer(pointer(pages+24))==(uintptr_t)page_vtable &&
        pointer(pages) && pointer(pages+8) && pointer(pages+16) &&
        pointer(buttons)==image+0x13514f0 && integer(buttons+0x138)==4 && selector){

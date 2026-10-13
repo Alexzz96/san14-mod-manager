@@ -23,7 +23,7 @@ typedef struct {void *object;int kind,registered;} Widget;
 typedef struct {void *object,*rim[32],*face[32],*glyph[128];int rim_count,face_count,glyph_count;} Badge;
 typedef struct {void *button,*label,*icon,*ring,*status,*fill,*edge,*skin;Badge badge;uintptr_t *slot,original;int action,paint;} Button;
 typedef struct {
- void *page,*container,*popup;Widget widgets[256];int used,active,built,pending,offset,modal,modal_first;
+ void *page,*container,*popup;Widget widgets[256];int used,active,built,pending,offset,modal,modal_first,tech_on;
  Button buttons[28];int button_count;
  void *heading,*points,*detail,*detail_icon,*condition,*notice,*hint,*summary,*metrics[5],*point_marks[8],*lines[17],*branches[5];
  S14TechSession model;
@@ -256,6 +256,7 @@ int s14_tech_ui_create(void *page){
 }
 static void utf8(const char *source,wchar_t *out,int count){if(!MultiByteToWideChar(CP_UTF8,0,source,-1,out,count))out[0]=0;}
 static void refresh(Pane *p){
+ p->tech_on=s14_archer_tech_enabled();
  wchar_t name[64],caption[512];S14TechSession *s=&p->model;S14TechRecord *r=s->record;int supported=archer(p);
  if(r&&supported&&s->current)r->learned=s14_archer_tech_mask(s->current->id);
  if(s->selected>=0&&s->selected<s->count)utf8(s->choices[s->selected].name,name,64);else wcscpy(name,L"无可用兵种");
@@ -267,20 +268,21 @@ static void refresh(Pane *p){
   Button *b=&p->buttons[i];int action=b->action;
   if(action>=30&&action<35){int index=p->offset+action-30;int show=index<s->count;visible(b->button,show);visible(b->label,show);if(b->icon)visible(b->icon,show);if(b->skin)visible(b->skin,show);enabled(b->button,!p->modal);if(show){utf8(s->choices[index].name,caption,512);text_size(b->label,wcslen(caption)>6?16:22);text(b->label,caption);set_icon(b->icon,graphic(s->choices[index].carrier));selected(b->button,index==s->selected);b->paint=-1;node_style(b,p,index==s->selected);}}
   else if(action==1||action==2)enabled(b->button,!p->modal&&(action==1?p->offset>0:p->offset+5<s->count));
-  else if(action==3){int status=s14_tech_status(r,r?r->node:-1);visible(b->button,p->modal);enabled(b->button,p->modal&&can&&status==1);text(b->label,status==2?L"已学习":!can?L"仅限自势力弓弩":s14_tech_points(r?r->learned:1)>=8?L"点数已用完":status==1?L"确认学习":L"前置未满足");}
+  else if(action==3){int status=s14_tech_status(r,r?r->node:-1);visible(b->button,p->modal);enabled(b->button,p->modal&&can&&status==1);text(b->label,!p->tech_on?L"测试功能已关闭":status==2?L"已学习":!can?L"仅限自势力弓弩":s14_tech_points(r?r->learned:1)>=8?L"点数已用完":status==1?L"确认学习":L"前置未满足");}
   else if(action==5){visible(b->button,p->modal);enabled(b->button,p->modal);}
   else if(node_action(action)){int n=action-10,status=s14_tech_status(r,n);enabled(b->button,!p->modal&&r!=NULL);selected(b->button,r&&status==2);if(b->icon)alpha(b->icon,!supported||status==0?90:255);if(!supported||status==0)native_disabled((void*)ptr((uintptr_t)b->button+0x178),b->button);b->paint=-1;node_style(b,p,status==2);if(b->status){const wchar_t *rank[]={L"一阶",L"二阶",L"三阶"};text(b->status,status==2?L"已学":rank[(n-1)%3]);}}
  }
  for(int b=0;b<5;b++)for(int t=0;t<3;t++)tint(p->lines[b*3+t],supported&&s14_tech_status(r,1+b*3+t)==2?GOLD:EDGE);
- S14TechBonus bonus=s14_tech_bonus(r&&supported?r->learned:1);int cap,rate;s14_archer_ammo_parameters(s->current&&supported?s->current->id:0,&cap,&rate);
+ S14TechBonus bonus=s14_tech_bonus(r&&supported&&p->tech_on?r->learned:1);int cap,rate;s14_archer_ammo_parameters(s->current&&supported?s->current->id:0,&cap,&rate);
  int values[]={bonus.attack_bp,bonus.defense_bp,bonus.mobility_bp,cap,rate};
  for(int i=0;i<5;i++){
   if(i<3)swprintf(caption,512,L"%+.1f%%",values[i]/100.);
   else if(i==3)swprintf(caption,512,L"%d",cap);else swprintf(caption,512,L"%.2f / 日",rate/100.);
   text(p->metrics[i],caption);tint_text(p->metrics[i],i<3&&values[i]<0?RGBA(218,133,105,255):GOLD);
  }
- if(!supported)text(p->notice,L"本次仅接入原生弓弩。其它原生与MOD兵种暂未强化。");
- else if(!can)text(p->notice,L"仅自势力可学习；请确认MOD总开关、弓弩弹药功能已启用。");
+ if(!p->tech_on)text(p->notice,L"弓兵科技树已停用。请在管理器‘测试功能’中开启；已学进度保留。");
+ else if(!supported)text(p->notice,L"本次仅接入原生弓弩。其它原生与MOD兵种暂未强化。");
+ else if(!can)text(p->notice,L"仅自势力且具有弓弩权限的武将可学习。");
  else text(p->notice,L"基础免费 · 最多8点 · 关闭保留，需保存游戏 · 进阶尚未接入");
  if(r&&p->modal){int n=r->node,status=s14_tech_status(r,n);int icons[]={0x1aa,0x1ac,0x1a9,0x1aa,0x1ab};set_icon(p->detail_icon,icons[s14_tech_nodes[n].icon]);
   swprintf(caption,512,L"%ls · %ls",s14_tech_nodes[n].name,name);text(p->detail,caption);
@@ -303,6 +305,11 @@ int s14_tech_ui_dispatch(void *container,int event,void *sender){
    (p->modal?(b->action==3||b->action==5):b->action!=3&&b->action!=4&&b->action!=5))p->pending=b->action;return 1;
 }
 void s14_tech_ui_update(void *page){Pane *p=pane(page);if(!p||!p->active)return;
+ /* Configuration can change while a native details window is still open.
+    Keep its ownership intact; cancel stale confirmation and show paused values. */
+ if(p->tech_on!=s14_archer_tech_enabled()){
+  p->pending=p->modal=0;refresh(p);return;
+ }
  /* A load replaces saved masks; never retain a learned mask only in the UI. */
  int action=p->pending;p->pending=0;
  if(action==1&&p->offset>0)p->offset-=5;

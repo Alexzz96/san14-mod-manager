@@ -409,8 +409,12 @@ static void apply_configuration(S14ManagerUI *ui) {
     s14_ai_configure(!!(ui->effective&S14_AI_RANDOM_AFFIX));
     if(!s14_blink_ready())ui->effective&=~S14_HUANG_ZHONG_BLINK;
     s14_blink_configure(!!(ui->effective&S14_HUANG_ZHONG_BLINK));
-    s14_archer_probe_configure(hooks_ready && !runtime_fault && !!(ui->effective&S14_MASTER) && GetPrivateProfileIntW(L"Troops",L"ArcherAmmunition",0,ini_path));
-    s14_archer_tech_configure(hooks_ready && !runtime_fault && !!(ui->effective&S14_MASTER) && GetPrivateProfileIntW(L"Troops",L"ArcherAmmunition",0,ini_path) && GetPrivateProfileIntW(L"Troops",L"ArcherTechnology",1,ini_path));
+    if(!s14_archer_tech_ready())ui->effective&=~S14_ARCHER_TECH;
+    s14_archer_tech_configure(!!(ui->effective&S14_ARCHER_TECH));
+    /* Technology's ammunition branches work even if only this test is enabled.
+       An explicit ammunition preference remains independent when tech is off. */
+    s14_archer_probe_configure(!!(ui->effective&S14_MASTER) &&
+        (GetPrivateProfileIntW(L"Troops",L"ArcherAmmunition",0,ini_path)==1 || !!(ui->effective&S14_ARCHER_TECH)));
     s14_domestic_enabled(hooks_ready && !runtime_fault && !!(ui->effective&S14_MASTER));
     S14DOptions validate_preferences;
     if(!s14_search_bridge_available()||!s14_domestic_can_apply(NULL,0)||!s14_domestic_settings_read(ini_path,&validate_preferences))ui->effective&=~S14_AUTO_DOMESTIC;

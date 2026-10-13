@@ -26,6 +26,8 @@ static void tech_log(const char *kind,int officer,int node,int attr,float before
 int s14_archer_tech_next_log(char *out,size_t cap){if(!out||cap<768)return 0;for(int i=0;i<64;i++)if(InterlockedCompareExchange(&tech_logs[i].state,3,2)==2){strcpy(out,tech_logs[i].text);InterlockedExchange(&tech_logs[i].state,0);return 1;}return 0;}
 void s14_archer_tech_attach(uintptr_t base,const wchar_t *root,int ready){tech_image=base;if(root&&wcslen(root)<MAX_PATH)wcscpy(tech_root,root);InterlockedExchange(&tech_ready,!!ready);}
 void s14_archer_tech_configure(int on){InterlockedExchange(&tech_enabled,on&&tech_ready);}
+int s14_archer_tech_ready(void){return !!InterlockedCompareExchange(&tech_ready,0,0);}
+int s14_archer_tech_enabled(void){return !!InterlockedCompareExchange(&tech_enabled,0,0);}
 static void bind_world(uintptr_t world){if(world&&world!=tech_world){memset(tech_masks,0,sizeof(tech_masks));tech_world=world;}}
 static int eligible_person(int officer,uintptr_t world){
  if(officer<1||officer>6000||!world)return 0;
@@ -44,7 +46,7 @@ unsigned short s14_archer_tech_mask(int officer){
 }
 int s14_archer_tech_learn(int officer,int node){
  uintptr_t world=world_now();if(!tech_enabled||tech_loading||!eligible_person(officer,world))return 0;
- AcquireSRWLockExclusive(&tech_lock);int ok=0;if(!tech_loading&&world_now()==world){bind_world(world);S14TechRecord r={.learned=tech_masks[officer]?tech_masks[officer]:1};S14TechSession s={.record=&r};
+ AcquireSRWLockExclusive(&tech_lock);int ok=0;if(tech_enabled&&!tech_loading&&world_now()==world){bind_world(world);S14TechRecord r={.learned=tech_masks[officer]?tech_masks[officer]:1};S14TechSession s={.record=&r};
   if(s14_tech_upgrade(&s,node)){tech_masks[officer]=r.learned;ok=1;}}
  ReleaseSRWLockExclusive(&tech_lock);if(ok)tech_log("learned",officer,node,-1,0,0);return ok;
 }
