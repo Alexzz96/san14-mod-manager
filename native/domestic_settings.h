@@ -11,6 +11,8 @@ int s14_domestic_settings_read(const wchar_t*,S14DOptions*);
 int s14_domestic_settings_write(const wchar_t*,const S14DOptions*);
 int s14_domestic_settings_seen(const wchar_t*);
 int s14_domestic_settings_mark_seen(const wchar_t*);
+int s14_domestic_settings_configured(const wchar_t*);
 int s14_domestic_quick_show(S14DomesticQuickUI*,HINSTANCE,HWND,const wchar_t*);
+int s14_domestic_quick_show_loaded(S14DomesticQuickUI*,HINSTANCE,HWND,const wchar_t*,const S14DResult*);
 void s14_domestic_quick_destroy(S14DomesticQuickUI*);
 #endif

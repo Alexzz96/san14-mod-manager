@@ -38,8 +38,8 @@ config+=b'[Views]\nEnabled=1\nOfficers=1\nNativeOfficerStats=1\nNativeArmyValues
 config+=b'[Troops]\nArcherAmmunition=1\nArcherAmmoCapacity=25\nArcherAmmoRecovery=2\nArcherTechnology=0\n'
 config+=b'[Observation]\nBattleEvents=1\n'
 config+=b'[Visuals]\nCaoRenHalo=1\nCaoRenTooltip=1\nAiAffixHalo=1\nAiAffixTooltip=1\n'
-config=config.replace(b'PluginTroops=0\n',b'PluginTroops=0\nAiRandomAffix=0\nHuangZhongBlink=0\nAutoDomesticFill=0\n')
-manifest={'plugin_initialization':verification.get('initialization',{}),'domestic_in_foundation':True,'nonfoundation_defaults_off':True,'turn_report_player_force_unified':True,'turn_report_force_fix_in_game_acceptance':'pending','adaptive_player_force_matching':True,'force_group_identity_separated':True,'successful_load_session_reset':True,'adaptive_search_in_game_acceptance':'pending','version':version,'release_status':'prerelease','platform':'windows-x64',
+config=config.replace(b'PluginTroops=0\n',b'PluginTroops=0\nAiRandomAffix=0\nHuangZhongBlink=0\nAutoDomesticFill=1\n')
+manifest={'plugin_initialization':verification.get('initialization',{}),'domestic_in_foundation':True,'auto_domestic_default_enabled':True,'nonfoundation_defaults_off':True,'turn_report_player_force_unified':True,'turn_report_force_fix_in_game_acceptance':'pending','adaptive_player_force_matching':True,'force_group_identity_separated':True,'successful_load_session_reset':True,'adaptive_search_in_game_acceptance':'pending','version':version,'release_status':'prerelease','platform':'windows-x64',
           'target_executable':'SAN14PK_SC.exe','game_version_check':False,
           'game_sha256_check':False,'runtime_hook_validation':True,
           'manager_exe_sha256':verification['manager_exe_sha256'],

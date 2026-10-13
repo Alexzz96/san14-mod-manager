@@ -15,7 +15,7 @@ static int tree(const wchar_t *path,int depth){if(depth>32 || !plain(path,1))ret
     DWORD e=GetLastError();FindClose(f);return ok && e==ERROR_NO_MORE_FILES;}
 static int defaults(const wchar_t *path){
     HANDLE file=CreateFileW(path,GENERIC_WRITE,0,NULL,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,NULL);if(file==INVALID_HANDLE_VALUE)return 0;
-    const char text[]="[Rule]\r\nMode=0\r\n[Manager]\r\nEnabled=1\r\n[Features]\r\nWallClusterLimit=0\r\nLimitHint=1\r\nDiagnostics=0\r\nAutoSearch=1\r\nAutoDomesticFill=0\r\nCaoRenAttackDefense=0\r\nPluginTroops=0\r\nAiRandomAffix=0\r\nHuangZhongBlink=0\r\n[Observation]\r\nBattleEvents=1\r\n[Views]\r\nEnabled=1\r\nOfficers=1\r\nNativeOfficerStats=1\r\nNativeArmyValues=1\r\n[AutoSearch]\r\nExecutors=1\r\nReturnDays=0\r\nPriority=0\r\n";
+    const char text[]="[Rule]\r\nMode=0\r\n[Manager]\r\nEnabled=1\r\n[Features]\r\nWallClusterLimit=0\r\nLimitHint=1\r\nDiagnostics=0\r\nAutoSearch=1\r\nAutoDomesticFill=1\r\nCaoRenAttackDefense=0\r\nPluginTroops=0\r\nAiRandomAffix=0\r\nHuangZhongBlink=0\r\n[Observation]\r\nBattleEvents=1\r\n[Views]\r\nEnabled=1\r\nOfficers=1\r\nNativeOfficerStats=1\r\nNativeArmyValues=1\r\n[AutoSearch]\r\nExecutors=1\r\nReturnDays=0\r\nPriority=0\r\n";
     DWORD n=0;int ok=WriteFile(file,text,sizeof(text)-1,&n,NULL) && n==sizeof(text)-1 && FlushFileBuffers(file);CloseHandle(file);return ok;
 }
 int s14_package_reset(const wchar_t *root,wchar_t backup[MAX_PATH],wchar_t error[192]){

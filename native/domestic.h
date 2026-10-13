@@ -14,7 +14,7 @@ enum {S14_D_KEEP,S14_D_LOCKED,S14_D_PROTECTED,S14_D_NO_CANDIDATE,S14_D_CHANGE};
 typedef struct {int active,account,balance,direction,area_count,development_aura,security_aura;uintptr_t address;wchar_t name[40],aura_description[256];} S14DCity;
 typedef struct {int active,city,officer,project,ordinal,development[3],security;uintptr_t address;wchar_t name[32];} S14DArea;
 typedef struct {int active,city,eligible,protected_job,busy,owned;int ability[5],traits[9],forecast_start,forecast_count;uintptr_t address;wchar_t name[40];} S14DPerson;
-typedef struct {wchar_t name[16],description[112];int effect[2],value[2],domestic;} S14DTrait;
+typedef struct {wchar_t name[16],description[112];int effect[2],value[2],domestic,defined;} S14DTrait;
 /* Native one-turn forecasts with current neighbouring appointments held fixed. */
 typedef struct {int development[3],security,gold_cost;} S14DForecast;
 typedef struct {uintptr_t world;unsigned epoch;int force,group,unit_cost,forecast_ready,forecast_count;S14DCity cities[S14_D_CITIES];S14DArea areas[S14_D_AREAS];S14DPerson people[S14_D_PEOPLE];S14DTrait traits[S14_D_TRAITS];S14DForecast forecasts[S14_D_FORECASTS];} S14DSnapshot;

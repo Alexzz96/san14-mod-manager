@@ -27,8 +27,8 @@ int main(void) {
     wchar_t temp[MAX_PATH],root[MAX_PATH],ini[MAX_PATH]; REQUIRE(GetTempPathW(MAX_PATH,temp));
     swprintf(root,MAX_PATH,L"%lsS14-manager-test-%lu",temp,(unsigned long)GetCurrentProcessId()); REQUIRE(CreateDirectoryW(root,NULL));
     REQUIRE(s14_join(ini,root,L"SAN14BuildLimit.ini"));
-    REQUIRE(s14_config_read(ini)==(S14_MASTER|S14_LIMIT_HINT|S14_AUTO_SEARCH));
-    REQUIRE(s14_effective_flags(s14_config_read(ini))==(S14_MASTER|S14_AUTO_SEARCH));
+    REQUIRE(s14_config_read(ini)==(S14_MASTER|S14_LIMIT_HINT|S14_AUTO_SEARCH|S14_AUTO_DOMESTIC));
+    REQUIRE(s14_effective_flags(s14_config_read(ini))==(S14_MASTER|S14_AUTO_SEARCH|S14_AUTO_DOMESTIC));
     REQUIRE(s14_search_settings_read(ini)==1 && s14_battle_setting_read(ini));
     REQUIRE(WritePrivateProfileStringW(L"AutoSearch",L"Executors",L"99",ini));
     REQUIRE(s14_search_settings_read(ini)==1);
@@ -36,7 +36,7 @@ int main(void) {
     REQUIRE(!(s14_config_read(ini)&S14_CAO_REN_BUFF));
     REQUIRE(!(s14_config_read(ini)&S14_PLUGIN_TROOPS));
     REQUIRE(!(s14_config_read(ini)&S14_HUANG_ZHONG_BLINK));
-    REQUIRE(!(s14_config_read(ini)&S14_AUTO_DOMESTIC));
+    REQUIRE(s14_config_read(ini)&S14_AUTO_DOMESTIC);
     REQUIRE(!(s14_config_read(ini)&S14_ARCHER_TECH));
     REQUIRE(WritePrivateProfileStringW(L"Troops",L"ArcherAmmoCapacity",L"25",ini));
     REQUIRE(WritePrivateProfileStringW(L"Troops",L"ArcherTechnology",L"1",ini));
@@ -48,7 +48,7 @@ int main(void) {
     REQUIRE(!(s14_config_read(ini)&S14_ARCHER_TECH));
     REQUIRE(s14_config_set(ini,S14_ARCHER_TECH,0));
     REQUIRE(s14_config_set(ini,S14_AUTO_DOMESTIC,1)&&(s14_config_read(ini)&S14_AUTO_DOMESTIC));
-    REQUIRE(s14_config_set(ini,S14_AUTO_DOMESTIC,0));
+    REQUIRE(s14_config_set(ini,S14_AUTO_DOMESTIC,0) && !(s14_config_read(ini)&S14_AUTO_DOMESTIC));
     REQUIRE(s14_config_set(ini,S14_HUANG_ZHONG_BLINK,1) && (s14_effective_flags(s14_config_read(ini))&S14_HUANG_ZHONG_BLINK));
     REQUIRE(s14_config_set(ini,S14_HUANG_ZHONG_BLINK,0));
     REQUIRE(s14_config_set(ini,S14_PLUGIN_TROOPS,0) && !(s14_config_read(ini)&S14_PLUGIN_TROOPS));

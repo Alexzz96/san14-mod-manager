@@ -5,8 +5,9 @@
 unsigned s14_battle_session_epoch(void){return 1;}int s14_battle_is_loading(void){return 0;}
 static unsigned char world[0x85200],settings[64],group_data[32],foreign_group[32],cities[52][208],areas[501][120],people_data[7][512],tiles[4][32];
 static unsigned char trait_data[356][224],force_data[32];
+static unsigned char empty_person_data[512],later_person_data[512];
 static uintptr_t heads[4],ptr_counts[4],int_counts[4],nodes[6][2];static unsigned ids[3]={0,1,2};
-static int constructions,destructions,dtor_step,settlements,appended,fail_append;
+static int constructions,destructions,dtor_step,settlements,appended,fail_append,effective_calls;
 static struct {void *area;int person,project;} changes[501];
 static void *group_of(void *city){return city==cities[1]?group_data:foreign_group;}
 static void *player_of(void *s){assert(s==settings);return group_data;}
@@ -14,7 +15,7 @@ static void *construct(void *arg){NativeBatch *b=arg;constructions++;dtor_step=0
 static void destroy_number(void *arg){NativeList *l=arg;assert((dtor_step==0&&l->handle==(uintptr_t)&ids[2])||(dtor_step==1&&l->handle==(uintptr_t)&ids[1]));dtor_step++;l->handle=0;}
 static void destroy_pointer(void *arg){NativeList *l=arg;assert(dtor_step==2&&l->vtable==image+0x123f418&&l->handle==(uintptr_t)&ids[0]);destructions++;l->handle=0;}
 static void enumerate(void *city,void *list){assert(city==cities[1]);NativeList *l=list;assert(l->handle==(uintptr_t)&ids[0]);heads[0]=(uintptr_t)nodes[0];ptr_counts[0]=5;}
-static int effective_value(void *person,int stat,int flags){assert(stat>=0&&stat<5&&flags==0xfff);return ((unsigned char*)person)[0x124+stat]+5;}
+static int effective_value(void *person,int stat,int flags){effective_calls++;assert(stat>=0&&stat<5&&flags==0xfff);return ((unsigned char*)person)[0x124+stat]+5;}
 static void push(void *batch,void *area,int id,int project){(void)batch;assert(id>=0&&id<6001&&project>=0&&project<4);changes[appended].area=area;changes[appended].person=id;changes[appended].project=project;appended++;ptr_counts[0]++;int_counts[1]++;if(!fail_append)int_counts[2]++;}
 static int min_length(void *arg){(void)arg;int n=(int)ptr_counts[0];if((int)int_counts[1]<n)n=(int)int_counts[1];if((int)int_counts[2]<n)n=(int)int_counts[2];return n;}
 static int resident(void *p){return ((unsigned char*)p)[0x196]!=0;}
@@ -56,9 +57,40 @@ int main(void){
  assert(s14_domestic_plan(s,&o,&p)&&p.rows[0].after==1);fail_append=1;assert(!batch(s,&p,1)&&!settlements&&constructions==destructions);fail_append=0;assert(batch(s,&p,1)&&settlements==1&&group_data[0x14]==18&&*(unsigned short*)(areas[1]+0x36)==1&&constructions==destructions);
  const S14DForecast *f=s14_domestic_forecast(s,1,1);assert(s->forecast_ready&&f&&f->development[0]==3&&f->development[1]==12&&f->security==5&&f->gold_cost==8&&s->traits[110].domestic&&s->traits[110].effect[0]==33&&s->people[1].traits[0]==110&&s->cities[1].development_aura==50&&s->cities[1].security_aura==500);
  *(unsigned short*)(areas[1]+0x36)=6;assert(capture(s,why)&&s->people[6].owned&&!s->people[6].eligible&&s->people[6].ability[2]==85);o.mode=S14_D_OPTIMIZE;assert(s14_domestic_plan(s,&o,&p)&&p.rows[0].after==6&&p.rows[0].reason==S14_D_PROTECTED);
+ /* Reserved/custom slots can be allocated without a person identity. Their
+    presence must not hide valid roster members at later table indices. */
+ *(void**)(world+0x148+3001*8)=empty_person_data;*(uintptr_t*)empty_person_data=image+0x12a00d0;
+ empty_person_data[0x129]=100;*(unsigned short*)(empty_person_data+0x186)=65535;empty_person_data[0x1e8]=7;*(unsigned short*)(empty_person_data+0x1f8)=65535;
+ memcpy(later_person_data,people_data[6],512);*(unsigned short*)(later_person_data+0x10)=5001;*(void**)(world+0x148+5001*8)=later_person_data;
+ assert(capture(s,why)&&!s->people[3001].active&&s->people[5001].owned&&!s->people[5001].eligible);
+ memset(empty_person_data+0x124,1,5);assert(capture(s,why)&&s->people[5001].owned);
+ empty_person_data[0x124]=10;assert(!capture(s,why));memset(empty_person_data+0x124,0,5);
+ empty_person_data[0x12]=1;assert(!capture(s,why));empty_person_data[0x12]=0;
+ *(unsigned short*)(empty_person_data+0x150)=110;assert(!capture(s,why));*(unsigned short*)(empty_person_data+0x150)=0;
+ empty_person_data[0x11e]=4;assert(!capture(s,why));empty_person_data[0x11e]=0;
+ *(unsigned short*)(later_person_data+0x10)=5002;assert(!capture(s,why));*(unsigned short*)(later_person_data+0x10)=5001;
+ *(uintptr_t*)empty_person_data=image+0x129fd10;assert(!capture(s,why));*(uintptr_t*)empty_person_data=image+0x12a00d0;
+ *(unsigned short*)(areas[1]+0x36)=3001;assert(!capture(s,why));*(unsigned short*)(areas[1]+0x36)=6;
+ assert(capture(s,why)&&s->people[6].owned&&s->people[5001].owned);
+ /* Sparse unused directories are legal; referenced missing objects and wrong
+    types must still stop capture before any native forecast is attempted. */
+ *(void**)(world+0xdaa8+51*8)=NULL;*(void**)(world+0x6c860+500*8)=NULL;*(void**)(world+0x7d440+355*8)=NULL;
+ assert(capture(s,why)&&s->cities[1].active&&s->areas[1].active&&s->forecast_ready&&!s->traits[355].defined);
+ int earlier_effective_calls=effective_calls;*(void**)(world+0x7d440+110*8)=NULL;assert(!capture(s,why)&&wcsstr(why,L"个性 #110")&&effective_calls==earlier_effective_calls);*(void**)(world+0x7d440+110*8)=trait_data[110];
+ *(unsigned short*)(people_data[5]+0x150)=355;assert(!capture(s,why)&&wcsstr(why,L"驻城武将"));*(unsigned short*)(people_data[5]+0x150)=0;
+ *(void**)(world+0xdaa8+2*8)=NULL;assert(!capture(s,why)&&wcsstr(why,L"城市 #2"));*(void**)(world+0xdaa8+2*8)=cities[2];
+ *(void**)(world+0x148+1*8)=NULL;assert(!capture(s,why));*(void**)(world+0x148+1*8)=people_data[1];
+ *(uintptr_t*)trait_data[354]=image+0x129fd10;assert(!capture(s,why));*(uintptr_t*)trait_data[354]=image+0x12a0658;
+ *(unsigned short*)(people_data[1]+0x150)=356;assert(!capture(s,why));*(unsigned short*)(people_data[1]+0x150)=110;
+ *(void**)(world+0x148+5001*8)=NULL;*(void**)(world+0x148+6000*8)=later_person_data;*(unsigned short*)(later_person_data+0x10)=6000;
+ assert(capture(s,why)&&s->people[6000].owned&&!s->people[6000].eligible);
+ *(void**)(world+0x148+6000*8)=NULL;*(void**)(world+0x148+5001*8)=later_person_data;*(unsigned short*)(later_person_data+0x10)=5001;
+ nodes[4][1]=(uintptr_t)nodes[4];assert(!capture(s,why));nodes[4][1]=0;
+ *(void**)(world+0xdfe0+1*8)=NULL;assert(!capture(s,why));*(void**)(world+0xdfe0+1*8)=tiles[1];
+ assert(capture(s,why)&&s->areas[1].active&&s->cities[1].active&&constructions==destructions);
  /* Real settlement semantics for swaps and an implicit vacancy, including
     charges for both displayed rows rather than a hidden removal. */
  memset(&p,0,sizeof(p));p.count=2;p.valid=1;p.rows[0]=(S14DRow){.area=1,.city=1,.before=1,.after=2,.project=1,.reason=S14_D_CHANGE,.selected=1};p.rows[1]=(S14DRow){.area=2,.city=1,.before=2,.after=1,.project=2,.reason=S14_D_CHANGE,.selected=1};s->areas[2].address=(uintptr_t)areas[2];*(unsigned short*)(areas[1]+0x36)=1;*(unsigned short*)(areas[2]+0x36)=2;areas[1][0x72]=areas[2][0x72]=1;group_data[0x14]=20;assert(batch(s,&p,1)&&*(unsigned short*)(areas[1]+0x36)==2&&*(unsigned short*)(areas[2]+0x36)==1&&areas[2][0x72]==2&&group_data[0x14]==16);
  p.rows[0].after=0;p.rows[0].project=0;p.rows[1].after=2;p.rows[1].project=1;assert(batch(s,&p,1)&&!*(unsigned short*)(areas[1]+0x36)&&!areas[1][0x72]&&*(unsigned short*)(areas[2]+0x36)==2&&group_data[0x14]==12&&constructions==destructions);
- free(s);VirtualFree((void*)image,0,MEM_RELEASE);printf("{\"own_roster_includes_ineligible_officers\":true,\"production_snapshot_reader\":true,\"native_forecast_adapter\":true,\"development_security_caps\":true,\"session_trait_definitions\":true,\"protected_city_aura\":true,\"force_group_separation\":true,\"delegated_cities_excluded\":true,\"enemy_area_excluded\":true,\"same_city_candidates\":true,\"effective_ability\":true,\"native_list_lifetime\":true,\"incomplete_append_rejected\":true,\"production_batch_adapter\":true,\"actual_game_calls\":false}\n");return 0;
+ free(s);VirtualFree((void*)image,0,MEM_RELEASE);printf("{\"sparse_unused_directories_and_reference_guards\":true,\"production_snapshot_reader\":true,\"native_forecast_adapter\":true,\"development_security_caps\":true,\"session_trait_definitions\":true,\"protected_city_aura\":true,\"force_group_separation\":true,\"delegated_cities_excluded\":true,\"enemy_area_excluded\":true,\"same_city_candidates\":true,\"effective_ability\":true,\"native_list_lifetime\":true,\"incomplete_append_rejected\":true,\"production_batch_adapter\":true,\"actual_game_calls\":false}\n");return 0;
 }

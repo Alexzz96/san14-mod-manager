@@ -79,7 +79,7 @@ def run_reset_tests(package, build):
         assert 'QuickSetupShown' not in fresh and 'Preferences' not in fresh
         for key in ['WallClusterLimit','PluginTroops','CaoRenAttackDefense','AiRandomAffix','HuangZhongBlink']:
             assert f'{key}=0' in fresh
-        assert 'AutoSearch=1' in fresh and 'BattleEvents=1' in fresh
+        assert 'AutoSearch=1' in fresh and 'BattleEvents=1' in fresh and 'AutoDomesticFill=1' in fresh
         assert game.read_bytes()==original_game and save.read_bytes()==b'native-save-untouched'
         for name,data in binaries.items():
             assert (root/name).read_bytes()==data and (saved/name).read_bytes()==data

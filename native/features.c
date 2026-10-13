@@ -51,7 +51,7 @@ unsigned int s14_config_read(const wchar_t *path) {
     if (boolean(path,L"Features",L"PluginTroops",0)) flags|=S14_PLUGIN_TROOPS;
     if (boolean(path,L"Features",L"AiRandomAffix",0)) flags|=S14_AI_RANDOM_AFFIX;
     if (boolean(path,L"Features",L"HuangZhongBlink",0)) flags|=S14_HUANG_ZHONG_BLINK;
-    if (boolean(path,L"Features",L"AutoDomesticFill",0)) flags|=S14_AUTO_DOMESTIC;
+    if (boolean(path,L"Features",L"AutoDomesticFill",1)) flags|=S14_AUTO_DOMESTIC;
     /* Keep the existing INI key so an upgrade preserves explicit preferences. */
     if (boolean(path,L"Troops",L"ArcherTechnology",0)) flags|=S14_ARCHER_TECH;
     return flags;

@@ -695,11 +695,21 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
             write_line(log,line);last_detail_visible=native_detail.shown;last_detail_officer=native_detail.frame.officer_id;last_detail_ready=native_detail.ready;last_detail_stats=native_detail.stats;
         }
         if(report_epoch!=s14_turn_report_epoch()) {report_epoch=s14_turn_report_epoch();s14_report_ui_clear(&turn_ui);}
-        if(s14_domestic_quick_pending()){
-            if(s14_domestic_settings_seen(ini_path))s14_domestic_quick_ack();
-            else if((ui.effective&S14_MASTER)&&domestic_ready&&owner&&GetForegroundWindow()==owner&&!map_blocked&&s14_map_main_scene(quick_scene_memory,NULL,image_base)){
-                int shown=s14_domestic_quick_show(&domestic_ui.quick,own_module,owner,ini_path);
-                if(shown){int remembered=s14_domestic_settings_mark_seen(ini_path);s14_domestic_quick_ack();char line[160];snprintf(line,sizeof(line),"{\"event\":\"domestic_quick_shown\",\"scope\":\"installation_once\",\"remembered\":%s}\n",remembered?"true":"false");write_line(log,line);}
+        /* Parse in the game planning callback after entering a save. Opening
+           the window must use a complete snapshot, not a partial failed read. */
+        static S14DResult *quick_loaded;static uint64_t quick_request;static unsigned quick_request_epoch;static ULONGLONG quick_retry;
+        unsigned quick_live_epoch=s14_battle_session_epoch();
+        if(quick_request_epoch!=quick_live_epoch||s14_battle_is_loading()){quick_request=0;quick_retry=0;quick_request_epoch=quick_live_epoch;}
+        if(s14_domestic_quick_pending()&&(ui.effective&S14_MASTER)&&domestic_ready&&owner&&!map_blocked&&s14_map_main_scene(quick_scene_memory,NULL,image_base)){
+            if(!quick_loaded)quick_loaded=calloc(1,sizeof(*quick_loaded));
+            if(quick_loaded&&!quick_request&&tick>=quick_retry){S14DOptions initial;s14_domestic_settings_read(ini_path,&initial);initial.mode=S14_D_FILL;initial.city=0;quick_request=s14_domestic_request(&initial);quick_retry=tick+2000;}
+            if(quick_request&&s14_domestic_result(quick_request,quick_loaded)&&quick_loaded->status!=S14_D_PENDING){
+                if(quick_loaded->status==S14_D_PREVIEW&&quick_loaded->plan.valid&&quick_loaded->snapshot.epoch==quick_live_epoch){
+                    if(s14_domestic_settings_configured(ini_path)){s14_domestic_quick_ack();quick_request=0;}
+                    else if(GetForegroundWindow()==owner&&s14_domestic_quick_show_loaded(&domestic_ui.quick,own_module,owner,ini_path,quick_loaded)){
+                        s14_domestic_quick_ack();quick_request=0;write_line(log,"{\"event\":\"domestic_quick_shown\",\"scope\":\"unconfigured_save_entry\",\"parsed\":true}\n");
+                    }
+                }else {quick_request=0;quick_retry=tick+2000;}
             }
         }
         const wchar_t *search_report,*battle_report;
