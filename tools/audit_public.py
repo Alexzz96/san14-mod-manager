@@ -12,6 +12,8 @@ patterns = [
     re.compile(rb'(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}'),
     re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
 ]
+# The generated two-character MOD menu caption is a source asset, not game art.
+mod_assets = {'native/officer-caption.png'}
 failures = []
 total = 0
 for name in filter(None, paths):
@@ -21,7 +23,7 @@ for name in filter(None, paths):
         continue
     data = (ROOT / path).read_bytes()
     total += len(data)
-    if b'\0' in data or len(data) > 512_000:
+    if (b'\0' in data and name not in mod_assets) or len(data) > 512_000:
         failures.append(name + ': unexpected binary or large file')
     if any(pattern.search(data) for pattern in patterns):
         failures.append(name + ': private path or credential pattern')

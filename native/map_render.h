@@ -5,14 +5,18 @@
 #include "map_effects_model.h"
 typedef struct {
     ID3D11Device *device;ID3D11DeviceContext *context;ID3D11DeviceContext1 *context1;
-    ID3DDeviceContextState *state;ID3D11VertexShader *vs;ID3D11PixelShader *ps;ID3D11Buffer *constants;
+    ID3DDeviceContextState *state;ID3D11VertexShader *vs,*sprite_vs;ID3D11PixelShader *ps,*sprite_ps;ID3D11Buffer *constants;
     ID3D11BlendState *blend;ID3D11RasterizerState *raster;ID3D11DepthStencilState *depth;
-    ID3D11PixelShader *troop_ps;
+    ID3D11PixelShader *troop_ps,*ammo_ps;ID3D11ShaderResourceView *caption_image;ID3D11SamplerState *caption_sampler;
+    float caption_uv[4],caption_aspect;
     HRESULT error;
 } S14MapGraphics;
 int s14_map_graphics_init(S14MapGraphics*,ID3D11Device*);
 int s14_map_graphics_draw(S14MapGraphics*,ID3D11Texture2D*,float,float,float,float);
 int s14_troop_graphics_draw(S14MapGraphics*,ID3D11Texture2D*,float,float,float,int,int);
+int s14_caption_graphics_draw(S14MapGraphics*,ID3D11Texture2D*,float,float,float,float,float);
+int s14_ammo_graphics_draw(S14MapGraphics*,ID3D11Texture2D*,float,float,float,float,int,int);
+void s14_map_ammo_publish(HWND,uintptr_t,int,ULONGLONG);
 void s14_map_graphics_destroy(S14MapGraphics*);
 int s14_map_render_install(void);
 int s14_map_render_ready(void);
@@ -20,4 +24,6 @@ void s14_map_render_publish_all(HWND,uintptr_t,int,unsigned int,unsigned int,con
 void s14_map_render_publish(HWND,uintptr_t,int,const S14MapFrame*,const uintptr_t[2],const HWND[4],ULONGLONG);
 int s14_map_render_visible(void);
 int s14_map_render_log(char*,size_t);
+void s14_map_caption_publish(float,float,float,float,float,int,ULONGLONG);
+int s14_map_caption_drawn(ULONGLONG);
 #endif

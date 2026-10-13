@@ -31,6 +31,7 @@ sys.path.insert(0,str(HERE.parent/'reference'))
 from build_limit import Building,evaluate
 from verify_entry import run_entry_tests
 from verify_cleanup import run_cleanup_tests
+from verify_reset import run_reset_tests
 
 sys.stdout.reconfigure(encoding='utf-8')
 parser=argparse.ArgumentParser(description=__doc__)
@@ -102,6 +103,13 @@ if GAME:
         verified_prologues.append({'rva':hex(rva),'bytes':bytes(signature)[:length.value].hex(),
                                    'private_trampoline':'passed'})
     search_prologue=test.S14TestSearchPrologue
+    for rva,signature in ((0x166760,bytes.fromhex('40 55 57 41 56 48 83 ec 40 4c 8b 32 48 8d 7a 08 49 8b')),
+                          (0x15bb40,bytes.fromhex('40 53 41 57 48 81 ec 88 00 00 00 48 8b 05 7e d6 e6 01'))):
+        assert rva_bytes(rva,len(signature))==signature
+        code=(C.c_ubyte*64).from_buffer_copy(rva_bytes(rva,64))
+        assert hook_bytes(code,64)==1,f'MinHook rejected archer adapter {rva:#x}'
+        verified_prologues.append({'rva':hex(rva),'bytes':signature.hex(),'adapter':'archer_ammunition','private_trampoline':'passed'})
+    assert rva_bytes(0x16685c,5)==bytes.fromhex('e8 0f 5b 41 02')
     search_prologue.argtypes=[C.c_int,C.POINTER(C.c_ubyte),C.POINTER(C.c_int)];search_prologue.restype=C.c_int
     search_count=test.S14TestSearchEntryCount;search_count.argtypes=[];search_count.restype=C.c_int
     for index in range(search_count()):
@@ -384,6 +392,7 @@ installer_metrics={'install_update_remove_reinstall':'passed','unicode_game_fold
                    'locked_manager_rolls_back_plugin':True,
                    'game_binary_unchanged':True}
 cleanup_metrics=run_cleanup_tests(package,BUILD,args.legacy_manager)
+reset_metrics=run_reset_tests(package,BUILD)
 battle_metrics={}
 for name in ('test_battle_probe','test_battle_skills','test_battle_details','test_battle_save','test_battle_special'):
     with tempfile.TemporaryDirectory(prefix='S14-battle-verify-') as root:
@@ -565,32 +574,77 @@ assert ai_metrics['city_periodic_ninth'] and ai_metrics['city_counts_independent
 ai_metrics.update({'in_game_acceptance':'pending','ai_create_path_acceptance':'pending','multi_halo_in_game_acceptance':'pending','first_map_values_acceptance':'pending','publication':'local_only'})
 blink_metrics=json.loads(subprocess.check_output([str(BUILD/'test_blink_backstab.exe')],text=True,encoding='utf-8'))
 assert blink_metrics['status']=='passed' and blink_metrics['separate_process_restore']
+archer_metrics=json.loads(subprocess.check_output([str(BUILD/'test_archer_ammo.exe')],text=True,encoding='utf-8'))
+archer_metrics['technology']=json.loads(subprocess.check_output([str(BUILD/'test_archer_tech.exe')],text=True,encoding='utf-8'))
+assert archer_metrics['status']=='passed' and archer_metrics['empty_blocks_damage'] and archer_metrics['save_load_balance']
+archer_metrics['in_game_acceptance']='pending'
 tech_metrics=json.loads(subprocess.check_output([str(BUILD/'test_tech_tree.exe')],text=True,encoding='utf-8'))
 assert tech_metrics['status']=='passed'
+tech_metrics['model']=json.loads(subprocess.check_output([str(BUILD/'test_tech_tree_model.exe')],text=True,encoding='utf-8'))
+tech_metrics['lifecycle']=json.loads(subprocess.check_output([str(BUILD/'test_tech_tree_ui.exe')],text=True,encoding='utf-8'))
+assert tech_metrics['model']['status']=='passed' and tech_metrics['lifecycle']['status']=='passed'
 if GAME:
     for rva,hexcode in ((0x76a440,'40535556574154415541564157'),(0x3a54d0,'48895c2408'),
                         (0x77a0b0,'48894c2408'),(0x82beb0,'33c0488901'),(0x7e7430,'4056574156'),
-                        (0x8309d0,'85d27872'),(0x831e70,'48895c2408'),(0x789ca0,'4883ec28')):
+                        (0x8309d0,'85d27872'),(0x831e70,'48895c2408'),(0x789ca0,'4883ec28'),(0x4c0020,'48895c241048896c')):
         assert rva_bytes(rva,len(bytes.fromhex(hexcode)))==bytes.fromhex(hexcode)
     assert rva_bytes(0x1304d80,24)==b'11_01_02_02_info_busho2\0'
     for slot,method in ((0,0x8161c0),(4,0x7e7430),(5,0x78d9b0),(48,0x80ba40),(49,0x54b380)):
         assert struct.unpack('<Q',rva_bytes(0x1304be8+slot*8,8))[0]==preferred_base+method
     code=(C.c_ubyte*64).from_buffer_copy(rva_bytes(0x76a440,64))
     assert hook_bytes(code,64)==1
-    tech_metrics['static_anchors_verified']=14
-report={'blink_backstab':blink_metrics,'foundation_editor':{'plan_complete':False,'candidate_ready':False,'implemented_operations':['personalities'],'missing_operations':['attributes','tactics','rank','likes','dislikes','sworn','books','items'],'six_page_editor_complete':False,'in_game_acceptance':'pending','publication':'development_local_only'},'ai_random_affix':ai_metrics,'personality_editor':personality_metrics,'status':'passed','game_version_check':False,'game_sha256_check':False,'hook_entry_validation':entry_metrics,'verified_game_prologues':verified_prologues,
+    assert rva_bytes(0x76a6cc,1)==b'\xe8'
+    assert 0x76a6d1+struct.unpack('<i',rva_bytes(0x76a6cd,4))[0]==0x4c0020
+    assert struct.unpack('<Q',rva_bytes(0x13514f0+0x170,8))[0]==preferred_base+0x76aa50
+    assert rva_bytes(0x775cd7,1)==b'\xe9'
+    assert 0x775cdc+struct.unpack('<i',rva_bytes(0x775cd8,4))[0]==0x773ff0
+    tech_metrics['native_selection_event_and_content_path_verified']=True
+    for rva,hexcode in ((0x77a050,'48894c2408'),(0x781540,'48895c2408'),(0x7815c0,'40535556574154'),(0x830fb0,'4885c9'),(0x830750,'4885c9'),(0x784b90,'48895c2410'),(0x830f10,'4885c9')):
+        assert rva_bytes(rva,len(bytes.fromhex(hexcode)))==bytes.fromhex(hexcode)
+    assert list(struct.unpack('<19i',rva_bytes(0x1921640,76)))[:7]==[4,8,2,14,15,16,17]
+    assert rva_bytes(0x20f810,17)==bytes.fromhex('4533c083fa1477288b81640100000fa3d0')
+    assert struct.unpack('<4I',rva_bytes(0x18cf3b0+16*16,16))[0]==0xf4f2e9ff
+    assert struct.unpack('<4I',rva_bytes(0x18cf3b0+27*16,16))[0]==0xffdf70ff
+    tech_metrics['native_text_palette_alpha_verified']=True
+    tech_metrics['native_portrait_resource_mapping_verified']=True
+    tech_metrics['native_permission_bit_index_verified']=True
+    tech_metrics['static_anchors_verified']=27
+report={'archer_ammunition':archer_metrics,'blink_backstab':blink_metrics,'foundation_editor':{'plan_complete':False,'candidate_ready':False,'implemented_operations':['personalities'],'missing_operations':['attributes','tactics','rank','likes','dislikes','sworn','books','items'],'six_page_editor_complete':False,'in_game_acceptance':'pending','publication':'development_local_only'},'ai_random_affix':ai_metrics,'personality_editor':personality_metrics,'status':'passed','game_version_check':False,'game_sha256_check':False,'hook_entry_validation':entry_metrics,'verified_game_prologues':verified_prologues,
         'territory_adapter_cases':512,'creation_correlation':'passed',
         'random_reference_cases':random_cases,'private_snapshots_required':False,
         'tls_thread_count':8,'tls_calls':8000,'full_queue_dropped':dropped,
         'queue_test_ms':round(elapsed*1000,3),'directinput_proxy_hresult':hr,
         'synthetic_hook_and_rule':metrics,
         'interaction':ui_metrics,'verified_phase_call_sites':len(wrapper_returns)+2 if GAME else 0,
-        'manager':manager_metrics,'github_update':update_metrics,'officers':officer_metrics,'native_officer_detail':detail_metrics,'native_army_values':army_metrics,'cao_ren_buff':buff_metrics,'career_affix':affix_metrics,'map_effects':map_metrics,'plugin_troop_registry':troop_metrics,'auto_search':search_metrics,'battle_observation':battle_metrics,'installer':installer_metrics,'cleanup':cleanup_metrics,
+        'manager':manager_metrics,'github_update':update_metrics,'officers':officer_metrics,'native_officer_detail':detail_metrics,'native_army_values':army_metrics,'cao_ren_buff':buff_metrics,'career_affix':affix_metrics,'map_effects':map_metrics,'plugin_troop_registry':troop_metrics,'auto_search':search_metrics,'battle_observation':battle_metrics,'installer':installer_metrics,'cleanup':cleanup_metrics,'initialization':reset_metrics,
         'private_actual_check_off_on':list(switch_results),
         'manager_exe_sha256':hashlib.sha256((BUILD/'SAN14ModManager.exe').read_bytes()).hexdigest(),
         'production_dll_sha256':hashlib.sha256((BUILD/'dinput8.dll').read_bytes()).hexdigest(),
         'game_process_touched':False}
 report['native_tech_tree']=tech_metrics
+basic_metrics=json.loads(subprocess.check_output([str(BUILD/'test_basic_stats.exe')],text=True,encoding='utf-8'))
+assert basic_metrics['status']=='passed'
+if GAME:
+    for slot,rva in ((0,0x7cf780),(2,0x78de90),(5,0x800f50),(7,0x776ca0),(8,0x765df0),(48,0x80a220)):
+        assert struct.unpack('<Q',rva_bytes(0x1381700+slot*8,8))[0]==preferred_base+rva
+        code=(C.c_ubyte*64).from_buffer_copy(rva_bytes(rva,64))
+        assert hook_bytes(code,64)==1
+    basic_resource_name=b'11_01_02_00_info_busho0\0'
+    assert rva_bytes(0x1381890,len(basic_resource_name))==basic_resource_name
+    for slot,rva in ((0,0x8161c0),(5,0x78d9b0),(7,0x77c0e0),(8,0x77ebf0),(46,0x7834a0)):
+        assert struct.unpack('<Q',rva_bytes(0x123e360+slot*8,8))[0]==preferred_base+rva
+    basic_metrics['native_page_and_layout_abi_verified']=True
+    assert rva_bytes(0x78982c,4)==bytes.fromhex('836140fe')
+    basic_metrics['native_widget_visibility_setter_verified']=True
+basic_metrics['in_game_acceptance']='pending'
+report['native_basic_stats']=basic_metrics
+with tempfile.TemporaryDirectory(prefix='S14-merit-') as folder:
+    merit_metrics=json.loads(subprocess.check_output([str(BUILD/'test_merit.exe'),folder],text=True,encoding='utf-8',timeout=20))
+    assert merit_metrics['status']=='passed'
+    reopened=json.loads(subprocess.check_output([str(BUILD/'test_merit.exe'),folder,'--reopen'],text=True,encoding='utf-8',timeout=20))
+    assert reopened['cross_process_restore']
+    merit_metrics['cross_process_restore']=True
+report['officer_merit']=merit_metrics
 domestic_execution=test.S14TestDomesticExecutionEnabled
 domestic_execution.argtypes=[];domestic_execution.restype=C.c_int
 assert domestic_execution()==1
@@ -617,6 +671,8 @@ domestic_metrics.update({'status':'passed','apply_enabled':bool(domestic_executi
 report['domestic_officers']=domestic_metrics
 maneuver_metrics=json.loads(subprocess.check_output([str(BUILD/'test_maneuver_button.exe')],text=True,encoding='utf-8'))
 assert maneuver_metrics['status']=='passed'
+report['native_person_entry']=json.loads(subprocess.check_output([str(BUILD/'test_person_entry.exe')],text=True,encoding='utf-8'))
+assert report['native_person_entry']['status']=='passed'
 if GAME:
     # Keep the static check in sync with the production adapter's entry guards.
     import re
@@ -635,10 +691,36 @@ if GAME:
                            (0x1357af8,5,0x7a2fe0),(0x1357af8,6,0x7a2730),(0x1357af8,7,0x7a3b70),
                            (0x1357af8,9,0x7a1ed0),(0x1357af8,10,0x7a2120),
                            (0x1357dc8,7,0x793c90),(0x1357dc8,8,0x794a50),
+                           (0x13580e8,7,0x43bec0),(0x13580e8,24,0x789820),
                            (0x12d9ef0,3,0x76dfb0),(0x13546b0,3,0x788310)):
         assert struct.unpack('<Q',rva_bytes(vt+8*slot,8))[0]==preferred_base+method
-    for rva in (0x797b50,0x7a7520,0x7a6670,0x793c90,0x794a50,0x76dfb0):
+    for rva in (0x797b50,0x7a7520,0x7a6670,0x793c90,0x794a50,0x76dfb0,0x7a5a10,0x794700,0x793db0,0x7940a0):
         code=(C.c_ubyte*64).from_buffer_copy(rva_bytes(rva,64));assert hook_bytes(code,64)==1
+    for slot,method in ((0,0x793560),(2,0x78de90),(3,0x788350),(5,0x78d9b0),(7,0x77c0e0),(8,0x77ebf0),(48,0x797890)):
+        assert struct.unpack('<Q',rva_bytes(0x1357c38+8*slot,8))[0]==preferred_base+method
+    assert struct.unpack('<f',rva_bytes(0x123e9a8,4))[0]==1.0
+    assert rva_bytes(0x7a4e64,7)==bytes.fromhex('488b15f5991601')
+    assert 0x7a4e6b+struct.unpack('<i',rva_bytes(0x7a4e67,4))[0]==0x190e860
+    assert rva_bytes(0x7f9183,1)==b'\xe8'
+    assert 0x7f9188+struct.unpack('<i',rva_bytes(0x7f9184,4))[0]==0x3c5980
+    entry_source=(HERE/'person_entry.c').read_text(encoding='utf-8')
+    entry_checked=0
+    for entry in re.finditer(r'\{(0x[0-9a-f]+),\{([^}]+)\},(\d+)\}',entry_source):
+        rva=int(entry.group(1),16);code=bytes(int(v.strip(),16) for v in entry.group(2).split(','));n=int(entry.group(3))
+        assert rva_bytes(rva,n)==code[:n],hex(rva);entry_checked+=1
+    assert entry_checked>=6
+    report['native_person_entry']['stock_officer_list_ui_entry_verified']=True
+    report['native_person_entry']['static_anchors_verified']=entry_checked
+    maneuver_metrics['native_cursor_resource_and_loop_verified']=True
+    maneuver_metrics['proposal_population_bypassed']=True
+    maneuver_metrics['proposal_tooltip_overridden']=True
+    maneuver_metrics['information_ui_waits_for_native_close']=True
+    assert rva_bytes(0x794772,1)==b'\xe8'
+    assert 0x794777+struct.unpack('<i',rva_bytes(0x794773,4))[0]==0x7a3fc0
+    assert rva_bytes(0x7f0c39,1)==b'\xe9'
+    assert 0x7f0c3e+struct.unpack('<i',rva_bytes(0x7f0c3a,4))[0]==0x010950
+    maneuver_metrics['stock_map_control_restore_call_verified']=True
+    report['native_person_entry']['native_close_queues_state_return_verified']=True
     maneuver_metrics['static_anchors_verified']=checked+23
     maneuver_metrics['native_draw_callbacks_verified']=True
     # Execute only the original leaf setter in this private verification process.

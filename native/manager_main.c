@@ -116,6 +116,12 @@ static void action(S14ManagerUI *ui,int command,void *context) {
         else swprintf(ui->notice,192,L"未完成（已清理 %d 个文件）：%.150ls",report.files,error);
         refresh(ui,1);
         MessageBoxW(ui->window,ui->notice,cleaned?L"卸载完成":L"卸载未完成",MB_OK|(cleaned?MB_ICONINFORMATION:MB_ICONERROR));
+    } else if(command==S14_ACTION_RESET){
+        if(MessageBoxW(ui->window,L"先备份，再初始化全部插件设置、累计战绩、词条/兵种附属数据与运行记录。\n首次快速设置会重新提示。游戏本体及原生存档保留。\n\n请关闭其他管理器。确认初始化？",L"备份并初始化",MB_YESNO|MB_ICONWARNING|MB_DEFBUTTON2)!=IDYES)return;
+        wchar_t backup[MAX_PATH];int ok=s14_package_reset(ui->root,backup,error);ui->notice_error=!ok;
+        wcscpy(ui->notice,ok?L"初始化完成；基础以外 Mod 默认关闭，首次快速设置已恢复。":error);refresh(ui,1);
+        MessageBoxW(ui->window,ui->notice,ok?L"初始化完成":L"初始化未完成",MB_OK|(ok?MB_ICONINFORMATION:MB_ICONERROR));
+        if(backup[0])ShellExecuteW(ui->window,L"open",backup,NULL,NULL,SW_SHOWNORMAL);
     } else if (command==S14_ACTION_REMOVE) {
         int removed=s14_package_remove(ui->root,error); ui->notice_error=!removed;
         if (removed) wcscpy(ui->notice,L"插件已移除。设置、管理器和备份已保留。"); else wcscpy(ui->notice,error);
@@ -134,12 +140,12 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE previous,LPWSTR command,int sho
         if(ok)printf("{\"version\":\"%s\",\"newer\":%s,\"sha256\":\"%s\"}\n",release.version,release.newer?"true":"false",release.sha256);
         else{char text[768];WideCharToMultiByte(CP_UTF8,0,error,-1,text,sizeof(text),NULL,NULL);fprintf(stderr,"%s\n",text);}LocalFree(args);return ok?0:2;
     }
-    if (count==3 && (!wcscmp(args[1],L"--install") || !wcscmp(args[1],L"--remove") || !wcscmp(args[1],L"--uninstall"))) {
+    if (count==3 && (!wcscmp(args[1],L"--install") || !wcscmp(args[1],L"--remove") || !wcscmp(args[1],L"--uninstall") || !wcscmp(args[1],L"--reset"))) {
         wchar_t target[MAX_PATH],error[192]={0}; DWORD length=GetFullPathNameW(args[2],MAX_PATH,target,NULL);
         if (!length || length>=MAX_PATH) { LocalFree(args); return 2; }
         size_t n=wcslen(target); while (n>3 && (target[n-1]==L'\\' || target[n-1]==L'/')) target[--n]=0;
-        S14CleanupReport report={0};
-        int ok=!wcscmp(args[1],L"--install")?s14_package_install(target,executable,error):
+        S14CleanupReport report={0};wchar_t backup[MAX_PATH]={0};
+        int ok=!wcscmp(args[1],L"--reset")?s14_package_reset(target,backup,error):!wcscmp(args[1],L"--install")?s14_package_install(target,executable,error):
             !wcscmp(args[1],L"--remove")?s14_package_remove(target,error):s14_package_clean(target,executable,&report,error);
         if (ok && !wcscmp(args[1],L"--uninstall")) printf("{\"files\":%d,\"directories\":%d,\"preserved\":%d}\n",report.files,report.directories,report.preserved);
         if (!ok) { char utf8[768]; if (WideCharToMultiByte(CP_UTF8,0,error,-1,utf8,sizeof(utf8),NULL,NULL)) fprintf(stderr,"%s\n",utf8); }

@@ -92,6 +92,14 @@ int main(int argc,char **argv){
     for(int i=0;i<100;i++)assert(attack(1,0)==110 && defense(1,0)==110); // Two +10% bonuses never become +20%/+21%.
     group[0x10]=1;s14_army_buff_configure(0);assert(attack(1,0)==100);group[0x10]=3;
     s14_ai_creation_end();assert(attack(1,0)==100);s14_ai_configure(0);
+    /* Learned archer stats use the existing native getter exactly once;
+       they work independently of the Cao Ren / special-troop switches. */
+    group[0x10]=1;unsigned permission=1u<<3;memcpy(person+0x164,&permission,4);pool[512+0x1b]=3;
+    s14_archer_tech_attach(buff_image,NULL,1);s14_archer_tech_configure(1);s14_archer_tech_new_game((uintptr_t)world);
+    assert(s14_archer_tech_learn(518,1));before=call_count;
+    for(int i=0;i<100;i++){assert(fabsf(attack(1,0)-105)<.0001f);assert(defense(1,0)==97.5f);assert(GetLastError()==0x7788);}
+    assert(call_count==before+200);assert(attack(0,0)==100);assert(defense(0,0)==100);
+    s14_archer_tech_configure(0);assert(attack(1,0)==100&&defense(1,0)==100);
     free(world);free(pool);VirtualFree(image,0,MEM_RELEASE);
     puts("{\"status\":\"passed\",\"commander_only\":true,\"canonical_live_army_only\":true,\"baseline_unchanged\":true,\"disabled_restores_native\":true,\"independent_of_detail_window\":true,\"no_compounding\":true,\"identity_change_rejected\":true,\"nonfinite_preserved\":true,\"native_float_and_stack_abi\":true,\"original_calls_once\":true,\"last_error_preserved\":true,\"combat_event_queue_bounded\":true,\"rounding_before_integer_conversion\":true,\"production_install_entry_validation\":true,\"failed_creation_rolled_back\":true}");return 0;
 }

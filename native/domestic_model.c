@@ -3,9 +3,15 @@
 #include <string.h>
 /* Exact lexicographic matching: security/development (user priority), unchanged
    appointment, leadership, charm, stable ID. No invented money conversion. */
-typedef struct {int64_t v[6];} Weight;
-static Weight add(Weight a,Weight b,int sign){for(int i=0;i<6;i++)a.v[i]+=sign*b.v[i];return a;}
-static int less(Weight a,Weight b){for(int i=0;i<6;i++)if(a.v[i]!=b.v[i])return a.v[i]<b.v[i];return 0;}
+typedef struct {int64_t v[7];} Weight;
+static Weight add(Weight a,Weight b,int sign){for(int i=0;i<7;i++)a.v[i]+=sign*b.v[i];return a;}
+static int less(Weight a,Weight b){for(int i=0;i<7;i++)if(a.v[i]!=b.v[i])return a.v[i]<b.v[i];return 0;}
+int s14_domestic_candidate_allowed(const S14DSnapshot *s,const S14DOptions *o,int id){
+ if(!s||!o||id<1||id>=S14_D_PEOPLE)return 0;const S14DPerson *p=&s->people[id];
+ if(!p->active||!p->eligible||p->protected_job||p->busy||o->blacklist[id])return 0;
+ if(o->whitelist[id])return 1;
+ return !o->excluded[id]&&(!o->leadership_enabled||p->ability[0]<o->leadership_min);
+}
 static int ability(int project){return project==2?3:project==3?1:2;}
 const S14DForecast *s14_domestic_forecast(const S14DSnapshot *s,int area,int person){
  if(!s||!s->forecast_ready||area<1||area>=501||person<1||person>=6001)return NULL;
@@ -22,6 +28,11 @@ static int security(const S14DSnapshot *s,int area,int person){const S14DForecas
 static int project_for(const S14DSnapshot *s,const S14DOptions *o,const S14DRow *r,int id){
  if(!id||o->policy==S14_D_KEEP_DIRECTION)return r->project;
  if(o->policy==S14_D_COMMERCIAL)return 1;if(o->policy==S14_D_AGRICULTURAL)return 2;
+ if(o->policy==S14_D_COMMERCIAL_FIRST||o->policy==S14_D_AGRICULTURAL_FIRST){
+  const int com[]={1,2,3},agr[]={2,1,3};const int *sequence=o->policy==S14_D_COMMERCIAL_FIRST?com:agr;
+  for(int i=0;i<3;i++)if(s->areas[r->area].development[sequence[i]-1]<1000)return sequence[i];
+  int old=s->areas[r->area].project;return old>=1&&old<=3?old:sequence[0];
+ }
  int best=1;for(int d=2;d<=3;d++)if(gain(s,r->area,id,d)>gain(s,r->area,id,best))best=d;
  int old=s->areas[r->area].project;if(old>=1&&old<=3&&gain(s,r->area,id,old)==gain(s,r->area,id,best))best=old;
  return best;
@@ -38,7 +49,7 @@ static int match(const S14DSnapshot *s,const S14DOptions *options,S14DPlan *p,in
    for(int j=1;j<=m;j++)if(!used[j]){
     int id=j<=k?people[j-1]:0;const S14DPerson *o=&s->people[id];
     int project=project_for(s,options,r,id),development=s->forecast_ready?gain(s,r->area,id,project):o->ability[ability(project)],order=s->forecast_ready?security(s,r->area,id):0;
-    Weight w={{options->security_first?-order:-development,options->security_first?-development:-order,-(id==r->before&&id!=0&&project==s->areas[r->area].project),-o->ability[0],-o->ability[4],id?id:S14_D_PEOPLE}};
+    Weight w={{id&&options->whitelist[id]?-1:0,options->security_first?-order:-development,options->security_first?-development:-order,-(id==r->before&&id!=0&&project==s->areas[r->area].project),-o->ability[0],-o->ability[4],id?id:S14_D_PEOPLE}};
     Weight cur=add(add(w,u[i0],-1),v[j],-1);
     if(less(cur,best[j])){best[j]=cur;way[j]=j0;}
     if(less(best[j],delta)){delta=best[j];j1=j;}
@@ -53,24 +64,28 @@ static int match(const S14DSnapshot *s,const S14DOptions *options,S14DPlan *p,in
 }
 int s14_domestic_plan(const S14DSnapshot *s,const S14DOptions *o,S14DPlan *p){
  if(!s||!o||!p)return 0;memset(p,0,sizeof(*p));
- if(o->mode<0||o->mode>1||o->city<0||o->city>=52||o->policy<0||o->policy>3||o->security_first<0||o->security_first>1||s->unit_cost<0||s->unit_cost>200){wcscpy(p->reason,L"配置参数或命令书单价无效。");return 0;}
+ if(o->mode<0||o->mode>1||o->city<0||o->city>=52||o->policy<0||o->policy>5||o->security_first<0||o->security_first>1||o->leadership_enabled<0||o->leadership_enabled>1||o->leadership_min<0||o->leadership_min>1000||s->unit_cost<0||s->unit_cost>200){wcscpy(p->reason,L"配置参数或命令书单价无效。");return 0;}
  if(o->policy!=S14_D_KEEP_DIRECTION&&!s->forecast_ready){wcscpy(p->reason,L"原生开发及治安增量未通过读取校验，三种开发规划暂不可用。");return 0;}
- int occupied[S14_D_PEOPLE]={0},modifiable[S14_D_AREAS]={0};
+ int occupied[S14_D_PEOPLE]={0},modifiable[S14_D_AREAS]={0},preferred_city[S14_D_CITIES]={0};
  for(int a=1;a<501;a++)if(s->areas[a].active){int id=s->areas[a].officer;if(id<0||id>=6001||s->areas[a].city<1||s->areas[a].city>=52||s->areas[a].project<0||s->areas[a].project>3 || (id && occupied[id])){wcscpy(p->reason,L"区域归属、项目或重复任职数据异常。");return 0;}if(id)occupied[id]=a;}
+ for(int id=1;id<S14_D_PEOPLE;id++)if(o->whitelist[id]&&!occupied[id]&&s14_domestic_candidate_allowed(s,o,id)){int c=s->people[id].city;if(c>0&&c<S14_D_CITIES)preferred_city[c]=1;}
  for(int a=1;a<501;a++){
   const S14DArea *area=&s->areas[a];int c=area->city,id=area->officer;
   if(!area->active||!s->cities[c].active||(o->city && o->city!=c))continue;
   S14DRow *r=&p->rows[p->count];*r=(S14DRow){.area=a,.city=c,.before=id,.after=id,.project=area->project,.group=p->count};p->count++;
   if(o->locked[a])r->reason=S14_D_LOCKED;
-  else if(id&&(o->mode==S14_D_FILL))r->reason=S14_D_KEEP;
-  else if(id&&(!s->people[id].active||!s->people[id].eligible||s->people[id].city!=c||s->people[id].protected_job||s->people[id].busy||o->excluded[id]))r->reason=S14_D_PROTECTED;
+  else if(id&&(!s->people[id].active||!s->people[id].eligible||s->people[id].city!=c||s->people[id].protected_job||s->people[id].busy||(o->excluded[id]&&!o->whitelist[id])))r->reason=S14_D_PROTECTED;
+  else if(id&&o->mode==S14_D_FILL&&(!preferred_city[c]||o->whitelist[id])&&!o->blacklist[id]&&(!o->leadership_enabled||o->whitelist[id]||s->people[id].ability[0]<o->leadership_min)){
+   r->reason=S14_D_KEEP;
+   if(o->policy==S14_D_MAX_DEVELOPMENT||o->policy==S14_D_COMMERCIAL_FIRST||o->policy==S14_D_AGRICULTURAL_FIRST)r->project=project_for(s,o,r,id);
+  }
   else {modifiable[a]=1;if(!r->project){int d=s->cities[c].direction;r->project=d>=1&&d<=3?d:1;r->first=1;}}
  }
  for(int c=1;c<52;c++)if(s->cities[c].active){
   int rows[500],people[6000],n=0,k=0;
   for(int r=0;r<p->count;r++)if(p->rows[r].city==c&&modifiable[p->rows[r].area])rows[n++]=r;
   if(!n)continue;
-  for(int id=1;id<6001;id++){const S14DPerson *person=&s->people[id];if(person->active&&person->eligible&&person->city==c&&!person->protected_job&&!person->busy&&!o->excluded[id]&&(!occupied[id]||(o->mode==S14_D_OPTIMIZE&&modifiable[occupied[id]])))people[k++]=id;}
+  for(int id=1;id<6001;id++){const S14DPerson *person=&s->people[id];if(s14_domestic_candidate_allowed(s,o,id)&&person->city==c&&(!occupied[id]||((o->mode==S14_D_OPTIMIZE||preferred_city[c])&&modifiable[occupied[id]])))people[k++]=id;}
   if(s->forecast_ready)for(int j=0;j<n;j++)for(int id=0;id<k;id++)if(!s14_domestic_forecast(s,p->rows[rows[j]].area,people[id])){wcscpy(p->reason,L"同城候选的原生增量数据不完整，未生成方案。");return 0;}
   if(!match(s,o,p,rows,n,people,k)){wcscpy(p->reason,L"无法分配预览内存。");return 0;}
  }
@@ -99,14 +114,14 @@ int s14_domestic_budget(const S14DSnapshot *s,const S14DPlan *p,int *count,int *
 int s14_domestic_same(const S14DSnapshot *a,const S14DSnapshot *b){return a&&b&&!memcmp(a,b,sizeof(*a));}
 int s14_domestic_select_budget(const S14DSnapshot *s,const S14DOptions *o,S14DPlan *p){
  if(!s||!o||!p||!p->valid)return 0;
- struct {int id,account,cost,order,development,area;} groups[501];int count=0,available[52]={0};
+ struct {int id,account,cost,order,development,area,preferred;} groups[501];int count=0,available[52]={0};
  for(int c=1;c<52;c++)if(s->cities[c].active){int a=s->cities[c].account;if(a<1||a>=52)return 0;available[a]=s->cities[c].balance;}
  for(int i=0;i<p->count;i++){S14DRow *r=&p->rows[i];r->selected=0;if(r->completed||r->reason!=S14_D_CHANGE)continue;int j=0;for(;j<count&&groups[j].id!=r->group;j++){}int a=s->cities[r->city].account;
-  if(j==count){groups[count].id=r->group;groups[count].account=a;groups[count].cost=groups[count].order=groups[count].development=0;groups[count].area=r->area;count++;}
-  if(groups[j].account!=a)return 0;groups[j].cost+=s->unit_cost;groups[j].order+=r->after_security-r->before_security;groups[j].development+=r->after_gain-r->before_gain;
+  if(j==count){groups[count].id=r->group;groups[count].account=a;groups[count].cost=groups[count].order=groups[count].development=groups[count].preferred=0;groups[count].area=r->area;count++;}
+  if(groups[j].account!=a)return 0;groups[j].cost+=s->unit_cost;groups[j].order+=r->after_security-r->before_security;groups[j].development+=r->after_gain-r->before_gain;groups[j].preferred+=r->after>0&&r->after<S14_D_PEOPLE&&o->whitelist[r->after]&&!o->blacklist[r->after];
  }
  int selected=0;for(int i=0;i<count;i++){int best=i;for(int j=i+1;j<count;j++){int x=o->security_first?groups[j].order:groups[j].development,y=o->security_first?groups[best].order:groups[best].development;
-  int xx=o->security_first?groups[j].development:groups[j].order,yy=o->security_first?groups[best].development:groups[best].order;if(x>y||(x==y&&(xx>yy||(xx==yy&&groups[j].area<groups[best].area))))best=j;}
+  int xx=o->security_first?groups[j].development:groups[j].order,yy=o->security_first?groups[best].development:groups[best].order;if(groups[j].preferred>groups[best].preferred||(groups[j].preferred==groups[best].preferred&&(x>y||(x==y&&(xx>yy||(xx==yy&&groups[j].area<groups[best].area))))))best=j;}
   if(best!=i){unsigned char temp[sizeof(groups[0])];memcpy(temp,&groups[i],sizeof(temp));groups[i]=groups[best];memcpy(&groups[best],temp,sizeof(temp));}
   if(groups[i].cost>available[groups[i].account])continue;available[groups[i].account]-=groups[i].cost;for(int r=0;r<p->count;r++)if(p->rows[r].group==groups[i].id&&!p->rows[r].completed&&p->rows[r].reason==S14_D_CHANGE){p->rows[r].selected=1;selected++;}
  }

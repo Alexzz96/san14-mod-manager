@@ -372,9 +372,9 @@ static uintptr_t hooked_update(void *state,void *arg) {
     s14_domestic_service(state);
     s14_personality_service(state);
     void *previous=current_user_state; current_user_state=state;
-    if (s14_battle_enabled() && readable(state,0x474) && *(int*)((unsigned char*)state+0x470)<=2) {
+    if (readable(state,0x474) && *(int*)((unsigned char*)state+0x470)>=0 && *(int*)((unsigned char*)state+0x470)<=2) {
         unsigned char *g,*s;int day;
-        if (world_clock(&g,&s,&day)) s14_battle_planning((uintptr_t)g,day,s[0x3a]);
+        if (world_clock(&g,&s,&day)) {s14_domestic_planning((uintptr_t)g,day,s[0x3a]);if(s14_battle_enabled())s14_battle_planning((uintptr_t)g,day,s[0x3a]);}
     }
     planning(state); SetLastError(error); uintptr_t result=original_update(state,arg); current_user_state=previous; return result;
 }
@@ -385,7 +385,7 @@ static void hooked_progress(int value) {
     // confirmation flag has been consumed and before strategy phase cleanup.
     if (!value && caller==0x3f9446 && current_user_state) {
         s14_battle_progress();unsigned char *g,*s;int id,day;
-        if(context(&g,&s,&id,&day)&&s14_domestic_auto_turn(current_user_state,(uintptr_t)g,day,id))dispatch_search();
+        if(context(&g,&s,&id,&day)){s14_domestic_progress((uintptr_t)g,day,id);if(s14_domestic_auto_turn(current_user_state,(uintptr_t)g,day,id))dispatch_search();}
     }
     SetLastError(error); original_progress(value);
 }

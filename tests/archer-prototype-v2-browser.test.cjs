@@ -1,0 +1,40 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{pathToFileURL}=require('node:url');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const file=path.resolve(process.argv[2]||path.join(__dirname,'../docs/prototypes/archer-tech-tree.html'));
+const out=path.resolve(process.argv[3]||path.join(__dirname,'../docs/prototypes/qa'));
+fs.mkdirSync(out,{recursive:true});
+(async()=>{
+ const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_EXE||'C:/Program Files/Google/Chrome/Application/chrome.exe'}),page=await browser.newPage({viewport:{width:1920,height:1080}}),errors=[],network=[];
+ page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url()))network.push(r.url());});
+ await page.goto(pathToFileURL(file).href);await page.locator('#referencePortrait').evaluate(img=>img.decode());
+ assert.equal(await page.locator('[data-node]').count(),15);assert.equal(await page.locator('[data-advanced]').count(),5);assert.equal(await page.locator('#detailAction').count(),0);
+ await page.locator('[data-node="defense.2"]').click();assert(await page.locator('#skillDialog').isVisible());assert(await page.locator('#dialogConfirm').isDisabled());await page.locator('#dialogCancel').click();
+ const learn=async(id)=>{await page.locator(`[data-node="${id}"]`).click();assert(await page.locator('#dialogConfirm').isEnabled());await page.locator('#dialogConfirm').click();assert(!(await page.locator('#skillDialog').isVisible()));};
+ await learn('attack.1');
+ await learn('defense.2');await learn('attack.3');
+ assert.equal(await page.locator('[data-group]').count(),0);await learn('defense.1');await learn('attack.2');await learn('defense.3');
+ await learn('capacity.1');await learn('loading.2');
+ assert.equal(await page.evaluate(()=>ArcherPrototype.used(ArcherUI.states.get(ArcherUI.current))),8);
+ await page.locator('[data-node="mobility.1"]').click();assert(await page.locator('#dialogConfirm').isDisabled());assert((await page.locator('#dialogDescription').textContent()).includes('8 点基础点数已用完'));await page.keyboard.press('Escape');
+ assert.equal(await page.locator('[data-advanced].available').count(),2);
+ await page.locator('[data-advanced="focus"]').click();assert(await page.locator('#dialogConfirm').isEnabled());await page.locator('#dialogConfirm').click();
+ await page.locator('[data-advanced="pin"]').click();await page.locator('#dialogConfirm').click();
+ assert.equal(await page.locator('[data-advanced].learned').count(),2);
+ assert.equal(await page.evaluate(()=>ArcherPrototype.used(ArcherUI.states.get(ArcherUI.current))),8);
+ await page.locator('[data-advanced="reload"]').click();assert(await page.locator('#dialogConfirm').isDisabled());await page.locator('#dialogCancel').click();
+ await page.locator('[data-officer="huangzu"]').click();assert.equal(await page.locator('[data-node].learned').count(),0);
+ await page.locator('[data-officer="guan"]').click();assert.equal(await page.locator('[data-node].learned').count(),8);
+ await page.screenshot({path:path.join(out,'v2-cross-paths-1080p.png'),fullPage:true});
+ await page.locator('[data-node="attack.1"]').click();assert((await page.locator('#dialogDescription').textContent()).includes('攻军 +5%'));await page.screenshot({path:path.join(out,'v2-skill-popup.png'),fullPage:true});await page.keyboard.press('Escape');
+ assert(await page.locator('[data-final-open="repeating"]').isDisabled());await page.locator('#rosterZhuge').check();await page.locator('[data-final-open="repeating"]').click();assert((await page.locator('#dialogDescription').textContent()).includes('效果待设计'));assert(await page.locator('#dialogConfirm').isDisabled());await page.keyboard.press('Escape');
+ await page.locator('#resetBuild').click();await page.locator('#simPanel summary').click();await page.locator('#targetCount').selectOption('4');await page.locator('#advanceTurn').click();assert.equal(await page.evaluate(()=>ArcherUI.states.get(ArcherUI.current).combat.ammo),0);
+ await page.locator('#attackType').selectOption('tactic');await page.locator('#advanceDay').click();assert.equal(await page.evaluate(()=>ArcherUI.states.get(ArcherUI.current).combat.logs.at(-1).shots),0);
+ await page.locator('#resetCombat').click();await page.locator('#targetCount').selectOption('2');await page.locator('#advanceTurn').click();assert.equal(await page.evaluate(()=>ArcherUI.states.get(ArcherUI.current).combat.ammo),20);
+ await page.locator('#simPanel summary').click();await page.locator('#resetBuild').click();await page.locator('#rosterZhuge').uncheck();
+ const sizes=[];for(const [width,height,label] of [[1920,1080,'1080p'],[3840,2160,'4k'],[1024,768,'window'],[900,900,'narrow'],[390,844,'mobile']]){
+  await page.setViewportSize({width,height});await page.screenshot({path:path.join(out,`v2-layout-${label}.png`),fullPage:true});
+  const geometry=await page.evaluate(()=>{const e=document.querySelector('.native').getBoundingClientRect();return {scrollWidth:document.documentElement.scrollWidth,canvas:{width:e.width,height:e.height},paths:document.querySelectorAll('#treePaths path').length};});assert(geometry.scrollWidth<=width,`Horizontal overflow at ${label}`);
+  assert(geometry.paths>=15);const circle=await page.locator('[data-node="capacity.1"] .circle').boundingBox();assert(Math.abs(circle.width-circle.height)<1,'Node icon must be round');await page.locator('[data-node="capacity.1"]').click();assert(await page.locator('#skillDialog').isVisible());assert(await page.locator('#dialogConfirm').isEnabled());assert((await page.locator('#dialogDescription').textContent()).includes('弹药上限 +10'));await page.keyboard.press('Escape');sizes.push({label,width,...geometry});
+ }
+ assert.deepEqual(errors,[]);assert.deepEqual(network,[]);const report={status:'passed',uiInteractions:true,popupConfirmation:true,crossColumnPaths:true,noExternalRequests:true,errors,sizes};fs.writeFileSync(path.join(out,'v2-browser-verification.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));await browser.close();
+})().catch(e=>{console.error(e);process.exit(1);});

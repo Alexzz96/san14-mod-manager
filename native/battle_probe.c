@@ -23,6 +23,8 @@
 #include "troop_runtime.h"
 #include "ai_affix.h"
 #include "blink_backstab.h"
+#include "archer_probe.h"
+#include "archer_tech.h"
 
 #define BATTLE_QSIZE 2048
 #define BATTLE_JSON_SIZE 16384
@@ -387,7 +389,7 @@ static uintptr_t hooked_battle_troops(int type,int id,int amount,int source_type
     battle_enqueue(&e); SetLastError(error); return result;
 }
 static uintptr_t hooked_battle_remove(void *target,void *source,void *other,int reason,int option) {
-    if (!s14_battle_enabled()){uintptr_t result=original_remove(target,source,other,reason,option);DWORD error=GetLastError();s14_troop_forget(target);s14_ai_forget(target);s14_blink_forget(target);SetLastError(error);return result;}
+    if (!s14_battle_enabled()){uintptr_t result=original_remove(target,source,other,reason,option);DWORD error=GetLastError();s14_troop_forget(target);s14_ai_forget(target);s14_blink_forget(target);s14_archer_ammo_forget(target);SetLastError(error);return result;}
     DWORD error=GetLastError(); BattleEvent e=battle_begin(B_REMOVE,(uintptr_t)__builtin_return_address(0)-battle_base);
     e.args[0]=(uintptr_t)target; e.args[1]=(uintptr_t)source; e.args[2]=(uintptr_t)other;
     e.args[3]=(uintptr_t)(intptr_t)reason; e.args[4]=(uintptr_t)(intptr_t)option;
@@ -397,6 +399,7 @@ static uintptr_t hooked_battle_remove(void *target,void *source,void *other,int 
     uintptr_t result=original_remove(target,source,other,reason,option); error=GetLastError(); battle_parent=previous;
     s14_troop_forget(target);s14_ai_forget(target);
     s14_blink_forget(target);
+    s14_archer_ammo_forget(target);
     e.native_return=result; e.target_after=battle_object(e.world,target); e.source_after=battle_object(e.world,source);
     e.post_identity_matches=same_object(&e.target,&e.target_after); e.elapsed=GetTickCount64()-e.tick;
     battle_enqueue(&e); SetLastError(error); return result;

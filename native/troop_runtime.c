@@ -4,6 +4,7 @@
 #include "troop_store.h"
 #include "ai_affix.h"
 #include "blink_backstab.h"
+#include "archer_tech.h"
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
@@ -415,7 +416,7 @@ static uintptr_t create_hook(void *packet){
 }
 static float siege_hook(float base,void *a,void *t,void *f,int actual,int mode){uintptr_t caller=(uintptr_t)__builtin_return_address(0);DWORD before=GetLastError();s14_troop_status_service(a);SetLastError(before);float v=original_siege(base,a,t,f,actual,mode);DWORD e=GetLastError();v=s14_troop_attribute_at(a,S14_TROOP_SIEGE_ATTACK,actual,v,mode,caller);SetLastError(e);return v;}
 static float break_hook(void *a,void *f,int actual,int mode){uintptr_t caller=(uintptr_t)__builtin_return_address(0);DWORD before=GetLastError();s14_troop_status_service(a);SetLastError(before);float v=original_break(a,f,actual,mode);DWORD e=GetLastError();v=s14_troop_attribute_at(a,S14_TROOP_SIEGE_BREAK,actual,v,mode,caller);SetLastError(e);return v;}
-static float mobility_hook(void *a,void *f,int actual,int mode,void *hex){uintptr_t caller=(uintptr_t)__builtin_return_address(0);DWORD before=GetLastError();s14_troop_status_service(a);SetLastError(before);float v=original_mobility(a,f,actual,mode,hex);DWORD e=GetLastError();v=s14_troop_attribute_at(a,S14_TROOP_MOBILITY,actual,v,mode,caller);SetLastError(e);return v;}
+static float mobility_hook(void *a,void *f,int actual,int mode,void *hex){uintptr_t caller=(uintptr_t)__builtin_return_address(0);DWORD before=GetLastError();s14_troop_status_service(a);SetLastError(before);float v=original_mobility(a,f,actual,mode,hex);DWORD e=GetLastError();v=s14_troop_attribute_at(a,S14_TROOP_MOBILITY,actual,v,mode,caller);v=s14_archer_tech_attribute(a,S14_TROOP_MOBILITY,actual,v);SetLastError(e);return v;}
 
 /* Content-addressed sidecars: never add fields to the game's save format. */
 typedef S14TroopCheckpoint Checkpoint;

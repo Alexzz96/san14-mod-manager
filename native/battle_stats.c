@@ -8,7 +8,16 @@
 #include <stddef.h>
 #define SEEN 32768
 typedef struct {int leader,routed;} UnitLife;
-typedef struct {unsigned char magic[16];unsigned int version,bytes,crc;unsigned char save_hash[32];S14BattleStatsSnapshot snapshot;UnitLife life[501];} Checkpoint;
+typedef struct {unsigned char magic[16];unsigned int version,bytes,crc;unsigned char save_hash[32];S14BattleStatsSnapshot snapshot;UnitLife life[501];} LegacyCheckpoint;
+typedef struct {unsigned char magic[16];unsigned int version,bytes,crc;unsigned char save_hash[32];S14BattleStatsSnapshot snapshot;UnitLife life[501];S14MeritAccount merit[S14_STATS_MAX];} Checkpoint;
+_Static_assert(offsetof(Checkpoint,merit)==sizeof(LegacyCheckpoint),"Legacy checkpoint prefix must remain unchanged");
+static S14MeritAccount merits[S14_STATS_MAX];
+static uint64_t add(uint64_t a,uint64_t b){return UINT64_MAX-a<b?UINT64_MAX:a+b;}
+static uint64_t multiply(uint64_t a,uint64_t b){return a>UINT64_MAX/b?UINT64_MAX:a*b;}
+static void merit_damage(int officer,unsigned loss){
+ S14MeritAccount *m=&merits[officer];uint64_t combined=m->enemy_remainder+loss;
+ m->earned=add(m->earned,combined/100);m->enemy_remainder=combined%100;
+}
 static S14BattleStatsSnapshot totals;
 static UnitLife lives[501];
 static uint64_t seen[SEEN];
@@ -17,10 +26,10 @@ static wchar_t storage_root[MAX_PATH];
 static unsigned int crc(const unsigned char *p,size_t n) {
     unsigned int c=~0u;for(size_t i=0;i<n;i++) {c^=p[i];for(int b=0;b<8;b++) c=(c>>1)^((c&1)?0xedb88320u:0);}return ~c;
 }
-static unsigned int payload_crc(const Checkpoint *p) {return crc((const unsigned char*)&p->save_hash,sizeof(*p)-offsetof(Checkpoint,save_hash));}
+static unsigned int payload_crc(const Checkpoint *p) {return crc((const unsigned char*)&p->save_hash,p->bytes-offsetof(Checkpoint,save_hash));}
 static void guid(unsigned char out[16]) {if(BCryptGenRandom(NULL,out,16,BCRYPT_USE_SYSTEM_PREFERRED_RNG)<0) memset(out,0,16);}
 static void fresh(uintptr_t world,int day) {
-    memset(&totals,0,sizeof(totals));memset(lives,0,sizeof(lives));memset(seen,0,sizeof(seen));
+    memset(&totals,0,sizeof(totals));memset(merits,0,sizeof(merits));memset(lives,0,sizeof(lives));memset(seen,0,sizeof(seen));
     totals.version=1;totals.world=world;totals.start_day=totals.last_day=day;guid(totals.campaign);guid(totals.branch);initialized=1;
     for(int i=1;i<S14_STATS_MAX;i++) totals.rows[i].valid_mask=S14_STATS_DAMAGE|S14_STATS_ROUTS|S14_STATS_DEFEATS|S14_STATS_LOSSES|S14_STATS_INJURIES;
 }
@@ -47,8 +56,17 @@ static int path_for(const unsigned char hash[32],wchar_t path[MAX_PATH],int make
 static int read_checkpoint(const wchar_t *path,Checkpoint *p) {
     DWORD attr=GetFileAttributesW(path);if(attr==INVALID_FILE_ATTRIBUTES || (attr&(FILE_ATTRIBUTE_REPARSE_POINT|FILE_ATTRIBUTE_DIRECTORY))) return 0;
     HANDLE f=CreateFileW(path,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);if(f==INVALID_HANDLE_VALUE) return 0;
-    LARGE_INTEGER size;DWORD got=0;int ok=GetFileSizeEx(f,&size) && size.QuadPart==sizeof(*p) && ReadFile(f,p,sizeof(*p),&got,NULL) && got==sizeof(*p);CloseHandle(f);
-    if(!ok || memcmp(p->magic,"S14CAREER.v1",12) || p->version!=1 || p->bytes!=sizeof(*p) || p->crc!=payload_crc(p) || p->snapshot.version!=1) return 0;
+    LARGE_INTEGER size;DWORD got=0;int ok=GetFileSizeEx(f,&size) && (size.QuadPart==sizeof(*p)||size.QuadPart==sizeof(LegacyCheckpoint));
+    if(ok){memset(p,0,sizeof(*p));ok=ReadFile(f,p,(DWORD)size.QuadPart,&got,NULL)&&got==size.QuadPart;}CloseHandle(f);
+    if(!ok || p->bytes!=size.QuadPart || p->snapshot.version!=1) return 0;
+    int legacy=p->version==1&&p->bytes==sizeof(LegacyCheckpoint)&&!memcmp(p->magic,"S14CAREER.v1",12);
+    if(!legacy && !(p->version==2&&p->bytes==sizeof(*p)&&!memcmp(p->magic,"S14CAREER.v2",12)))return 0;
+    if(p->crc!=payload_crc(p))return 0;
+    for(int i=1;i<S14_STATS_MAX;i++){
+     S14MeritAccount *m=&p->merit[i];S14BattleTotals *r=&p->snapshot.rows[i];
+     if(legacy){m->earned=add(add((r->valid_mask&S14_STATS_DAMAGE)?r->enemy_loss/100:0,(r->valid_mask&S14_STATS_ROUTS)?multiply(r->units_routed,100):0),(r->valid_mask&S14_STATS_INJURIES)?multiply(r->officers_injured,50):0);m->enemy_remainder=(r->valid_mask&S14_STATS_DAMAGE)?r->enemy_loss%100:0;}
+     if(m->spent>m->earned || m->enemy_remainder>=100)return 0;
+    }
     const wchar_t *base=wcsrchr(path,L'\\');base=base?base+1:path;
     wchar_t expected[84];for(int i=0;i<32;i++) swprintf(expected+i*2,3,L"%02x",p->save_hash[i]);wcscat(expected,L".s14career");if(!_wcsicmp(base,expected)) return 1;wcscat(expected,L".tmp");return !_wcsicmp(base,expected);
 }
@@ -58,7 +76,7 @@ void s14_stats_load_begin(void) {loading=1;}
 void s14_stats_load_end(uintptr_t world,int day,int success,const unsigned char hash[32],int hash_valid,int new_game) {
     loading=0;if(!success) return;
     Checkpoint *p=malloc(sizeof(*p));wchar_t path[MAX_PATH];int found=!new_game && hash_valid && p && path_for(hash,path,0) && read_checkpoint(path,p) && !memcmp(hash,p->save_hash,32);
-    if(found) {totals=p->snapshot;totals.world=world;totals.last_day=day;totals.bound_to_save=1;guid(totals.branch);memcpy(lives,p->life,sizeof(lives));memset(seen,0,sizeof(seen));initialized=1;}
+    if(found) {totals=p->snapshot;memcpy(merits,p->merit,sizeof(merits));totals.world=world;totals.last_day=day;totals.bound_to_save=1;guid(totals.branch);memcpy(lives,p->life,sizeof(lives));memset(seen,0,sizeof(seen));initialized=1;}
     else fresh(world,day);
     free(p);
 }
@@ -68,7 +86,7 @@ int s14_stats_save(uintptr_t world,const unsigned char hash[32],int hash_valid) 
     DWORD attr=GetFileAttributesW(path);if(attr!=INVALID_FILE_ATTRIBUTES && !s14_stats_checkpoint_owned(path)) return 0;
     swprintf(temp,MAX_PATH,L"%ls.tmp",path);if(GetFileAttributesW(temp)!=INVALID_FILE_ATTRIBUTES && (!s14_stats_checkpoint_owned(temp) || !DeleteFileW(temp))) return 0;
     Checkpoint *p=calloc(1,sizeof(*p));if(!p) return 0;
-    memcpy(p->magic,"S14CAREER.v1",12);p->version=1;p->bytes=sizeof(*p);memcpy(p->save_hash,hash,32);p->snapshot=totals;p->snapshot.bound_to_save=1;
+    memcpy(p->magic,"S14CAREER.v2",12);p->version=2;p->bytes=sizeof(*p);memcpy(p->save_hash,hash,32);p->snapshot=totals;p->snapshot.bound_to_save=1;memcpy(p->merit,merits,sizeof(merits));
     memcpy(p->life,lives,sizeof(lives));p->crc=payload_crc(p);
     HANDLE f=CreateFileW(temp,GENERIC_WRITE,0,NULL,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,NULL);DWORD wrote=0;
     int ok=f!=INVALID_HANDLE_VALUE && WriteFile(f,p,sizeof(*p),&wrote,NULL) && wrote==sizeof(*p) && FlushFileBuffers(f);
@@ -100,13 +118,13 @@ void s14_stats_consume(const S14RoundEvent *e) {
     if(e->kind==S14_ROUND_DAMAGE && target && e->target.kind==2) {
         int loss=e->target.troops-e->target_after.troops;if(loss<=0) return;
         totals.rows[target].own_loss+=loss;
-        if(source && e->source.force!=e->target.force) totals.rows[source].enemy_loss+=loss;
+        if(source && e->source.force!=e->target.force){totals.rows[source].enemy_loss+=loss;merit_damage(source,(unsigned)loss);}
     } else if(e->kind==S14_ROUND_REMOVE && target && e->target.kind==2 && e->target.troops==0 && e->reason==1 && e->target.id>=1 && e->target.id<=500) {
         UnitLife *u=&lives[e->target.id];if(u->routed) return;u->routed=1;u->leader=target;
-        if(source && e->source.kind==2 && e->source.force!=e->target.force) totals.rows[source].units_routed++;
+        if(source && e->source.kind==2 && e->source.force!=e->target.force){totals.rows[source].units_routed++;merits[source].earned=add(merits[source].earned,100);}
         totals.rows[target].units_defeated++;
         s14_timeline_battle(e,source && e->source.kind==2 && e->source.force!=e->target.force);
-    } else if(e->kind==S14_ROUND_INJURY && source && target && e->source.force!=e->target.force && e->target_after.health>e->target.health && e->target.health>=0 && e->target_after.health<=3){totals.rows[source].officers_injured++;s14_timeline_battle(e,1);}
+    } else if(e->kind==S14_ROUND_INJURY && source && target && e->source.force!=e->target.force && e->target_after.health>e->target.health && e->target.health>=0 && e->target_after.health<=3){totals.rows[source].officers_injured++;merits[source].earned=add(merits[source].earned,50);s14_timeline_battle(e,1);}
 }
 int s14_stats_snapshot(void *unused,uintptr_t world,S14BattleStatsSnapshot *out) {
     (void)unused;if(!out || !initialized || loading || totals.world!=world) return 0;*out=totals;return 1;
@@ -114,4 +132,12 @@ int s14_stats_snapshot(void *unused,uintptr_t world,S14BattleStatsSnapshot *out)
 int s14_stats_row(uintptr_t world,int officer,S14BattleTotals *out,int *incomplete,int *bound) {
     if(!out || !incomplete || !bound || !initialized || loading || totals.world!=world || officer<=0 || officer>=S14_STATS_MAX) return 0;
     *out=totals.rows[officer];*incomplete=totals.incomplete;*bound=totals.bound_to_save;return 1;
+}
+int s14_merit_row(uintptr_t world,int officer,S14MeritAccount *out){
+ if(!out||!initialized||loading||world!=totals.world||officer<=0||officer>=S14_STATS_MAX)return 0;
+ *out=merits[officer];return 1;
+}
+int s14_merit_spend(uintptr_t world,int officer,uint64_t amount,uint64_t expected_spent){
+ S14MeritAccount m;if(!amount||!s14_merit_row(world,officer,&m)||m.spent!=expected_spent||amount>m.earned-m.spent)return 0;
+ merits[officer].spent+=amount;return 1;
 }

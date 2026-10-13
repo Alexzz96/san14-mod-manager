@@ -10,6 +10,15 @@ int main(void){int cmp;S14Release r;
     assert(s14_version_compare("0.7.2","0.7.2",&cmp)&&!cmp);
     assert(!s14_version_compare("0.7.2-rc1","0.7.2",&cmp));
     assert(!s14_version_compare("0.7","0.7.2",&cmp));
+    assert(s14_version_compare("v0.11.0-dev.17","0.11.0-dev.16",&cmp)&&cmp>0);
+    assert(s14_version_compare("0.11.0","0.11.0-dev.999",&cmp)&&cmp>0);
+    assert(s14_version_compare("0.11.0-dev.17","0.10.12",&cmp)&&cmp>0);
+    assert(!s14_version_compare("0.11.0-dev.","0.11.0",&cmp));
+    assert(!s14_version_compare("0.11.0-dev.999999","0.11.0",&cmp));
+    assert(!s14_version_compare("0.11.0-dev.17extra","0.11.0",&cmp));
+    char dev[4096]={0};const char *cursor=asset;size_t used=0;
+    for(const char *match;(match=strstr(cursor,"0.8.0"));cursor=match+5){size_t length=(size_t)(match-cursor);memcpy(dev+used,cursor,length);used+=length;strcpy(dev+used,"0.11.0-dev.17");used+=strlen("0.11.0-dev.17");}
+    strcpy(dev+used,cursor);assert(s14_release_parse(dev,strlen(dev),"0.11.0-dev.16",&r)&&r.newer&&!strcmp(r.version,"0.11.0-dev.17"));
     assert(s14_release_parse(asset,strlen(asset),"0.7.2",&r)&&r.newer&&r.size==900000&&!strcmp(r.version,"0.8.0"));
     assert(s14_release_parse(asset,strlen(asset),"0.8.0",&r)&&!r.newer);
     assert(s14_release_parse(asset,strlen(asset),"1.0.0",&r)&&!r.newer);

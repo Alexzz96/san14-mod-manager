@@ -11,9 +11,9 @@ def build_shaders(output):
     compile_.argtypes=[C.c_void_p,C.c_size_t,C.c_char_p,C.c_void_p,C.c_void_p,C.c_char_p,C.c_char_p,W.UINT,W.UINT,C.POINTER(C.c_void_p),C.POINTER(C.c_void_p)]
     compile_.restype=C.c_long
     source=(HERE/'map_halo.hlsl').read_bytes();parts=[]
-    for entry in (b'vs',b'ps',b'troop_ps'):
+    for entry in (b'vs',b'ps',b'troop_ps',b'sprite_vs',b'sprite_ps',b'ammo_ps'):
         code=C.c_void_p();errors=C.c_void_p()
-        target=b'vs_4_0' if entry==b'vs' else b'ps_4_0'
+        target=b'vs_4_0' if entry in (b'vs',b'sprite_vs') else b'ps_4_0'
         hr=compile_(source,len(source),b'map_halo.hlsl',None,None,entry,target,1<<15,0,C.byref(code),C.byref(errors))
         def method(blob,index,restype):
             table=C.cast(blob,C.POINTER(C.POINTER(C.c_void_p))).contents

@@ -23,8 +23,10 @@ typedef struct {int count;S14MapFrame frames[500];} S14MapBatch;
 typedef int (*S14MapQualify)(void*,uintptr_t,uintptr_t,int);
 int s14_map_capture_all(S14OfficerRead,void*,uintptr_t,S14MapCache*,ULONGLONG,S14MapFrame*,S14MapBatch*,S14MapQualify,void*);
 int s14_map_validate(S14OfficerRead,void*,uintptr_t);
+int s14_map_main_scene(S14OfficerRead,void*,uintptr_t);
 int s14_map_capture(S14OfficerRead,void*,uintptr_t,S14MapCache*,ULONGLONG,S14MapFrame*);
 int s14_map_scale(const RECT*,int,int,RECT*,int*);
 int s14_map_card(const RECT *panel,const RECT *traits,RECT *card);
 int s14_map_present_capture(S14OfficerRead,void*,uintptr_t,const S14MapFrame*,const uintptr_t[2],S14MapFrame*);
+int s14_map_ammo_rect(S14OfficerRead,void*,const S14MapFrame*,RECT*);
 #endif

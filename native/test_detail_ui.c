@@ -3,6 +3,8 @@
 #error Assertions required
 #endif
 #include "detail_ui.c"
+void s14_basic_stats_publish(uintptr_t a,uintptr_t b,uintptr_t c,const S14BattleTotals *d,int e,int f,int g,uint64_t m){(void)m;(void)a;(void)b;(void)c;(void)d;(void)e;(void)f;(void)g;}
+int s14_basic_stats_embedded(uintptr_t a,uintptr_t b){(void)a;(void)b;return 0;}
 static int render(S14DetailUI *ui,const char *path) {
     HDC dc=CreateCompatibleDC(NULL);BITMAPINFO bi={0};bi.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);bi.bmiHeader.biWidth=ui->width;bi.bmiHeader.biHeight=-ui->height;bi.bmiHeader.biPlanes=1;bi.bmiHeader.biBitCount=32;
     void *bits;HBITMAP bitmap=CreateDIBSection(dc,&bi,DIB_RGB_COLORS,&bits,NULL,0);if(!bitmap) {DeleteDC(dc);return 0;}HGDIOBJ old=SelectObject(dc,bitmap);s14_detail_paint(ui,dc);GdiFlush();

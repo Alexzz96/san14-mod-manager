@@ -20,8 +20,13 @@ void s14_domestic_service(void *state);
 int s14_domestic_next_log(char *text,size_t capacity);
 void s14_domestic_auto_configure(int on);
 void s14_domestic_preferences(const S14DOptions*);
+int s14_domestic_preferences_read(S14DOptions*);
 int s14_domestic_auto_turn(void *state,uintptr_t world,int day,int force);
 int s14_domestic_search_allowed(int person);
 unsigned s14_domestic_revision(void);
 void s14_domestic_auto_status(wchar_t *text,size_t capacity);
+void s14_domestic_progress(uintptr_t world,int day,int force);
+void s14_domestic_planning(uintptr_t world,int day,int force);
+int s14_domestic_quick_pending(void);
+void s14_domestic_quick_ack(void);
 #endif

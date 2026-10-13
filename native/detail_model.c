@@ -1,5 +1,6 @@
 #include "detail_model.h"
 #include "career_affix.h"
+#include "tech_tree_abi.h"
 #include <string.h>
 #include <wchar.h>
 #include <limits.h>
@@ -21,8 +22,13 @@ static int technology_page(DetailReader *r,uintptr_t base,const unsigned char *t
     uintptr_t fourth=0,vt=0,methods[51],buttons=ptr(tab+0x128),selection=0;int index=-1;
     *active=0;
     if(!get(r,array+24,&fourth,8) || !get(r,fourth,&vt,8) || !get(r,vt,methods,sizeof(methods)) ||
-       methods[0]!=base+0x8161c0 || methods[5]!=base+0x78d9b0 || methods[49]!=base+0x54b380 ||
+       methods[49]!=base+0x54b380 ||
        !methods[4] || methods[4]==base+0x7e7430 || !methods[48] || methods[48]==base+0x80ba40)return 0;
+    if(methods[0]!=base+0x8161c0 || methods[5]!=base+0x78d9b0){
+        S14TechPageIdentity identity;
+        if(!get(r,vt+sizeof(methods),&identity,sizeof(identity)) || identity.magic!=S14_TECH_PAGE_MAGIC || identity.version!=1 ||
+           identity.original_vtable!=base+0x1304be8 || !methods[0] || !methods[5] || !methods[2] || !methods[7] || !methods[8])return 0;
+    }
     if(buttons && get(r,buttons+0x130,&selection,8) && selection && get(r,selection+0x18,&index,4)) *active=index==3;
     return 1;
 }
@@ -51,7 +57,7 @@ static int candidate(DetailReader *r,uintptr_t base,uintptr_t object,uintptr_t w
     memcpy(&found->panel,dlg+0x20,sizeof(RECT)); // Native x,y,width,height.
     long x=found->panel.left,y=found->panel.top,w=found->panel.right,h=found->panel.bottom;
     if(x<0 || y<0 || w<800 || w>1920 || h<300 || h>1080 || x+w>1920 || y+h>1080) return 0;
-    found->panel.right=x+w;found->panel.bottom=y+h;found->world=world;found->dialog=object;found->person=selected;found->officer_id=id;
+    found->panel.right=x+w;found->panel.bottom=y+h;found->world=world;found->dialog=object;found->person=selected;found->basic_page=page;found->officer_id=id;
     unsigned int length=0;for(int group=0;group<2;group++) for(int i=0;i<9 && length<23;i++) {wchar_t c=(wchar_t)half(person+0x12+group*18+i*2);if(!c) break;found->name[length++]=c;}found->name[length]=0;
     wchar_t titled[24];s14_affix_display(world,id,found->name,titled,24);if(titled[0])wcscpy(found->name,titled);
     if(!length) return 0;

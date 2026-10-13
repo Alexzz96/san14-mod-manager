@@ -20,13 +20,17 @@
 #include "search_model.h"
 #include "officer_ui.h"
 #include "detail_ui.h"
+#include "basic_stats_ui.h"
 #include "tech_tree.h"
 #include "maneuver_button.h"
+#include "person_entry.h"
 #include "army_ui.h"
 #include "army_buff.h"
 #include "career_affix.h"
 #include "ai_affix.h"
 #include "blink_backstab.h"
+#include "archer_probe.h"
+#include "archer_tech.h"
 #include "affix_names.h"
 #include "map_effects_ui.h"
 #include "map_render.h"
@@ -36,6 +40,7 @@
 #include "personality_edit.h"
 #include "domestic_ui.h"
 static S14DomesticUI domestic_ui;
+static int quick_scene_memory(void *context,uintptr_t at,void *out,size_t n){(void)context;SIZE_T got=0;return ReadProcessMemory(GetCurrentProcess(),(void*)at,out,n,&got)&&got==n;}
 
 #define COMMON_RVA 0x251610
 #define CREATE_RVA 0x2a7e60
@@ -404,8 +409,11 @@ static void apply_configuration(S14ManagerUI *ui) {
     s14_ai_configure(!!(ui->effective&S14_AI_RANDOM_AFFIX));
     if(!s14_blink_ready())ui->effective&=~S14_HUANG_ZHONG_BLINK;
     s14_blink_configure(!!(ui->effective&S14_HUANG_ZHONG_BLINK));
+    s14_archer_probe_configure(hooks_ready && !runtime_fault && !!(ui->effective&S14_MASTER) && GetPrivateProfileIntW(L"Troops",L"ArcherAmmunition",0,ini_path));
+    s14_archer_tech_configure(hooks_ready && !runtime_fault && !!(ui->effective&S14_MASTER) && GetPrivateProfileIntW(L"Troops",L"ArcherAmmunition",0,ini_path) && GetPrivateProfileIntW(L"Troops",L"ArcherTechnology",1,ini_path));
     s14_domestic_enabled(hooks_ready && !runtime_fault && !!(ui->effective&S14_MASTER));
-    if(!s14_search_bridge_available()||!s14_domestic_can_apply(NULL,0))ui->effective&=~S14_AUTO_DOMESTIC;
+    S14DOptions validate_preferences;
+    if(!s14_search_bridge_available()||!s14_domestic_can_apply(NULL,0)||!s14_domestic_settings_read(ini_path,&validate_preferences))ui->effective&=~S14_AUTO_DOMESTIC;
     s14_domestic_auto_configure(!!(ui->effective&S14_AUTO_DOMESTIC));
     s14_domestic_auto_status(ui->domestic_status,192);
     s14_personality_enabled(hooks_ready && !runtime_fault && !!(ui->effective&S14_MASTER) && s14_manager_view_enabled(ui,0));
@@ -432,6 +440,7 @@ static void publish_manager_runtime(S14ManagerUI *ui) {
 }
 static void game_manager_action(S14ManagerUI *ui,int action,void *context) {
     (void)context;
+    if(action==S14_ACTION_DOMESTIC_QUICK){ShowWindow(ui->window,SW_HIDE);if(domestic_ui.window)SendMessageW(domestic_ui.window,WM_CLOSE,0,0);s14_domestic_quick_show(&domestic_ui.quick,own_module,ui->owner,ini_path);}
     if(action==S14_ACTION_DOMESTIC_FILL || action==S14_ACTION_DOMESTIC_OPTIMIZE){
         ShowWindow(ui->window,SW_HIDE);
         wcscpy(domestic_ui.ini,ini_path);
@@ -489,16 +498,26 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
     int buff_ready=status==MH_OK && s14_army_buff_install(image_base,image_end);
     int name_ready=status==MH_OK && s14_affix_names_install(image_base,image_end);
     int tech_ready=status==MH_OK && s14_tech_tree_install(image_base,image_end);
-    char tech_startup[256];snprintf(tech_startup,sizeof(tech_startup),"{\"event\":\"native_tech_tree_ready\",\"ready\":%d,\"native_controls\":true,\"placeholder_only\":true,\"in_game_acceptance\":\"pending\"}\n",tech_ready);write_line(log,tech_startup);
+    int basic_stats_ready=status==MH_OK && s14_basic_stats_install(image_base,image_end);
+    char basic_startup[160];snprintf(basic_startup,sizeof(basic_startup),"{\"event\":\"native_basic_stats_ready\",\"ready\":%d,\"revision\":1,\"native_rows\":6}\n",basic_stats_ready);write_line(log,basic_startup);
+    char tech_startup[256];snprintf(tech_startup,sizeof(tech_startup),"{\"event\":\"native_tech_tree_ready\",\"ready\":%d,\"native_controls\":true,\"preview_revision\":1,\"placeholder_only\":false,\"in_game_acceptance\":\"pending\"}\n",tech_ready);write_line(log,tech_startup);
     int maneuver_ready=status==MH_OK && s14_maneuver_button_install(image_base,image_end);
-    char maneuver_startup[256];snprintf(maneuver_startup,sizeof(maneuver_startup),"{\"event\":\"native_maneuver_button_ready\",\"ready\":%d,\"native_controls\":true,\"placeholder_only\":true,\"in_game_acceptance\":\"pending\"}\n",maneuver_ready);write_line(log,maneuver_startup);
+    char maneuver_startup[256];snprintf(maneuver_startup,sizeof(maneuver_startup),"{\"event\":\"native_maneuver_button_ready\",\"ready\":%d,\"native_controls\":true,\"native_submenu\":true,\"native_panel_link\":true,\"placeholder_only\":false,\"in_game_acceptance\":\"pending\"}\n",maneuver_ready);write_line(log,maneuver_startup);
     s14_troop_root(game_folder);
     int troop_ready=status==MH_OK && battle_ready && army_ready && buff_ready && name_ready && s14_troop_install(image_base,image_end);
     s14_ai_attach(image_base,game_folder,troop_ready && buff_ready && name_ready && battle_ready);
     int blink_ready=status==MH_OK && battle_ready && troop_ready && name_ready && s14_blink_install(image_base,image_end,game_folder);
     char blink_startup[192];snprintf(blink_startup,sizeof(blink_startup),"{\"event\":\"blink_ready\",\"ready\":%d,\"officer\":\"黄忠\",\"rear_search\":3,\"backstab_percent\":30,\"default_enabled\":false,\"in_game_acceptance\":\"pending\"}\n",blink_ready);write_line(log,blink_startup);
+    int archer_capacity=GetPrivateProfileIntW(L"Troops",L"ArcherAmmoCapacity",25,ini_path),archer_recovery=GetPrivateProfileIntW(L"Troops",L"ArcherAmmoRecovery",2,ini_path);
+    if(archer_capacity<1||archer_capacity>1000)archer_capacity=25;if(archer_recovery<1||archer_recovery>1000)archer_recovery=2;
+    s14_archer_ammo_settings(game_folder,archer_capacity,archer_recovery);
+    int archer_ready=status==MH_OK && battle_ready && s14_archer_probe_install(image_base,image_end);
+    s14_archer_tech_attach(image_base,game_folder,tech_ready && archer_ready && troop_ready && buff_ready);
+    char archer_tech_startup[192];snprintf(archer_tech_startup,sizeof(archer_tech_startup),"{\"event\":\"archer_technology_ready\",\"ready\":%d,\"base_points\":8,\"advanced_enabled\":false,\"revision\":2}\n",tech_ready && archer_ready && troop_ready && buff_ready);write_line(log,archer_tech_startup);
+    char archer_startup[192];snprintf(archer_startup,sizeof(archer_startup),"{\"event\":\"archer_ammo_ready\",\"ready\":%d,\"capacity_provisional\":%d,\"idle_recovery\":%d,\"in_game_acceptance\":\"pending\"}\n",archer_ready,archer_capacity,archer_recovery);write_line(log,archer_startup);
     int map_ready=status==MH_OK && s14_map_render_install();
     int domestic_ready=battle_ready && search_ready && s14_domestic_init(image_base,image_end);
+    S14DOptions domestic_initial;if(s14_domestic_settings_read(ini_path,&domestic_initial))s14_domestic_preferences(&domestic_initial);
     char domestic_startup[256];snprintf(domestic_startup,sizeof(domestic_startup),"{\"event\":\"domestic_ready\",\"read_bridge_ready\":%d,\"apply_enabled\":%s,\"in_game_acceptance\":\"pending\"}\n",domestic_ready,S14_DOMESTIC_EXECUTION_ENABLED?"true":"false");write_line(log,domestic_startup);
     int personality_ready=battle_ready && search_ready && s14_personality_init(image_base,image_end);
     char personality_startup[256];snprintf(personality_startup,sizeof(personality_startup),"{\"event\":\"personality_editor_ready\",\"ready\":%d,\"slots\":9,\"catalog_ids\":355,\"staged_apply\":true,\"request_ids\":true,\"native_setter\":true,\"foundation_plan_complete\":false,\"in_game_acceptance\":\"pending\"}\n",personality_ready);write_line(log,personality_startup);
@@ -559,7 +578,7 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
         /* Plain F is registered only while the actual game window is focused.
            Search/edit controls in the popup must receive ordinary text input. */
         int officer_enabled=s14_manager_view_enabled(&ui,0);
-        int officer_input=owner && GetForegroundWindow()==owner && officer_enabled && officers.window;
+        int officer_input=owner && foreground_is(owner) && officer_enabled && officers.window;
         if (officer_input && officer_key && !officer_registered && input_tick-last_officer_key_attempt>=500) {
             last_officer_key_attempt=input_tick;officer_registered=RegisterHotKey(NULL,officer_key,MOD_NOREPEAT,'F');
             officer_error=officer_registered?0:GetLastError();
@@ -567,7 +586,7 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
         if (!officer_input && officer_registered) { UnregisterHotKey(NULL,officer_key);officer_registered=0; }
         /* Keep Ctrl+G local to the focused game, leaving popup edits and other
            applications alone. RegisterHotKey suppresses key-repeat requests. */
-        int domestic_input=owner && GetForegroundWindow()==owner;
+        int domestic_input=owner && foreground_is(owner);
         if (domestic_input && domestic_key && !domestic_registered && input_tick-last_domestic_key_attempt>=500) {
             last_domestic_key_attempt=input_tick;domestic_registered=RegisterHotKey(NULL,domestic_key,MOD_CONTROL|MOD_NOREPEAT,'G');
             domestic_error=domestic_registered?0:GetLastError();
@@ -598,13 +617,14 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
             write_line(log,"{\"event\":\"officer_hidden\",\"reason\":\"feature_disabled\"}\n");
         }
         MSG message; while (PeekMessageW(&message,NULL,0,0,PM_REMOVE)) {
+            if(message.message==WM_HOTKEY){char line[192];snprintf(line,sizeof(line),"{\"event\":\"hotkey_received\",\"id\":%llu,\"foreground\":%d}\n",(unsigned long long)message.wParam,foreground_is(owner));write_line(log,line);}
             if (message.message==WM_HOTKEY && message.wParam==hotkey_id && foreground_is(owner)) {
                 if (officers.window && IsWindowVisible(officers.window)) {s14_personality_ui_hide(&officers.personality);s14_history_hide(&officers.timeline);ShowWindow(officers.window,SW_HIDE);KillTimer(officers.window,1);}
                 s14_manager_toggle(&ui); char line[96];
                 snprintf(line,sizeof(line),"{\"event\":\"manager_toggle\",\"visible\":%d}\n",ui.window && IsWindowVisible(ui.window));
                 write_line(log,line);
             }
-            else if (message.message==WM_HOTKEY && message.wParam==officer_key && GetForegroundWindow()==owner && officer_enabled) {
+            else if (message.message==WM_HOTKEY && message.wParam==officer_key && foreground_is(owner) && officer_enabled) {
                 if (officer_registered) { UnregisterHotKey(NULL,officer_key);officer_registered=0; }
                 if (ui.window && IsWindowVisible(ui.window)) ShowWindow(ui.window,SW_HIDE);
                 s14_battle_worker(game_folder);
@@ -619,6 +639,7 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
                 game_manager_action(&ui,S14_ACTION_DOMESTIC_OPTIMIZE,NULL);
                 char line[160];snprintf(line,sizeof(line),"{\"event\":\"domestic_open\",\"source\":\"Ctrl+G\",\"mode\":\"optimize\",\"visible\":%d}\n",domestic_ui.window && IsWindowVisible(domestic_ui.window));write_line(log,line);
             }
+            else if(domestic_ui.quick.window && IsWindowVisible(domestic_ui.quick.window) && IsDialogMessageW(domestic_ui.quick.window,&message)) { }
             else if(domestic_ui.window && IsWindowVisible(domestic_ui.window) && IsDialogMessageW(domestic_ui.window,&message)) { }
             else if (officers.personality.window && IsWindowVisible(officers.personality.window) && IsDialogMessageW(officers.personality.window,&message)) { }
             else if (officers.timeline.window && IsWindowVisible(officers.timeline.window) && IsDialogMessageW(officers.timeline.window,&message)) { }
@@ -638,16 +659,18 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
         s14_toast_tick(&affix_toast,tick,foreground_is(owner) && affix.active);
         s14_detail_tick(&native_detail,own_module,owner,image_base,s14_manager_view_enabled(&ui,1),tick);
         s14_army_ui_tick(&army_values,own_module,owner,image_base,s14_manager_view_enabled(&ui,2),tick);
-        int map_blocked=(domestic_ui.window && IsWindowVisible(domestic_ui.window)) || (ui.window && IsWindowVisible(ui.window)) || (officers.window && IsWindowVisible(officers.window)) || turn_ui.visible || native_detail.shown || army_values.shown;
+        int map_blocked=(domestic_ui.quick.window && IsWindowVisible(domestic_ui.quick.window)) || (domestic_ui.window && IsWindowVisible(domestic_ui.window)) || (ui.window && IsWindowVisible(ui.window)) || (officers.window && IsWindowVisible(officers.window)) || turn_ui.visible || native_detail.shown || army_values.shown;
         s14_troop_ui_tick(&troop_ui,own_module,owner,map_blocked);
         s14_map_ui_tick(&map_effects,own_module,owner,image_base,(ui.effective&(S14_CAO_REN_BUFF|S14_AI_RANDOM_AFFIX)),ui.visual_settings,map_blocked,tick);
         int map_state=map_effects.ready|map_effects.halo_shown<<1|map_effects.card_shown<<2;
         HWND map_obstructions[4]={ui.window,officers.window,turn_ui.window,army_values.popup};
         s14_map_render_publish_all(owner,image_base,!map_blocked,ui.effective,ui.visual_settings,&map_effects.batch,map_effects.cache.dialogs,map_obstructions,tick);
-        char map_line[512];if(s14_map_render_log(map_line,sizeof(map_line)))write_line(log,map_line);
+        s14_map_ammo_publish(owner,image_base,!map_blocked && !!(ui.effective&S14_MASTER),tick);
+        char map_line[1024];if(s14_map_render_log(map_line,sizeof(map_line)))write_line(log,map_line);
         char personality_line[512];if(s14_personality_next_log(personality_line,sizeof(personality_line)))write_line(log,personality_line);
         char domestic_line[512];int domestic_written=0;for(int n=0;n<128&&s14_domestic_next_log(domestic_line,sizeof(domestic_line));n++){write_line(log,domestic_line);domestic_written=1;}if(domestic_written&&log!=INVALID_HANDLE_VALUE)FlushFileBuffers(log);
-        char maneuver_line[512];if(s14_maneuver_button_next_log(maneuver_line,sizeof(maneuver_line)))write_line(log,maneuver_line);
+        char maneuver_line[1536];if(s14_maneuver_button_next_log(maneuver_line,sizeof(maneuver_line)))write_line(log,maneuver_line);
+        char person_entry_line[256];if(s14_person_entry_next_log(person_entry_line,sizeof(person_entry_line)))write_line(log,person_entry_line);
         if(last_map_state!=map_state){
             S14MapFrame *f=&map_effects.frame;char line[512];snprintf(line,sizeof(line),"{\"event\":\"cao_ren_map_effects\",\"ready\":%d,\"halo\":%d,\"tooltip\":%d,\"army_id\":%d,\"read_calls\":%u,\"read_bytes\":%u,\"portrait\":[%ld,%ld,%ld,%ld],\"card\":[%ld,%ld,%ld,%ld]}\n",map_effects.ready,map_effects.halo_shown,map_effects.card_shown,f->army_id,f->calls,f->bytes,f->portrait.left,f->portrait.top,f->portrait.right,f->portrait.bottom,f->card.left,f->card.top,f->card.right,f->card.bottom);write_line(log,line);last_map_state=map_state;
         }
@@ -655,6 +678,8 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
         char troop_line[512];for(int n=0;n<16 && s14_troop_next_log(troop_line,sizeof(troop_line));n++)write_line(log,troop_line);
         char buff_line[768];for(int n=0;n<16 && s14_army_buff_next_log(buff_line,sizeof(buff_line));n++)write_line(log,buff_line);
         char blink_line[768];for(int n=0;n<32 && s14_blink_next_log(blink_line,sizeof(blink_line));n++)write_line(log,blink_line);
+        char archer_line[1024];for(int n=0;n<64 && s14_archer_probe_next_log(archer_line,sizeof(archer_line));n++)write_line(log,archer_line);
+        for(int n=0;n<64 && s14_archer_tech_next_log(archer_line,sizeof(archer_line));n++)write_line(log,archer_line);
         S14ArmyTrace stable_trace=army_values.frame.trace;stable_trace.tick=0;stable_trace.serial=0;
         if(last_army_visible!=army_values.shown || (army_values.shown && memcmp(&last_army_trace,&stable_trace,sizeof(stable_trace)))){
             char line[6144];
@@ -666,8 +691,15 @@ static DWORD WINAPI plugin_worker(LPVOID unused) {
             write_line(log,line);last_detail_visible=native_detail.shown;last_detail_officer=native_detail.frame.officer_id;last_detail_ready=native_detail.ready;last_detail_stats=native_detail.stats;
         }
         if(report_epoch!=s14_turn_report_epoch()) {report_epoch=s14_turn_report_epoch();s14_report_ui_clear(&turn_ui);}
+        if(s14_domestic_quick_pending()){
+            if(s14_domestic_settings_seen(ini_path))s14_domestic_quick_ack();
+            else if((ui.effective&S14_MASTER)&&domestic_ready&&owner&&GetForegroundWindow()==owner&&!map_blocked&&s14_map_main_scene(quick_scene_memory,NULL,image_base)){
+                int shown=s14_domestic_quick_show(&domestic_ui.quick,own_module,owner,ini_path);
+                if(shown){int remembered=s14_domestic_settings_mark_seen(ini_path);s14_domestic_quick_ack();char line[160];snprintf(line,sizeof(line),"{\"event\":\"domestic_quick_shown\",\"scope\":\"installation_once\",\"remembered\":%s}\n",remembered?"true":"false");write_line(log,line);}
+            }
+        }
         const wchar_t *search_report,*battle_report;
-        if(owner && IsWindowVisible(owner) && !IsIconic(owner) && s14_turn_report_take(tick,&search_report,&battle_report)) {
+        if(owner && IsWindowVisible(owner) && !IsIconic(owner) && !(domestic_ui.quick.window && IsWindowVisible(domestic_ui.quick.window)) && s14_turn_report_take(tick,&search_report,&battle_report)) {
             const S14ReportSearch *search_data;const S14ReportBattle *battle_data;s14_turn_report_data(&search_data,&battle_data);
             int shown=s14_report_ui_show(&turn_ui,own_module,owner,image_base,game_folder,search_data,battle_data);
             char report_event[192];snprintf(report_event,sizeof(report_event),"{\"event\":\"turn_report_shown\",\"shown\":%d,\"tabs\":0,\"view\":\"portrait_cards\",\"actors\":%d,\"search_available\":%d,\"battle_available\":%d}\n",shown,turn_ui.battle.actor_count,turn_ui.search_data.available,turn_ui.battle.available);write_line(log,report_event);

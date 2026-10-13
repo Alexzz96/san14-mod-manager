@@ -26,6 +26,10 @@ int main(void){
     s14_map_render_publish_all((HWND)5,6,1,S14_AI_RANDOM_AFFIX,12,&batch,NULL,NULL,1402);REQUIRE(control.batch.count==2 && control.tick==1400);
     s14_map_render_publish_all((HWND)5,6,1,S14_AI_RANDOM_AFFIX,12,&batch,NULL,NULL,2401);REQUIRE(!control_current(&control,2401));
     s14_map_render_publish_all((HWND)5,6,0,S14_AI_RANDOM_AFFIX,12,&batch,NULL,NULL,1402);REQUIRE(!control.batch.count && !control.binding.army);
+    s14_map_caption_publish(100,200,80,28,.5f,1,1403);REQUIRE(control.caption.visible&&control.caption.alpha==.5f);
+    s14_map_render_publish_all((HWND)5,6,0,0,0,NULL,NULL,NULL,1404);REQUIRE(control.caption.visible);
+    InterlockedExchange64(&caption_painted_at,1405);REQUIRE(s14_map_caption_drawn(1500)&&!s14_map_caption_drawn(1555));
+    s14_map_caption_publish(0,0,0,0,0,0,1406);REQUIRE(!control.caption.visible&&!s14_map_caption_drawn(1406));
     ID3D11Device *device=NULL;ID3D11DeviceContext *ctx=NULL;OK(D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_WARP,NULL,0,NULL,0,D3D11_SDK_VERSION,&device,NULL,&ctx));
     S14MapGraphics g={0};REQUIRE(s14_map_graphics_init(&g,device));
     ID3D11Texture2D *t=texture(device,D3D11_BIND_RENDER_TARGET),*extra=texture(device,D3D11_BIND_RENDER_TARGET),*resource=texture(device,D3D11_BIND_SHADER_RESOURCE);
@@ -42,6 +46,8 @@ int main(void){
     for(int i=0;i<8;i++){
         REQUIRE(s14_troop_graphics_draw(&g,t,128,128,48,i&1,i&2));
         ID3D11DeviceContext_ClearRenderTargetView(ctx,rt[0],color);REQUIRE(s14_map_graphics_draw(&g,t,128.25f+i*.25f,127.75f,32,1));
+        REQUIRE(s14_caption_graphics_draw(&g,t,-256,-256,80,28,1));
+        REQUIRE(s14_ammo_graphics_draw(&g,t,-256,-256,60,6,15,30));
         ID3D11RenderTargetView *after_rt[2]={0};ID3D11DeviceContext_OMGetRenderTargets(ctx,2,after_rt,NULL);REQUIRE(after_rt[0]==rt[0] && after_rt[1]==rt[1]);RELEASE(after_rt[0]);RELEASE(after_rt[1]);
         ID3D11BlendState *blend=NULL;float after_factors[4];UINT mask=0;ID3D11DeviceContext_OMGetBlendState(ctx,&blend,after_factors,&mask);REQUIRE(blend==g.blend && !memcmp(factors,after_factors,sizeof(factors)) && mask==0xff11ff11);RELEASE(blend);
         ID3D11DepthStencilState *depth=NULL;UINT reference=0;ID3D11DeviceContext_OMGetDepthStencilState(ctx,&depth,&reference);REQUIRE(depth==g.depth && reference==37);RELEASE(depth);
@@ -58,6 +64,44 @@ int main(void){
     D3D11_TEXTURE2D_DESC desc;ID3D11Texture2D_GetDesc(t,&desc);desc.Usage=D3D11_USAGE_STAGING;desc.BindFlags=0;desc.CPUAccessFlags=D3D11_CPU_ACCESS_READ;ID3D11Texture2D *staging=NULL;OK(ID3D11Device_CreateTexture2D(device,&desc,NULL,&staging));ID3D11DeviceContext_CopyResource(ctx,(ID3D11Resource*)staging,(ID3D11Resource*)t);
     D3D11_MAPPED_SUBRESOURCE data;OK(ID3D11DeviceContext_Map(ctx,(ID3D11Resource*)staging,0,D3D11_MAP_READ,0,&data));unsigned char *pixels=data.pData,*center=pixels+128*data.RowPitch+128*4,*outside=pixels+10*data.RowPitch+10*4,*ring=pixels+128*data.RowPitch+165*4;
     REQUIRE(!memcmp(center,outside,4) && ring[0]>center[0]+30 && ring[2]>center[2]+30);ID3D11DeviceContext_Unmap(ctx,(ID3D11Resource*)staging,0);
+    float transparent[4]={0};
+    const int ammo_counts[]={30,15,0};
+    for(int i=0;i<3;i++){
+        ID3D11DeviceContext_ClearRenderTargetView(ctx,rt[0],transparent);REQUIRE(s14_ammo_graphics_draw(&g,t,128,128,60,6,ammo_counts[i],30));
+        ID3D11DeviceContext_CopyResource(ctx,(ID3D11Resource*)staging,(ID3D11Resource*)t);OK(ID3D11DeviceContext_Map(ctx,(ID3D11Resource*)staging,0,D3D11_MAP_READ,0,&data));
+        pixels=data.pData;unsigned char *left=pixels+128*data.RowPitch+105*4,*right=pixels+128*data.RowPitch+150*4,*outside_bar=pixels+120*data.RowPitch+128*4;
+        REQUIRE(left[3]==255&&right[3]==255&&outside_bar[3]==0);
+        REQUIRE((left[2]>100)==(ammo_counts[i]>0)&&(right[2]>100)==(ammo_counts[i]==30));
+        ID3D11DeviceContext_Unmap(ctx,(ID3D11Resource*)staging,0);
+    }
+    REQUIRE(!s14_ammo_graphics_draw(&g,t,128,128,60,6,31,30)&&!s14_ammo_graphics_draw(&g,t,128,128,60,6,1,0));
+    ID3D11DeviceContext_ClearRenderTargetView(ctx,rt[0],transparent);REQUIRE(g.caption_image&&g.caption_aspect>0&&s14_caption_graphics_draw(&g,t,128,128,150,64,1));
+    ID3D11DeviceContext_CopyResource(ctx,(ID3D11Resource*)staging,(ID3D11Resource*)t);OK(ID3D11DeviceContext_Map(ctx,(ID3D11Resource*)staging,0,D3D11_MAP_READ,0,&data));
+    pixels=data.pData;int caption_pixels=0,caption_color=0;for(int y=0;y<256;y++)for(int x=0;x<256;x++){unsigned char *p=pixels+y*data.RowPitch+x*4;if(p[3]>100){caption_pixels++;if(abs((int)p[0]-70)<=2&&abs((int)p[1]-45)<=2&&abs((int)p[2]-39)<=2)caption_color=1;}}
+    REQUIRE(caption_pixels>100&&caption_color);ID3D11DeviceContext_Unmap(ctx,(ID3D11Resource*)staging,0);
+    ID3D11DeviceContext_ClearRenderTargetView(ctx,rt[0],transparent);REQUIRE(s14_caption_graphics_draw(&g,t,128,128,150,64,.5f));
+    ID3D11DeviceContext_CopyResource(ctx,(ID3D11Resource*)staging,(ID3D11Resource*)t);OK(ID3D11DeviceContext_Map(ctx,(ID3D11Resource*)staging,0,D3D11_MAP_READ,0,&data));
+    pixels=data.pData;int maximum_alpha=0;for(int y=0;y<256;y++)for(int x=0;x<256;x++){unsigned char a=pixels[y*data.RowPitch+x*4+3];if(a>maximum_alpha)maximum_alpha=a;}
+    REQUIRE(maximum_alpha>=126&&maximum_alpha<=129);ID3D11DeviceContext_Unmap(ctx,(ID3D11Resource*)staging,0);
+    /* The game uses sRGB targets: test encoded byte colors, not just an UNORM
+       mock. Both swapchain channel orders must produce the requested ink. */
+    DXGI_FORMAT formats[]={DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,DXGI_FORMAT_B8G8R8A8_UNORM_SRGB};
+    for(int format_index=0;format_index<2;format_index++){
+        D3D11_TEXTURE2D_DESC sd={.Width=256,.Height=256,.MipLevels=1,.ArraySize=1,.Format=formats[format_index],.SampleDesc={1,0},.Usage=D3D11_USAGE_DEFAULT,.BindFlags=D3D11_BIND_RENDER_TARGET};
+        ID3D11Texture2D *srgb_target=NULL,*srgb_staging=NULL;ID3D11RenderTargetView *srgb_view=NULL;
+        OK(ID3D11Device_CreateTexture2D(device,&sd,NULL,&srgb_target));OK(ID3D11Device_CreateRenderTargetView(device,(ID3D11Resource*)srgb_target,NULL,&srgb_view));
+        ID3D11DeviceContext_ClearRenderTargetView(ctx,srgb_view,transparent);REQUIRE(s14_caption_graphics_draw(&g,srgb_target,128,128,80,28,1));
+        sd.Usage=D3D11_USAGE_STAGING;sd.BindFlags=0;sd.CPUAccessFlags=D3D11_CPU_ACCESS_READ;OK(ID3D11Device_CreateTexture2D(device,&sd,NULL,&srgb_staging));
+        ID3D11DeviceContext_CopyResource(ctx,(ID3D11Resource*)srgb_staging,(ID3D11Resource*)srgb_target);OK(ID3D11DeviceContext_Map(ctx,(ID3D11Resource*)srgb_staging,0,D3D11_MAP_READ,0,&data));
+        pixels=data.pData;int opaque_color=0,left=256,right=-1,top=256,bottom=-1;
+        for(int y=0;y<256;y++)for(int x=0;x<256;x++){
+            unsigned char *p=pixels+y*data.RowPitch+x*4;int red_channel=format_index?2:0,blue_channel=format_index?0:2;
+            if(p[3]>250&&abs((int)p[red_channel]-70)<=2&&abs((int)p[1]-45)<=2&&abs((int)p[blue_channel]-39)<=2)opaque_color=1;
+            if(p[3]>16){if(x<left)left=x;if(x>right)right=x;if(y<top)top=y;if(y>bottom)bottom=y;}
+        }
+        REQUIRE(opaque_color&&left>=88&&right<168&&top>=114&&bottom<142&&right-left>=75&&bottom-top>=23);
+        ID3D11DeviceContext_Unmap(ctx,(ID3D11Resource*)srgb_staging,0);RELEASE(srgb_view);RELEASE(srgb_staging);RELEASE(srgb_target);
+    }
     ID3D11DeviceContext_ClearRenderTargetView(ctx,rt[0],color);
     REQUIRE(graphics_draw(&g,t,64,128,24,1,0,0,0,1));REQUIRE(graphics_draw(&g,t,192,128,24,1,0,0,0,0));
     ID3D11DeviceContext_CopyResource(ctx,(ID3D11Resource*)staging,(ID3D11Resource*)t);
@@ -84,5 +128,5 @@ int main(void){
     HRESULT before=IDXGISwapChain_Present(swap,0,DXGI_PRESENT_TEST);REQUIRE(MH_Initialize()==MH_OK && s14_map_render_install());HRESULT after=IDXGISwapChain_Present(swap,0,DXGI_PRESENT_TEST);REQUIRE(before==after);
     char log[1024];REQUIRE(s14_map_render_log(log,sizeof(log)) && strstr(log,"\"presents\":1") && strstr(log,"\"draws\":0"));REQUIRE(MH_DisableHook(MH_ALL_HOOKS)==MH_OK && MH_Uninitialize()==MH_OK);
     s14_map_graphics_destroy(&g);RELEASE(swap);RELEASE(ctx);RELEASE(device);DestroyWindow(window);
-    puts("{\"status\":\"passed\",\"warp_gpu_render\":true,\"native_pipeline_restored\":true,\"transparent_center\":true,\"ring_pixels_verified\":true,\"fractional_movement\":true,\"no_retained_backbuffer\":true,\"resize_buffers\":true,\"actual_present_hook\":true,\"present_hresult_preserved\":true,\"present_test_flag_skipped\":true,\"blocked_ui_clears_binding\":true,\"modal_and_missing_frame_clear_binding\":true,\"stale_samples_not_renewed\":true,\"map_resumes_after_close\":true}");return 0;
+    puts("{\"status\":\"passed\",\"warp_gpu_render\":true,\"embedded_caption_resource\":true,\"caption_pixels_and_rgb_verified\":true,\"caption_opacity_verified\":true,\"caption_srgb_color_and_native_size\":true,\"caption_pipeline_restored\":true,\"gpu_acknowledgment_expires\":true,\"native_pipeline_restored\":true,\"transparent_center\":true,\"ring_pixels_verified\":true,\"fractional_movement\":true,\"no_retained_backbuffer\":true,\"resize_buffers\":true,\"actual_present_hook\":true,\"present_hresult_preserved\":true,\"present_test_flag_skipped\":true,\"blocked_ui_clears_binding\":true,\"modal_and_missing_frame_clear_binding\":true,\"stale_samples_not_renewed\":true,\"map_resumes_after_close\":true}");return 0;
 }

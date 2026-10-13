@@ -35,3 +35,34 @@ float4 troop_ps(float4 pos : SV_POSITION) : SV_TARGET {
     float3 shield=lerp(steel,gold,max(border,detail*.9));
     return float4(lerp(ink,shield,mask),1);
 }
+struct SpriteOut { float4 position : SV_POSITION; float2 uv : TEXCOORD0; };
+SpriteOut sprite_vs(uint id : SV_VertexID) {
+    float2 corner=float2((id&1)?1:-1,(id&2)?1:-1);
+    float2 pixel=circle.xy+corner*circle.zw;
+    SpriteOut output;
+    output.position=float4(pixel.x*2/viewport.x-1,1-pixel.y*2/viewport.y,0,1);
+    output.uv=viewport.zw+float2((id&1)?1:0,(id&2)?1:0)*color.xy;
+    return output;
+}
+Texture2D caption_image : register(t0);
+SamplerState caption_sampler : register(s0);
+float4 sprite_ps(SpriteOut input) : SV_TARGET {
+    float alpha=caption_image.Sample(caption_sampler,input.uv).a*color.z;
+    float3 ink=float3(70.0,45.0,39.0)/255.0;
+    // The game's sRGB backbuffer encodes linear shader output. Convert the
+    // requested sRGB ink first; UNORM targets use the byte colors directly.
+    if(color.w>.5)ink=pow((ink+.055)/1.055,2.4);
+    return float4(ink*alpha,alpha);
+}
+float4 ammo_ps(SpriteOut input) : SV_TARGET {
+    float2 p=input.position.xy-(circle.xy-circle.zw);
+    float2 size=2*circle.zw;
+    float border=max(1,size.y/6);
+    float3 ink=float3(.16,.18,.18);
+    if(p.x<border||p.x>=size.x-border||p.y<border||p.y>=size.y-border)
+        ink=color.x>0?float3(.73,.70,.51):float3(.76,.28,.18);
+    else if((p.x-border)/(size.x-2*border)<color.x)
+        ink=lerp(float3(.24,.58,.68),float3(.53,.82,.86),1-p.y/size.y);
+    if(color.w>.5)ink=pow((ink+.055)/1.055,2.4);
+    return float4(ink,1);
+}

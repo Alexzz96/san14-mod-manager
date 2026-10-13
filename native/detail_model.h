@@ -2,7 +2,7 @@
 #define S14_DETAIL_MODEL_H
 #include "officer_model.h"
 typedef struct {
-    uintptr_t world,dialog,person;
+    uintptr_t world,dialog,person,basic_page;
     int officer_id;RECT panel;
     wchar_t name[24];
     unsigned int calls,bytes;

@@ -9,7 +9,7 @@ HERE=Path(__file__).resolve().parent
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--build-dir', type=Path, default=HERE/'build')
 parser.add_argument('--dist-dir', type=Path, default=HERE/'dist')
-parser.add_argument('--development', action='store_true', help='Local incomplete development snapshot; never a first-version candidate')
+parser.add_argument('--development', action='store_true', help='Incomplete development snapshot; never a first-version candidate')
 publication=parser.add_mutually_exclusive_group()
 publication.add_argument('--local', action='store_true', help='Package local observations without publishing')
 publication.add_argument('--prerelease', action='store_true', help='Explicitly package a public test release with acceptance still pending')
@@ -20,8 +20,8 @@ version=(HERE.parent/'VERSION').read_text(encoding='utf-8').strip()
 verification=json.loads((BUILD/'verification.json').read_text(encoding='utf-8'))
 if verification.get('status') != 'passed':
     raise SystemExit('Native verification must pass before packaging')
-if args.development and not args.local:
-    raise SystemExit('--development requires --local')
+if args.development and not (args.local or args.prerelease):
+    raise SystemExit('--development requires --local or --prerelease')
 if not verification.get('foundation_editor',{}).get('plan_complete',False) and not args.development:
     raise SystemExit('Foundation editor plan is incomplete; no candidate package. Use --local --development for a development snapshot')
 payloads={}
@@ -33,12 +33,13 @@ for name,key in [('SAN14ModManager.exe','manager_exe_sha256'),('dinput8.dll','pr
 license_data=(HERE/'vendor/minhook/LICENSE.txt').read_bytes()
 package=DIST/f'SAN14ModManager-{version}-windows-x64.zip'
 guide=(HERE.parent/'docs/USER_GUIDE.md').read_bytes()
-config=b'[Rule]\nMode=0\n[Manager]\nEnabled=1\n[Features]\nWallClusterLimit=0\nLimitHint=1\nDiagnostics=0\nAutoSearch=1\nCaoRenAttackDefense=0\nPluginTroops=1\n[AutoSearch]\nExecutors=1\nReturnDays=0\nPriority=0\n'
+config=b'[Rule]\nMode=0\n[Manager]\nEnabled=1\n[Features]\nWallClusterLimit=0\nLimitHint=1\nDiagnostics=0\nAutoSearch=1\nCaoRenAttackDefense=0\nPluginTroops=0\n[AutoSearch]\nExecutors=1\nReturnDays=0\nPriority=0\n'
 config+=b'[Views]\nEnabled=1\nOfficers=1\nNativeOfficerStats=1\nNativeArmyValues=1\n'
+config+=b'[Troops]\nArcherAmmunition=1\nArcherAmmoCapacity=25\nArcherAmmoRecovery=2\nArcherTechnology=1\n'
 config+=b'[Observation]\nBattleEvents=1\n'
 config+=b'[Visuals]\nCaoRenHalo=1\nCaoRenTooltip=1\nAiAffixHalo=1\nAiAffixTooltip=1\n'
-config=config.replace(b'PluginTroops=1\n',b'PluginTroops=1\nAiRandomAffix=0\nHuangZhongBlink=0\nAutoDomesticFill=0\n')
-manifest={'turn_report_player_force_unified':True,'turn_report_force_fix_in_game_acceptance':'pending','adaptive_player_force_matching':True,'force_group_identity_separated':True,'successful_load_session_reset':True,'adaptive_search_in_game_acceptance':'pending','version':version,'release_status':'prerelease','platform':'windows-x64',
+config=config.replace(b'PluginTroops=0\n',b'PluginTroops=0\nAiRandomAffix=0\nHuangZhongBlink=0\nAutoDomesticFill=0\n')
+manifest={'plugin_initialization':verification.get('initialization',{}),'domestic_in_foundation':True,'nonfoundation_defaults_off':True,'turn_report_player_force_unified':True,'turn_report_force_fix_in_game_acceptance':'pending','adaptive_player_force_matching':True,'force_group_identity_separated':True,'successful_load_session_reset':True,'adaptive_search_in_game_acceptance':'pending','version':version,'release_status':'prerelease','platform':'windows-x64',
           'target_executable':'SAN14PK_SC.exe','game_version_check':False,
           'game_sha256_check':False,'runtime_hook_validation':True,
           'manager_exe_sha256':verification['manager_exe_sha256'],
@@ -62,6 +63,7 @@ manifest.update({'manager_tabs':['foundation','testing','settings'],'manager_mod
                  'manager_expanded_group_border':True,'manager_parent_child_divider':True,
                  'manager_install_and_update_tab':'settings',
                  'manager_report_entry':'foundation / auto_search / expand / previous_turn_report'})
+manifest.update({'domestic_quick_settings':True,'domestic_quick_prompt_scope':'installation_once_after_first_turn','domestic_development_presets':['maximum_gain','commerce_then_agriculture_then_barracks','agriculture_then_commerce_then_barracks'],'domestic_whitelist':'extra_priority_and_filter_exemption','domestic_blacklist':'candidate_veto','domestic_leadership_threshold':'inclusive','domestic_preferences_scope':'installation','domestic_quick_in_game_acceptance':'pending'})
 manifest.update({'auto_search':True,'auto_search_start_toast_ms':2000,
                  'auto_search_result_types':['person','item','tactic_book','money'],
                  'auto_search_native_settings':True,'auto_search_in_game_acceptance':'pending',
@@ -211,7 +213,8 @@ files['FOUNDATION_IMPLEMENTATION.md']=(HERE.parent/'docs/FOUNDATION_IMPLEMENTATI
 files['NATIVE_EDIT_RESEARCH.md']=(HERE.parent/'docs/NATIVE_EDIT_RESEARCH.md').read_bytes()
 files['verification.json']=(BUILD/'verification.json').read_bytes()
 files['build-provenance.json']=(BUILD/'build-provenance.json').read_bytes()
-files['RELEASE_NOTES_0.11.0-dev.14.md']=(HERE.parent/'docs/RELEASE_NOTES_0.11.0-dev.14.md').read_bytes()
+notes_name=f'RELEASE_NOTES_{version}.md'
+files[notes_name]=(HERE.parent/'docs'/notes_name).read_bytes()
 files['AI_INTERFACES.md']=(HERE.parent/'docs/AI_INTERFACES.md').read_bytes()
 files['AI_INTERFACE_INVENTORY.json']=(HERE.parent/'docs/AI_INTERFACE_INVENTORY.json').read_bytes()
 files['PERSONALITY_EDITOR.md']=(HERE.parent/'docs/PERSONALITY_EDITOR.md').read_bytes()
@@ -233,6 +236,11 @@ files['NATIVE_TECH_TREE.md']=(HERE.parent/'docs/NATIVE_TECH_TREE.md').read_bytes
 assert verification['domestic_officers']['status']=='passed'
 manifest['domestic_officers']=verification['domestic_officers']
 files['DOMESTIC_OFFICERS.md']=(HERE.parent/'docs/DOMESTIC_OFFICERS.md').read_bytes()
+manifest['archer_ammunition']={'base_capacity':25,'idle_daily_recovery':2,'ordinary_empty_blocks':True,'shooting_tactic_empty_blocks':False,'configuration_on_update':'preserve_existing_values','in_game_basic_cycle_acceptance':'observed_xunyou_5_shot_test'}
+manifest['archer_sidecar_cleanup']=False
+manifest['complete_uninstall']=False
+manifest['archer_technology']={'basic_points':8,'advanced_enabled':False,'native_ui':'five_columns_circular_badges','sidecar':'.s14tech','in_game_acceptance':'pending'}
+for name in ('ARCHER_TECHNOLOGY.md','ARCHER_AMMUNITION.md','NATIVE_BASIC_STATS.md','OFFICER_MERIT.md'):files[name]=(HERE.parent/'docs'/name).read_bytes()
 manifest['native_tech_tree']=verification['native_tech_tree']
 files['NATIVE_MANEUVER_BUTTON.md']=(HERE.parent/'docs/NATIVE_MANEUVER_BUTTON.md').read_bytes()
 manifest['native_maneuver_button']=verification['native_maneuver_button']

@@ -4,6 +4,7 @@
 #include "troop_runtime.h"
 #include "career_affix.h"
 #include "ai_affix.h"
+#include "archer_tech.h"
 #include "MinHook.h"
 #include <string.h>
 #include <math.h>
@@ -61,6 +62,7 @@ static float buff_attribute(int attribute,AttributeCall original,float base,void
         if(isfinite(raised)){result=raised;percent=bonus;buff_sample(attribute,&unit,mode,caller,native,result);}
     }
     result=s14_troop_attribute_at(army,attribute,actual,result,mode,caller);
+    if(eligible && buff_same(&unit,army))result=s14_archer_tech_attribute(army,attribute,actual,result);
     s14_army_observer_attribute(attribute,army,actual,native,result,percent);
     SetLastError(after);return result;
 }

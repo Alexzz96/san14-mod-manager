@@ -36,7 +36,7 @@ jobs:
         run: python native/verify_native.py
       - name: Package verified test assets with pending acceptance disclosed
         shell: pwsh
-        run: python native/package_release.py --prerelease
+        run: python native/package_release.py --prerelease --development
       - name: Publish complete verified release
         shell: pwsh
         env:

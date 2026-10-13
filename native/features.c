@@ -25,10 +25,10 @@ const S14Mod s14_mods[S14_MOD_COUNT]={
     {L"domestic_officers",L"区域官员配置",L"Ctrl+G 规划；支持每回合先补齐直辖内政，再派遣探索。",L"内政",62,1}
 };
 int s14_mod_page(int mod){
-    return mod==S14_MOD_SEARCH || mod==S14_MOD_BATTLE || mod==S14_MOD_VIEWS || mod==S14_MOD_DIAGNOSTICS?S14_PAGE_FOUNDATION:S14_PAGE_TESTING;
+    return mod==S14_MOD_SEARCH || mod==S14_MOD_BATTLE || mod==S14_MOD_VIEWS || mod==S14_MOD_DIAGNOSTICS || mod==S14_MOD_DOMESTIC?S14_PAGE_FOUNDATION:S14_PAGE_TESTING;
 }
 const wchar_t *s14_mod_maturity(int mod){
-    if(mod==S14_MOD_DOMESTIC)return L"手动已核对 / 自动待验";
+    if(mod==S14_MOD_DOMESTIC)return L"自动已核对 / 快速设置待验";
     if(mod==S14_MOD_BLINK)return L"待实机验证";
     return mod==S14_MOD_SEARCH || mod==S14_MOD_BATTLE?L"稳定":mod==S14_MOD_VIEWS?L"查询稳定 / 编辑待验":mod==S14_MOD_DIAGNOSTICS?L"基础工具":L"测试";
 }
@@ -46,7 +46,7 @@ unsigned int s14_config_read(const wchar_t *path) {
     if (boolean(path,L"Features",L"Diagnostics",legacy==1)) flags|=S14_DIAGNOSTICS;
     if (boolean(path,L"Features",L"AutoSearch",1)) flags|=S14_AUTO_SEARCH;
     if (boolean(path,L"Features",L"CaoRenAttackDefense",0)) flags|=S14_CAO_REN_BUFF;
-    if (boolean(path,L"Features",L"PluginTroops",1)) flags|=S14_PLUGIN_TROOPS;
+    if (boolean(path,L"Features",L"PluginTroops",0)) flags|=S14_PLUGIN_TROOPS;
     if (boolean(path,L"Features",L"AiRandomAffix",0)) flags|=S14_AI_RANDOM_AFFIX;
     if (boolean(path,L"Features",L"HuangZhongBlink",0)) flags|=S14_HUANG_ZHONG_BLINK;
     if (boolean(path,L"Features",L"AutoDomesticFill",0)) flags|=S14_AUTO_DOMESTIC;

@@ -12,8 +12,8 @@ ROOT=Path(__file__).resolve().parents[1]
 VERSION=(ROOT/'VERSION').read_text(encoding='utf-8').strip()
 TAG='v'+VERSION
 REPO='Alexzz96/san14-mod-manager'
-if not re.fullmatch(r'\d+\.\d+\.\d+',VERSION):
-    raise SystemExit('VERSION must be numeric major.minor.patch')
+if not re.fullmatch(r'\d+\.\d+\.\d+(?:-dev\.\d+)?',VERSION):
+    raise SystemExit('VERSION must be major.minor.patch or major.minor.patch-dev.N')
 if os.environ.get('GITHUB_REPOSITORY')!=REPO or os.environ.get('GITHUB_REF')!='refs/tags/'+TAG:
     raise SystemExit('Publishing requires the matching version tag in the project repository')
 TOKEN=os.environ.get('GITHUB_TOKEN')

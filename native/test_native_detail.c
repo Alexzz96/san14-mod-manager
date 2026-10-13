@@ -3,6 +3,7 @@
 #error Assertions required
 #endif
 #include "detail_model.h"
+#include "tech_tree_abi.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +43,12 @@ int main(void) {
     tech_vtable[5]=base+0x78d9b0;tech_vtable[48]=0x6600100;tech_vtable[49]=base+0x54b380;
     add(0x6400000,&tech_header,8);add(0x6500000,tech_vtable,sizeof(tech_vtable));
     assert(s14_detail_capture(reader,NULL,base,&f));
+    S14TechPageIdentity identity={S14_TECH_PAGE_MAGIC,1,base+0x1304be8};
+    add(0x6500000+sizeof(tech_vtable),&identity,sizeof(identity));
+    tech_vtable[0]=0x6600200;tech_vtable[5]=0x6600300;tech_vtable[2]=0x6600400;tech_vtable[7]=0x6600500;tech_vtable[8]=0x6600600;
+    assert(s14_detail_capture(reader,NULL,base,&f));
+    identity.magic=0;assert(!s14_detail_capture(reader,NULL,base,&f));identity.magic=S14_TECH_PAGE_MAGIC;
+    identity.version=2;assert(!s14_detail_capture(reader,NULL,base,&f));identity.version=1;
     tech_vtable[49]=0;assert(!s14_detail_capture(reader,NULL,base,&f));tech_vtable[49]=base+0x54b380;
     put64(tab,0x128,0x6700000);put64(buttons,0x130,0x6800000);put32(selection,0x18,3);
     add(0x6700000,buttons,sizeof(buttons));add(0x6800000,selection,sizeof(selection));

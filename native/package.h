@@ -14,6 +14,7 @@ unsigned int s14_package_detect(const wchar_t *root,const wchar_t *source);
 int s14_owned_artifact(const wchar_t *root,const wchar_t *path,const wchar_t *source,int manager);
 int s14_package_clean(const wchar_t *root,const wchar_t *source,S14CleanupReport *report,wchar_t error[192]);
 int s14_package_install(const wchar_t *root,const wchar_t *manager_source,wchar_t error[192]);
+int s14_package_reset(const wchar_t *root,wchar_t backup[MAX_PATH],wchar_t error[192]);
 int s14_package_remove(const wchar_t *root,wchar_t error[192]);
 void s14_publish_runtime(const wchar_t *root,unsigned int desired,unsigned int effective,int ready,int fault);
 int s14_read_runtime(const wchar_t *root,unsigned int *effective,int *fault);

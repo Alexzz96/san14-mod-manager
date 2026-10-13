@@ -17,6 +17,7 @@ __declspec(dllexport) int S14TestTimelineSave(const wchar_t *root){unsigned char
 __declspec(dllexport) int S14TestSpecialSave(const wchar_t *root){unsigned char hash[32]={4};s14_special_root(root);s14_special_load(1,100,1,hash,0,1);return s14_special_save(1,hash,1);}
 __declspec(dllexport) int S14TestStatsSave(const wchar_t *root) {unsigned char hash[32]={1};s14_stats_root(root);s14_stats_load_end(1,100,1,hash,0,1);return s14_stats_save(1,hash,1);}
 __declspec(dllexport) int S14TestInstall(const wchar_t *root,const wchar_t *source,wchar_t *error) { return s14_package_install(root,source,error); }
+__declspec(dllexport) int S14TestReset(const wchar_t *root,wchar_t *backup,wchar_t *error){return s14_package_reset(root,backup,error);}
 __declspec(dllexport) int S14TestRemove(const wchar_t *root,wchar_t *error) { return s14_package_remove(root,error); }
 __declspec(dllexport) int S14TestOwned(const wchar_t *root) { return s14_owned_install(root); }
 __declspec(dllexport) int S14TestRunning(const wchar_t *root) { return s14_game_running(root); }

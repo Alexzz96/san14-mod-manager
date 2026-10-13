@@ -37,6 +37,7 @@ static uintptr_t auto_world;static unsigned auto_epoch,pref_epoch;
 static S14DOptions auto_preferences;
 static unsigned char auto_reserved[6001];static volatile LONG revision;
 static wchar_t auto_message[192]=L"自动补齐关闭；手动配置仍可使用。";
+static uintptr_t quick_world;static int quick_day=-1,quick_force,quick_armed,quick_pending;static unsigned quick_epoch;
 static SRWLOCK log_lock=SRWLOCK_INIT;
 static char log_lines[1024][512];static unsigned log_read,log_write,log_dropped;
 static void trace(const char *line){AcquireSRWLockExclusive(&log_lock);if(log_write-log_read<1024){strncpy(log_lines[log_write++%1024],line,511);}else log_dropped++;ReleaseSRWLockExclusive(&log_lock);}
@@ -154,7 +155,7 @@ static int capture(S14DSnapshot *s,wchar_t *why){
    /* Keep only same-home, same-current city and primary district. The native
       list also includes associated bases, which are intentionally excluded. */
    if(b[0x118]==s->group&&word(b+0x11a)==home[c]&&word(b+0x11c)==home[c]){
-    S14DPerson *o=&s->people[person];o->active=1;o->city=c;o->address=p;o->eligible=1;o->protected_job=jobs[person]||reserved[person];o->busy=word(b+0x196)!=0;
+    S14DPerson *o=&s->people[person];o->active=1;o->owned=1;o->city=c;o->address=p;o->eligible=1;o->protected_job=jobs[person]||reserved[person];o->busy=word(b+0x196)!=0;
     if(!person_traits(o,b)){ok=0;break;}
     wchar_t first[20],last[20];name(first,20,b+0x12,9);name(last,20,b+0x24,9);swprintf(o->name,40,L"%ls%ls",first,last);
     for(int k=0;k<5;k++){o->ability[k]=effective((void*)p,k,0xfff);if(o->ability[k]<0||o->ability[k]>1000)ok=0;}
@@ -162,6 +163,20 @@ static int capture(S14DSnapshot *s,wchar_t *why){
    node=ptr(node+8);
   }
   cleanup(&list);if(!ok){wcscpy(why,L"原生候选列表结构或有效能力不兼容。");return 0;}
+ }
+ /* Read the entire player's roster for lists, without promoting non-native
+    candidates into appointable officers (field armies/delegated groups included). */
+ for(int id=1;id<6001;id++)if(!s->people[id].active){
+  uintptr_t p=ptr(s->world+0x148+id*8);if(!p)continue;unsigned char b[512];
+  if(!get(p,b,512)||ptr(p)!=image+0x12a00d0||word(b+0x10)!=id){wcscpy(why,L"武将名单对象不兼容。");return 0;}
+  if(b[0x11e]>9){wcscpy(why,L"武将名单身份状态不兼容。");return 0;}if(b[0x11e]==0||b[0x11e]==7||b[0x11e]==9)continue;
+  int district=b[0x118];if(district<1||district>51)continue;
+  uintptr_t owner=district==s->group?group:ptr(s->world+0xde40+district*8);unsigned char owner_data[32];
+  if(!get(owner,owner_data,32)||ptr(owner)!=image+0x129fec8||owner_data[0x10]!=s->force)continue;
+  S14DPerson *o=&s->people[id];o->active=o->owned=1;o->address=p;o->busy=word(b+0x196)!=0;o->protected_job=jobs[id]||reserved[id];
+  for(int c=1;c<52;c++)if(home[c]&&word(b+0x11a)==home[c])o->city=c;
+  wchar_t first[20],last[20];name(first,20,b+0x12,9);name(last,20,b+0x24,9);swprintf(o->name,40,L"%ls%ls",first,last);
+  for(int k=0;k<5;k++){o->ability[k]=effective((void*)p,k,0xfff);if(o->ability[k]<0||o->ability[k]>1000){wcscpy(why,L"自势力武将有效能力超出核对范围。");return 0;}}
  }
  /* Incumbents outside the eligible list remain protected, with effective
     before-values still displayed. Do not infer eligibility from raw stats. */
@@ -255,6 +270,7 @@ void s14_domestic_service(void *state){
 }
 void s14_domestic_auto_configure(int on){AcquireSRWLockExclusive(&lock);if(on&&!automatic){auto_fault=0;wcscpy(auto_message,L"自动补齐已开启：确认进行时先补内政，再派遣探索。");}if(!on&&automatic)wcscpy(auto_message,L"自动补齐关闭；手动配置仍可使用。");automatic=!!on;ReleaseSRWLockExclusive(&lock);}
 void s14_domestic_preferences(const S14DOptions *o){if(!o)return;AcquireSRWLockExclusive(&lock);auto_preferences=*o;auto_preferences.mode=S14_D_FILL;auto_preferences.city=0;pref_epoch=s14_battle_session_epoch();ReleaseSRWLockExclusive(&lock);}
+int s14_domestic_preferences_read(S14DOptions *o){AcquireSRWLockShared(&lock);int ok=o&&pref_epoch==s14_battle_session_epoch();if(ok)*o=auto_preferences;ReleaseSRWLockShared(&lock);return ok;}
 unsigned s14_domestic_revision(void){return (unsigned)InterlockedCompareExchange(&revision,0,0);}
 void s14_domestic_auto_status(wchar_t *out,size_t n){if(!out||!n)return;AcquireSRWLockShared(&lock);wcsncpy(out,auto_message,n-1);out[n-1]=0;ReleaseSRWLockShared(&lock);}
 int s14_domestic_search_allowed(int person){AcquireSRWLockShared(&lock);int ok=person>0&&person<6001&&(!automatic||!auto_reserved[person]);ReleaseSRWLockShared(&lock);return ok;}
@@ -262,7 +278,7 @@ int s14_domestic_auto_turn(void *state,uintptr_t world,int day,int force){
  AcquireSRWLockExclusive(&lock);if(!automatic||!enabled||!ready||!execution_enabled){ReleaseSRWLockExclusive(&lock);return 1;}
  unsigned epoch=s14_battle_session_epoch();if(s14_battle_is_loading()||!world||day<0||force<1||force>51){ReleaseSRWLockExclusive(&lock);return 0;}
  if(epoch!=auto_epoch||world!=auto_world||force!=auto_force||day<auto_day){auto_epoch=epoch;auto_world=world;auto_force=force;auto_day=-1;auto_fault=0;memset(auto_reserved,0,sizeof(auto_reserved));}
- if(pref_epoch!=epoch){memset(&auto_preferences,0,sizeof(auto_preferences));auto_preferences.policy=S14_D_MAX_DEVELOPMENT;auto_preferences.security_first=1;pref_epoch=epoch;}
+ if(pref_epoch!=epoch){memset(auto_preferences.locked,0,sizeof(auto_preferences.locked));memset(auto_preferences.excluded,0,sizeof(auto_preferences.excluded));if(!auto_preferences.policy){auto_preferences.policy=S14_D_MAX_DEVELOPMENT;auto_preferences.security_first=1;}pref_epoch=epoch;}
  if(auto_fault){ReleaseSRWLockExclusive(&lock);return 0;}if(auto_day==day){int ok=auto_search_ok;ReleaseSRWLockExclusive(&lock);return ok;}
  if(operation||busy){wcscpy(auto_message,L"手动请求正在处理，本轮先保留内政；探索暂不派遣。");ReleaseSRWLockExclusive(&lock);return 0;}
  int phase=-1;if(!state||!get((uintptr_t)state+0x470,&phase,4)||phase<0||phase>2){wcscpy(auto_message,L"本轮未处于已验证的战略阶段，未自动任命。");ReleaseSRWLockExclusive(&lock);return 0;}
@@ -272,3 +288,12 @@ int s14_domestic_auto_turn(void *state,uintptr_t world,int day,int force){
  AcquireSRWLockExclusive(&lock);
  int ok=auto_search_ok;ReleaseSRWLockExclusive(&lock);return ok;
 }
+void s14_domestic_progress(uintptr_t world,int day,int force){
+ AcquireSRWLockExclusive(&lock);quick_world=world;quick_day=day;quick_force=force;quick_epoch=s14_battle_session_epoch();quick_armed=world&&day>=0&&force>0;quick_pending=0;ReleaseSRWLockExclusive(&lock);
+}
+void s14_domestic_planning(uintptr_t world,int day,int force){
+ AcquireSRWLockExclusive(&lock);if(s14_battle_is_loading()||quick_epoch!=s14_battle_session_epoch()||quick_world!=world||quick_force!=force){quick_armed=quick_pending=0;}
+ else if(quick_armed&&day>quick_day){quick_pending=1;quick_armed=0;}ReleaseSRWLockExclusive(&lock);
+}
+int s14_domestic_quick_pending(void){AcquireSRWLockShared(&lock);int ok=quick_pending&&!s14_battle_is_loading()&&quick_epoch==s14_battle_session_epoch();ReleaseSRWLockShared(&lock);return ok;}
+void s14_domestic_quick_ack(void){AcquireSRWLockExclusive(&lock);quick_pending=0;ReleaseSRWLockExclusive(&lock);}

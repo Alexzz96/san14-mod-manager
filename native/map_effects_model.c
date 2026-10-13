@@ -44,6 +44,7 @@ static int scene_read(Reader *r,uintptr_t base,S14MapScene *s){
 static int scene_stable(Reader *r,uintptr_t base,const S14MapScene *s){
     S14MapScene again;return scene_read(r,base,&again) && again.main_map && !memcmp(s,&again,sizeof(again));
 }
+int s14_map_main_scene(S14OfficerRead read,void *context,uintptr_t base){if(!read||!base)return 0;S14MapFrame f={0};Reader r={read,context,&f};return scene_read(&r,base,&f.scene)&&f.scene.main_map&&scene_stable(&r,base,&f.scene);}
 static int header(Reader *r,uintptr_t at,uintptr_t vt,unsigned char *b){return get(r,at,b,72) && ptr(b)==vt;}
 static int visible(const unsigned char *b){return (word(b+0x40)&3)==3;}
 static int discover(Reader *r,uintptr_t base,S14MapCache *c){
@@ -87,6 +88,14 @@ static int node_geometry(Reader *r,uintptr_t layout,int index,RECT *out,float *c
     if(circle){circle[0]=x+w*sx*.5f;circle[1]=y+h*sy*.5f;circle[2]=w*sx*.5f;circle[3]=h*sy*.5f;}return 1;
 }
 static int node_rect(Reader *r,uintptr_t layout,int index,RECT *out){return node_geometry(r,layout,index,out,NULL);}
+int s14_map_ammo_rect(S14OfficerRead read,void *ctx,const S14MapFrame *frame,RECT *out){
+ if(!read||!frame||!frame->root||!out||!frame->scene.main_map)return 0;S14MapFrame f={0};Reader r={read,ctx,&f};RECT morale;
+ /* Slot 87 is the current transformed 60x8 morale frame, observed on the
+    stock map marker. Reject stale/local template geometry during camera moves. */
+ if(!node_rect(&r,frame->root,87,&morale)||morale.right-morale.left<40||morale.right-morale.left>100||morale.bottom-morale.top<4||morale.bottom-morale.top>12||
+    abs((morale.left+morale.right)/2-(frame->portrait.left+frame->portrait.right)/2)>60||morale.top<frame->portrait.bottom||morale.top>frame->portrait.bottom+70)return 0;
+ *out=(RECT){morale.left,morale.bottom+3,morale.right,morale.bottom+9};return out->left>=0&&out->right<=1920&&out->top>=0&&out->bottom<=1080;
+}
 static int live_army(Reader *r,uintptr_t base,uintptr_t world,uintptr_t army,int *id,unsigned char *identity){
     unsigned char b[32];uintptr_t pool=0,canonical=0;
     if(!get(r,army,b,32) || ptr(b)!=base+0x123e288 || b[0x10]!=1 || (half(b+0x12)<1 || half(b+0x12)>6000) || !half(b+0x16) ||

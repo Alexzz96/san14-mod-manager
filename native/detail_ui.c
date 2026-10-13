@@ -1,5 +1,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include "detail_ui.h"
+#include "basic_stats_ui.h"
 #include "theme.h"
 #include <wchar.h>
 #include <stdio.h>
@@ -54,11 +55,14 @@ void s14_detail_tick(S14DetailUI *ui,HINSTANCE instance,HWND owner,uintptr_t bas
     if(ui->base!=base) {ui->base=base;ui->ready=s14_detail_validate(memory,NULL,base);}
     if(!ui->ready) {hide(ui);return;}
     S14DetailFrame frame;if(!s14_detail_capture(memory,NULL,base,&frame)) {hide(ui);return;}
+    ui->frame=frame;memset(&ui->stats,0,sizeof(ui->stats));ui->incomplete=ui->bound=0;
+    ui->connected=s14_stats_row(frame.world,frame.officer_id,&ui->stats,&ui->incomplete,&ui->bound);
+    S14MeritAccount merit={0};int merit_ready=s14_merit_row(frame.world,frame.officer_id,&merit);
+    s14_basic_stats_publish(frame.basic_page,frame.person,frame.world,&ui->stats,ui->connected&&merit_ready,ui->incomplete,ui->bound,merit.earned-merit.spent);
+    if(s14_basic_stats_embedded(frame.basic_page,frame.person)){hide(ui);return;}
     RECT client,bar;POINT origin={0};int scale;
     if(!GetClientRect(owner,&client) || !ClientToScreen(owner,&origin) || !s14_detail_rect(&frame.panel,client.right,client.bottom,&bar,&scale) || !fonts(ui,scale)) {hide(ui);return;}
     if(!ui->window && !create(ui,instance,owner)) return;
-    ui->frame=frame;memset(&ui->stats,0,sizeof(ui->stats));ui->incomplete=ui->bound=0;
-    ui->connected=s14_stats_row(frame.world,frame.officer_id,&ui->stats,&ui->incomplete,&ui->bound);
     int width=bar.right-bar.left,height=bar.bottom-bar.top;
     if(width!=ui->width || height!=ui->height) {ui->width=width;ui->height=height;HRGN region=CreateRoundRectRgn(0,0,width+1,height+1,px(ui,10),px(ui,10));if(region && !SetWindowRgn(ui->window,region,FALSE)) DeleteObject(region);}
     ui->shown=SetWindowPos(ui->window,HWND_TOPMOST,origin.x+bar.left,origin.y+bar.top,width,height,SWP_NOACTIVATE|SWP_SHOWWINDOW)!=0;

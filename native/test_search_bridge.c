@@ -6,6 +6,8 @@
 #error "Native verification requires assertions enabled"
 #endif
 static int domestic_callbacks;
+void s14_domestic_progress(uintptr_t w,int d,int f){(void)w;(void)d;(void)f;}
+void s14_domestic_planning(uintptr_t w,int d,int f){(void)w;(void)d;(void)f;}
 void s14_domestic_service(void *state){(void)state;domestic_callbacks++;}
 static uintptr_t update_without_search(void *state,void *arg){(void)state;(void)arg;return 314;}
 #include "auto_search.c"

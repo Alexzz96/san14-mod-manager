@@ -44,5 +44,30 @@ int main(void){
  o.security_first=1;assert(s14_domestic_select_budget(&s,&o,&p)==2&&!p.rows[0].selected&&!p.rows[1].selected&&p.rows[2].selected&&p.rows[3].selected);assert(s14_domestic_budget(&s,&p,&n,&c,&l)&&n==2&&c==4&&l==0);
  s.cities[1].balance=4;assert(s14_domestic_select_budget(&s,&o,&p)==3&&p.rows[0].selected&&p.rows[1].selected&&!p.rows[2].selected&&p.rows[3].selected);
  o.security_first=0;assert(s14_domestic_select_budget(&s,&o,&p)==2&&p.rows[2].selected&&p.rows[3].selected);s.unit_cost=0;assert(s14_domestic_select_budget(&s,&o,&p)==4);
- printf("{\"maximum_weight_bruteforce_cases\":600,\"native_gain_cases\":300,\"three_development_policies\":true,\"security_priority\":true,\"gain_over_ability\":true,\"fill\":true,\"shortage\":true,\"directions\":true,\"retention\":true,\"stable_ties\":true,\"protected_jobs\":true,\"excluded\":true,\"locks\":true,\"swap_groups\":true,\"city_scope\":true,\"budget\":true,\"automatic_partial_budget\":true,\"budget_preserves_linked_groups\":true,\"budget_account_isolation\":true}\n");return 0;
+
+ /* Installation preferences: inclusive threshold, explicit exemptions and veto. */
+ setup(1);person(1,99,99,99);person(2,10,10,10);s.people[1].ability[0]=80;s.people[2].ability[0]=79;
+ o.leadership_enabled=1;o.leadership_min=80;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==2);
+ o.whitelist[1]=1;o.excluded[1]=1;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==1);
+ o.blacklist[1]=1;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==2);o.blacklist[1]=0;s.people[1].busy=1;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==2);
+ s.people[1].busy=0;s.people[1].protected_job=1;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==2);
+ s.people[1].protected_job=0;s.people[1].city=2;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==2);o.leadership_min=1001;assert(!s14_domestic_plan(&s,&o,&p));
+ setup(1);person(1,100,100,100);person(2,1,1,1);o.whitelist[2]=1;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==2); /* Extra priority, not whitelist-only. */
+ s.areas[1].officer=1;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==2&&p.rows[0].selected);o.locked[1]=1;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==1&&!p.rows[0].selected);o.locked[1]=0;
+ o.blacklist[2]=1;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==1);
+ setup(1);person(1,60,60,60);person(2,50,50,50);s.areas[1].officer=1;o.blacklist[1]=1;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==2);
+ /* Full projects advance on existing officers without optimizing/replacing them. */
+ setup(1);person(1,80,80,80);forecasts_fixture(1,1);s.areas[1].officer=1;o.policy=S14_D_COMMERCIAL_FIRST;
+ s.areas[1].development[0]=999;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].project==1&&!p.rows[0].selected);
+ s.areas[1].project=2;s.areas[1].development[0]=500;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].project==1&&p.rows[0].selected);s.areas[1].project=1;
+ s.areas[1].development[0]=1000;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].after==1&&p.rows[0].project==2&&p.rows[0].selected);
+ s.areas[1].project=2;s.areas[1].development[1]=1000;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].project==3&&p.rows[0].selected);
+ s.areas[1].project=3;s.areas[1].development[2]=1000;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].project==3&&!p.rows[0].selected);
+ s.areas[1].development[0]=500;s.areas[1].development[2]=500;o.policy=S14_D_AGRICULTURAL_FIRST;s.areas[1].project=2;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].project==1);
+ o.locked[1]=1;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].project==2&&!p.rows[0].selected);o.locked[1]=0;s.people[1].busy=1;assert(s14_domestic_plan(&s,&o,&p)&&p.rows[0].project==2&&!p.rows[0].selected);
+ /* Budget trimming reserves affordable preferred assignments first. */
+ setup(2);s.cities[1].balance=2;o.whitelist[2]=1;memset(&p,0,sizeof(p));p.valid=1;p.count=2;
+ p.rows[0]=(S14DRow){.area=1,.city=1,.after=1,.group=0,.reason=S14_D_CHANGE,.after_gain=100};p.rows[1]=(S14DRow){.area=2,.city=1,.after=2,.group=1,.reason=S14_D_CHANGE,.after_gain=1};
+ assert(s14_domestic_select_budget(&s,&o,&p)==1&&!p.rows[0].selected&&p.rows[1].selected);
+ printf("{\"sequential_project_caps\":true,\"inclusive_leadership_threshold\":true,\"whitelist_exemption_priority\":true,\"blacklist_veto\":true,\"preferred_budget_group\":true,\"maximum_weight_bruteforce_cases\":600,\"native_gain_cases\":300,\"three_development_policies\":true,\"security_priority\":true,\"gain_over_ability\":true,\"fill\":true,\"shortage\":true,\"directions\":true,\"retention\":true,\"stable_ties\":true,\"protected_jobs\":true,\"excluded\":true,\"locks\":true,\"swap_groups\":true,\"city_scope\":true,\"budget\":true,\"automatic_partial_budget\":true,\"budget_preserves_linked_groups\":true,\"budget_account_isolation\":true}\n");return 0;
 }

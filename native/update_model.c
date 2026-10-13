@@ -53,13 +53,17 @@ static int text(Parser *p,int id,char *out,size_t cap){
         if(c<32 || c>126 || j+1>=cap)return 0;out[j++]=(char)c;}out[j]=0;return 1;
 }
 static int false_value(Parser *p,int id){return id>=0 && p->t[id].end-p->t[id].start==5 && !memcmp(p->s+p->t[id].start,"false",5);}
-static int version(const char *s,unsigned int a[3]){
+static int version(const char *s,unsigned int a[5]){
     if(*s=='v')s++;for(int i=0;i<3;i++){if(!isdigit((unsigned char)*s))return 0;unsigned int n=0;int digits=0;
         do{if(++digits>5)return 0;n=n*10+(*s++-'0');}while(isdigit((unsigned char)*s));a[i]=n;
-        if(i<2 && *s++!='.')return 0;}return !*s;
+        if(i<2 && *s++!='.')return 0;}
+    a[3]=1;a[4]=0;if(!*s)return 1;
+    if(strncmp(s,"-dev.",5))return 0;s+=5;a[3]=0;int digits=0;
+    if(!isdigit((unsigned char)*s))return 0;
+    do{if(++digits>5)return 0;a[4]=a[4]*10+(*s++-'0');}while(isdigit((unsigned char)*s));return !*s;
 }
-int s14_version_compare(const char *l,const char *r,int *c){unsigned int a[3],b[3];if(!l||!r||!c||!version(l,a)||!version(r,b))return 0;
-    *c=0;for(int i=0;i<3;i++)if(a[i]!=b[i]){*c=a[i]>b[i]?1:-1;break;}return 1;}
+int s14_version_compare(const char *l,const char *r,int *c){unsigned int a[5],b[5];if(!l||!r||!c||!version(l,a)||!version(r,b))return 0;
+    *c=0;for(int i=0;i<5;i++)if(a[i]!=b[i]){*c=a[i]>b[i]?1:-1;break;}return 1;}
 int s14_release_parse(const char *json,size_t size,const char *current,S14Release *out){
     if(!json||!out||!current||!size||size>1048576)return 0;
     Token *tokens=calloc(8192,sizeof(*tokens));if(!tokens)return 0;Parser p={json,size,0,tokens,0};int ok=0;

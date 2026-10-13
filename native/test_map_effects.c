@@ -64,6 +64,11 @@ int main(int argc,char **argv){
     REQUIRE(f.portrait.left==790 && f.portrait.top==589 && f.portrait.right==854 && f.card.left==244 && f.card.top==500);
     S14MapFrame binding=f,present;float *face_matrix=(void*)(uintptr_t)(*(uintptr_t*)(face2+0xe0));
     REQUIRE(binding.sampled_at==1 && binding.registry_table==(uintptr_t)table && binding.detail_handle==(uintptr_t)detail_handle);
+    void **marker_nodes=alloc(90*8);unsigned char *morale=node(60,8,-162,-121,NULL);marker_nodes[87]=morale;putptr(root,0x130,marker_nodes);putword(root,0x138,90);
+    RECT ammo_rect;REQUIRE(s14_map_ammo_rect(read_memory,NULL,&binding,&ammo_rect)&&ammo_rect.left==798&&ammo_rect.top==672&&ammo_rect.bottom==678);
+    /* Native local template transforms are rejected, as are unreadable slots. */
+    float *morale_matrix=(void*)(uintptr_t)(*(uintptr_t*)(morale+0xe8));morale_matrix[12]=-951;REQUIRE(!s14_map_ammo_rect(read_memory,NULL,&binding,&ammo_rect));morale_matrix[12]=-162;
+    putword(root,0x138,3);REQUIRE(!s14_map_ammo_rect(read_memory,NULL,&binding,&ammo_rect));putword(root,0x138,90);
     // Menus can change between capture and Present, before the worker discovers
     // the new dialog object. The context guard must work with empty modal caches.
     const uintptr_t no_dialogs[2]={0,0};putword(detail_handle,0,23);
